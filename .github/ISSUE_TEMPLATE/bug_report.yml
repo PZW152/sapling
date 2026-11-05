@@ -1,0 +1,24 @@
+name: 回報問題
+description: Sapling Launcher 出現錯誤或不正常的行為
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 發生了什麼
+      description: 你做了什麼，結果看到什麼，原本預期看到什麼。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 啟動器和遊戲版本
+      placeholder: 例如 Sapling 0.1.0、Minecraft 26.3
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: 錯誤訊息或遊戲日誌
+      description: 貼上前請確認內容沒有帳號或其他私人資料。
+      render: text
