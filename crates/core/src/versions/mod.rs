@@ -1,9 +1,14 @@
 //! 版本清單：從 Mojang 取得所有 Minecraft 版本，並篩選出 v1 支援的正式版。
 
+pub mod details;
+pub mod rules;
+
 use std::time::Duration;
 
 use serde::Deserialize;
 use thiserror::Error;
+
+use details::VersionDetails;
 
 const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 
@@ -17,9 +22,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Error)]
 pub enum VersionsError {
-    #[error("無法取得版本清單，請檢查網絡連線後再試一次")]
+    #[error("無法取得版本資料，請檢查網絡連線後再試一次")]
     Network(#[from] reqwest::Error),
-    #[error("版本清單的格式看不懂，可能是 Mojang 改了格式")]
+    #[error("版本資料的格式看不懂，可能是 Mojang 改了格式")]
     Parse(#[from] serde_json::Error),
     #[error("版本清單裡找不到 {OLDEST_SUPPORTED_RELEASE}，無法判斷哪些版本受支援")]
     MissingOldestSupported,
@@ -80,17 +85,26 @@ impl VersionManifest {
 
 /// 從 Mojang 下載並解析版本清單。
 pub async fn fetch_manifest() -> Result<VersionManifest, VersionsError> {
+    VersionManifest::parse(&fetch_text(MANIFEST_URL).await?)
+}
+
+/// 下載並解析單個版本的版本 JSON。
+pub async fn fetch_details(entry: &VersionEntry) -> Result<VersionDetails, VersionsError> {
+    VersionDetails::parse(&fetch_text(&entry.url).await?)
+}
+
+async fn fetch_text(url: &str) -> Result<String, VersionsError> {
     let client = reqwest::Client::builder()
         .timeout(REQUEST_TIMEOUT)
         .build()?;
     let body = client
-        .get(MANIFEST_URL)
+        .get(url)
         .send()
         .await?
         .error_for_status()?
         .text()
         .await?;
-    VersionManifest::parse(&body)
+    Ok(body)
 }
 
 #[cfg(test)]
