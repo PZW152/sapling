@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "../../shell/AppContext";
+import { useSlideMark, useTween } from "../../shell/motion";
 import { overallProgress, toMegabytes } from "../../shell/progress";
-import type { LaunchEvent, Profile, Progress } from "../../shell/types";
+import type { Instance, LaunchEvent, Profile, Progress } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
 import { LogPanel } from "./LogPanel";
 
@@ -13,7 +15,7 @@ const MAX_LOG_LINES = 2000;
 type Phase = "idle" | "preparing" | "running" | "failed";
 
 export function LaunchPage() {
-  const { instances, selected, listError, selectInstance, goTo, loadVersions } = useApp();
+  const { instances, selected, listError, selectInstance, goTo, loadVersions, isEnabled } = useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -59,16 +61,39 @@ export function LaunchPage() {
     setProgress(null);
   }
 
-  const overall = overallProgress(progress);
-  const preparing = phase === "preparing";
-  const busy = preparing || phase === "running";
+  const busy = phase === "preparing" || phase === "running";
   const noInstance = instances.length === 0;
 
   return (
     <div className="launch">
-      <aside className="side">
-        <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
-        <div className="side-launch">
+      <section className={`hero ${phase}`}>
+        <p className="motto" aria-hidden="true">
+          天下為公
+        </p>
+        {noInstance ? (
+          <div className="hero-top">
+            <p className="hero-name">歡迎使用 Sapling</p>
+            <p className="hero-welcome">兩步就能開始玩</p>
+          </div>
+        ) : (
+          <div className="hero-top">
+            <p className="hero-name" key={selected?.id}>
+              {selected?.name}，原版
+            </p>
+            <VersionNumber version={selected?.version ?? ""} />
+          </div>
+        )}
+
+        <div className="hero-bottom">
+          <HeroStatus
+            phase={phase}
+            progress={progress}
+            error={error}
+            signedIn={profile !== null}
+            noInstance={noInstance}
+            hasLogs={logs.length > 0}
+            onShowLogs={() => setLogOpen(true)}
+          />
           {noInstance ? (
             <button className="primary" onClick={() => goTo("download")}>
               前往下載
@@ -79,74 +104,108 @@ export function LaunchPage() {
               disabled={!selected || !profile || busy}
               onClick={startGame}
             >
-              <span>{launchLabel(phase)}</span>
-              <small>{selected?.name}</small>
+              <span key={phase} className="primary-label">
+                {launchLabel(phase)}
+              </span>
             </button>
           )}
         </div>
+
+        {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
+      </section>
+
+      <aside className="side">
+        <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
+        <InstanceList
+          instances={instances}
+          selected={selected}
+          disabled={busy}
+          error={listError}
+          canManage={isEnabled("instances")}
+          onManage={() => goTo("instances")}
+          onRetry={loadVersions}
+          onChoose={choose}
+        />
       </aside>
-
-      <div className="cards">
-        <section className="panel">
-          <h2 className="card-title">目前實例</h2>
-          <p className="current-name">{selected ? `Minecraft ${selected.version}` : "還沒有實例"}</p>
-          <StatusLine
-            phase={phase}
-            progress={progress}
-            error={error}
-            percent={overall}
-            signedIn={profile !== null}
-            noInstance={noInstance}
-          />
-          {preparing && (
-            <div
-              className="progress"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(overall * 100)}
-            >
-              <div style={{ transform: `scaleX(${overall})` }} />
-            </div>
-          )}
-          {phase === "failed" && logs.length > 0 && (
-            <button className="text-button" onClick={() => setLogOpen(true)}>
-              查看問題記錄
-            </button>
-          )}
-        </section>
-
-        <section className="panel instance-card">
-          <h2 className="card-title">我的實例</h2>
-          {listError && (
-            <div className="inline-error">
-              <p className="error">{listError}</p>
-              <button className="text-button" onClick={loadVersions}>
-                重試
-              </button>
-            </div>
-          )}
-          {noInstance && !listError && <p className="status">到下載頁下載一個版本，就會出現在這裡。</p>}
-          <ul className="row-list">
-            {instances.map((instance) => (
-              <li key={instance.id}>
-                <button
-                  className="row"
-                  disabled={busy}
-                  aria-current={instance.id === selected?.id ? "true" : undefined}
-                  onClick={() => choose(instance.id)}
-                >
-                  <span>{instance.name}</span>
-                  <small>{instance.version}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
     </div>
+  );
+}
+
+/** 版本號換掉時，只有變動的字元彈入。 */
+function VersionNumber({ version }: { version: string }) {
+  return (
+    <h2 className="version-number" aria-label={version}>
+      {[...version].map((character, index) => (
+        <span
+          key={`${index}-${character}`}
+          className="digit"
+          aria-hidden="true"
+          style={{ "--i": index } as CSSProperties}
+        >
+          {character}
+        </span>
+      ))}
+    </h2>
+  );
+}
+
+function InstanceList({
+  instances,
+  selected,
+  disabled,
+  error,
+  canManage,
+  onManage,
+  onRetry,
+  onChoose,
+}: {
+  instances: Instance[];
+  selected: Instance | null;
+  disabled: boolean;
+  error: string | null;
+  canManage: boolean;
+  onManage: () => void;
+  onRetry: () => void;
+  onChoose: (id: string) => void;
+}) {
+  const list = useSlideMark<HTMLUListElement>(`${selected?.id}-${instances.length}`);
+
+  return (
+    <section className="panel instance-tile">
+      <div className="head">
+        <h2 className="label">實例</h2>
+        {canManage && instances.length > 0 && (
+          <button className="text-button" onClick={onManage}>
+            管理
+          </button>
+        )}
+      </div>
+      {error && (
+        <>
+          <p className="error">{error}</p>
+          <button className="text-button" onClick={onRetry}>
+            重試
+          </button>
+        </>
+      )}
+      {instances.length === 0 && !error && <p className="hint">下載好的版本會出現在這裡。</p>}
+      <ul className="row-list" ref={list}>
+        <span className="slide-mark row-mark" />
+        {instances.map((instance) => (
+          <li key={instance.id}>
+            <button
+              className="row"
+              disabled={disabled}
+              aria-current={instance.id === selected?.id ? "true" : undefined}
+              onClick={() => onChoose(instance.id)}
+            >
+              <span>{instance.name}</span>
+              <small>{instance.version}</small>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -154,47 +213,72 @@ function launchLabel(phase: Phase) {
   if (phase === "preparing") {
     return "準備中";
   }
-  return phase === "running" ? "遊戲運行中" : "啟動遊戲";
+  if (phase === "running") {
+    return "遊戲運行中";
+  }
+  return phase === "failed" ? "再試一次" : "啟動遊戲";
 }
 
-function StatusLine({
+function HeroStatus({
   phase,
   progress,
   error,
-  percent,
   signedIn,
   noInstance,
+  hasLogs,
+  onShowLogs,
 }: {
   phase: Phase;
   progress: Progress | null;
   error: string;
-  percent: number;
   signedIn: boolean;
   noInstance: boolean;
+  hasLogs: boolean;
+  onShowLogs: () => void;
 }) {
+  const percent = useTween(overallProgress(progress) * 100);
+
   if (phase === "failed") {
-    return <p className="status-error">{error}</p>;
-  }
-  if (phase === "running") {
-    return <p className="status">遊戲已啟動，關閉遊戲後可以再次啟動。</p>;
-  }
-  if (phase === "preparing") {
-    if (!progress) {
-      return <p className="status">正在確認需要哪些檔案</p>;
-    }
-    const what = progress.stage === "game" ? "遊戲檔案" : "Java";
     return (
-      <p className="status status-row">
-        <span>
-          正在檢查{what}：{toMegabytes(progress.finishedBytes)} /{" "}
-          {toMegabytes(progress.totalBytes)} MB
-        </span>
-        <span>{Math.round(percent * 100)}%</span>
-      </p>
+      <div className="hero-error">
+        <p>{error}</p>
+        {hasLogs && (
+          <button className="text-button" onClick={onShowLogs}>
+            查看問題記錄
+          </button>
+        )}
+      </div>
     );
   }
-  if (noInstance) {
-    return <p className="status">先下載一個遊戲版本。</p>;
+  if (phase === "preparing") {
+    const what = progress?.stage === "java" ? "Java" : "遊戲檔案";
+    return (
+      <div className="hero-progress">
+        <p className="hero-note status-row">
+          <span>
+            {progress
+              ? `正在檢查${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB`
+              : "正在確認需要哪些檔案"}
+          </span>
+          <span>{Math.round(percent)}%</span>
+        </p>
+        <div
+          className="hero-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(percent)}
+        >
+          <div style={{ transform: `scaleX(${percent / 100})` }} />
+        </div>
+      </div>
+    );
   }
-  return <p className="status">{signedIn ? "準備好就開始吧。" : "登入微軟帳號後就能啟動遊戲。"}</p>;
+  if (phase === "running") {
+    return <p className="hero-note">遊戲已啟動，關閉遊戲後可以再次啟動。</p>;
+  }
+  if (noInstance) {
+    return <p className="hero-note">下載一個遊戲版本，再登入微軟帳號。</p>;
+  }
+  return signedIn ? null : <p className="hero-note">登入微軟帳號後就能啟動遊戲。</p>;
 }

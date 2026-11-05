@@ -53,8 +53,8 @@ export function AccountPanel({
 
   if (code) {
     return (
-      <section className="account">
-        <h2>在瀏覽器輸入代碼</h2>
+      <section className="panel account">
+        <h2 className="label">在瀏覽器輸入代碼</h2>
         <button
           className="login-code"
           aria-label="複製登入代碼"
@@ -62,27 +62,38 @@ export function AccountPanel({
         >
           {code.userCode}
         </button>
-        <p>{copied ? "代碼已複製，貼到瀏覽器的登入頁面。" : "按上面的代碼可以複製。"}</p>
-        <p>沒看到登入頁面的話，請前往 {code.verificationUri}</p>
-        <p className="waiting">正在等待你完成登入</p>
+        <p className="hint">{copied ? "代碼已複製，貼到登入頁面。" : "按上面的代碼可以複製。"}</p>
+        <p className="hint">沒看到頁面的話，請前往 {code.verificationUri}</p>
+        <p className="hint waiting">正在等待你完成登入</p>
+      </section>
+    );
+  }
+
+  if (profile) {
+    return (
+      <section className="panel account">
+        <div className="me">
+          <Avatar skinUrl={profile.skinUrl} />
+          <div className="me-text">
+            <strong>{profile.name}</strong>
+            <small>正版帳號</small>
+          </div>
+          <button className="text-button" disabled={disabled} onClick={signOut}>
+            登出
+          </button>
+        </div>
+        {error && <p className="error">{error}</p>}
       </section>
     );
   }
 
   return (
-    <section className="account">
-      <Avatar skinUrl={profile?.skinUrl ?? null} />
-      <h2>{profile?.name ?? (restoring ? "正在恢復登入" : "尚未登入")}</h2>
-      <p>{profile ? "正版帳號" : "需要正版微軟帳號"}</p>
-      {profile ? (
-        <button className="secondary" disabled={disabled} onClick={signOut}>
-          登出
-        </button>
-      ) : (
-        <button className="secondary" disabled={restoring || starting} onClick={signIn}>
-          {starting ? "正在取得代碼" : "用微軟帳號登入"}
-        </button>
-      )}
+    <section className="panel account">
+      <h2 className="label">帳號</h2>
+      <p className="hint">{restoring ? "正在恢復登入" : "需要正版微軟帳號才能進入遊戲。"}</p>
+      <button className="secondary strong" disabled={restoring || starting} onClick={signIn}>
+        {starting ? "正在取得代碼" : "用微軟帳號登入"}
+      </button>
       {error && <p className="error">{error}</p>}
     </section>
   );
@@ -98,18 +109,13 @@ async function copyText(text: string) {
 }
 
 function Avatar({ skinUrl }: { skinUrl: string | null }) {
-  if (skinUrl) {
-    return (
-      <div className="skin-head" aria-hidden="true">
-        <span className="skin-face" style={{ backgroundImage: `url(${skinUrl})` }} />
-        <span className="skin-hat" style={{ backgroundImage: `url(${skinUrl})` }} />
-      </div>
-    );
+  if (!skinUrl) {
+    return <div className="skin-head" aria-hidden="true" />;
   }
   return (
-    <svg className="avatar" viewBox="0 0 56 56" aria-hidden="true">
-      <circle cx="28" cy="22" r="10" />
-      <path d="M10 56c0-13 8-20 18-20s18 7 18 20z" />
-    </svg>
+    <div className="skin-head" aria-hidden="true">
+      <span className="skin-face" style={{ backgroundImage: `url(${skinUrl})` }} />
+      <span className="skin-hat" style={{ backgroundImage: `url(${skinUrl})` }} />
+    </div>
   );
 }

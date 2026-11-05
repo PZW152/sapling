@@ -61,5 +61,5 @@ export const about: Feature = {
   name: "關於",
   description: "版本資訊和連結",
   optional: false,
-  tab: { label: "更多", Page: AboutPage },
+  tab: { label: "更多", Page: AboutPage, pinned: true },
 };

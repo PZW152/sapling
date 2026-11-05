@@ -14,6 +14,8 @@ export type Feature = {
     Page: ComponentType;
     /** 切換分頁時保留狀態，不卸載頁面。 */
     keepAlive?: boolean;
+    /** 固定在側欄底部。 */
+    pinned?: boolean;
   };
   /** 放進設定頁的區塊。 */
   Settings?: ComponentType;
