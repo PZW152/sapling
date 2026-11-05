@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sapling",
+  "productName": "Sapling Launcher",
   "version": "0.1.0",
   "identifier": "io.github.pzw152.sapling",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Sapling",
+        "title": "Sapling Launcher",
         "width": 1000,
         "height": 640,
         "minWidth": 860,
