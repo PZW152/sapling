@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -93,7 +94,10 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={{ "--scene": TABS.findIndex(({ id }) => id === tab) } as CSSProperties}
+    >
       <svg className="hills" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
         <path className="hill-back" d="M0 170C190 130 430 190 800 40V220H0Z" />
         <path className="hill-front" d="M0 196C260 180 520 200 800 110V220H0Z" />

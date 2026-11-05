@@ -22,11 +22,12 @@
   --color-close: #c4483a;
 
   /* 圓角 */
-  --radius-small: 8px;
-  --radius-medium: 12px;
+  --radius-pill: 999px;
   /* Sapling 的招牌：對角葉形圓角。 */
   --radius-leaf: 4px 22px 4px 22px;
   --radius-leaf-small: 3px 12px 3px 12px;
+  --radius-leaf-flip: 22px 4px 22px 4px;
+  --radius-leaf-small-flip: 12px 3px 12px 3px;
 
   /* 間距 */
   --space-1: 4px;
@@ -54,9 +55,13 @@
 
   /* 動效 */
   --ease: cubic-bezier(0.22, 0.8, 0.28, 1);
-  --duration-quick: 140ms;
-  --duration-grow: 360ms;
+  --spring: linear(0, 0.2 5%, 0.6 13%, 0.9 22%, 1.05 32%, 1.08 40%, 1.03 55%, 0.995 70%, 1);
+  --duration-quick: 160ms;
+  --duration-grow: 420ms;
   --duration-intro: 900ms;
+  --duration-scene: 800ms;
+  --stagger: 45ms;
+  --breeze: 7s;
 
   /* 字體 */
   --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
@@ -105,6 +110,19 @@ button {
   background: none;
 }
 
+button {
+  transition:
+    transform var(--duration-quick) var(--ease),
+    background-color var(--duration-quick) var(--ease),
+    color var(--duration-quick) var(--ease),
+    box-shadow var(--duration-quick) var(--ease),
+    border-radius var(--duration-grow) var(--ease);
+}
+
+button:active:enabled {
+  transform: scale(0.97);
+}
+
 button:disabled {
   cursor: default;
 }
@@ -126,19 +144,25 @@ button:disabled {
 /* 所有分頁共用的山丘。 */
 .hills {
   position: absolute;
-  right: 0;
   bottom: 0;
-  left: 0;
-  width: 100%;
+  left: -8%;
+  width: 116%;
   height: 36%;
+}
+
+.hill-back,
+.hill-front {
+  transition: transform var(--duration-scene) var(--ease);
 }
 
 .hill-back {
   fill: var(--color-hill-back);
+  transform: translateX(calc(var(--scene) * -10px));
 }
 
 .hill-front {
   fill: var(--color-hill-front);
+  transform: translateX(calc(var(--scene) * -22px));
 }
 
 /* 標題列 */
@@ -180,14 +204,13 @@ button:disabled {
   border-radius: var(--radius-leaf-small);
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
-  transition: transform var(--duration-grow) var(--ease);
+  transition: transform var(--duration-grow) var(--spring);
 }
 
 .tab {
   position: relative;
   height: 32px;
   color: var(--color-muted);
-  transition: color var(--duration-quick) var(--ease);
 }
 
 .tab:hover {
@@ -211,9 +234,6 @@ button:disabled {
   width: 46px;
   height: 36px;
   color: var(--color-muted);
-  transition:
-    background var(--duration-quick) var(--ease),
-    color var(--duration-quick) var(--ease);
 }
 
 .window-controls button:hover {
@@ -241,17 +261,41 @@ button:disabled {
   flex: 1;
   min-height: 0;
   padding: 0 var(--space-4) var(--space-4);
-  animation: page-in var(--duration-grow) var(--ease);
 }
 
 .page[hidden] {
   display: none;
 }
 
-@keyframes page-in {
+/* 切換分頁時，內容依序彈起。 */
+.side > *,
+.stage-text,
+.stage-action,
+.settings > *,
+.notice-card,
+.download {
+  animation: rise var(--duration-grow) var(--spring) backwards;
+}
+
+.side > :nth-child(2),
+.settings > :nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.stage-text,
+.settings > :nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.stage-action,
+.settings > :nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+@keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(14px);
   }
 }
 
@@ -309,7 +353,7 @@ button:disabled {
   flex: none;
   width: 56px;
   height: 56px;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   background-color: var(--color-sunken);
 }
 
@@ -341,7 +385,7 @@ button:disabled {
 
 .login-code {
   height: 56px;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   color: var(--color-accent-deep);
   font-family: var(--font-mono);
   font-size: 22px;
@@ -349,7 +393,6 @@ button:disabled {
   letter-spacing: 0.06em;
   background: var(--color-accent-soft);
   user-select: text;
-  transition: background var(--duration-quick) var(--ease);
 }
 
 .login-code:hover {
@@ -394,10 +437,10 @@ button:disabled {
   font-size: 16px;
   font-weight: 600;
   background: var(--color-sunken);
-  transition: background var(--duration-quick) var(--ease);
 }
 
 .picker-trigger:hover:enabled {
+  border-radius: var(--radius-leaf-small-flip);
   background: var(--color-stage-deep);
 }
 
@@ -450,7 +493,7 @@ button:disabled {
   justify-content: space-between;
   width: 100%;
   padding: 7px var(--space-3);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   text-align: left;
 }
 
@@ -481,17 +524,11 @@ button:disabled {
   color: var(--color-accent-deep);
   font-weight: 600;
   background: var(--color-accent-soft);
-  transition:
-    background var(--duration-quick) var(--ease),
-    transform var(--duration-quick) var(--ease);
 }
 
 .secondary:hover:enabled {
+  border-radius: var(--radius-leaf-small-flip);
   background: var(--color-stage-deep);
-}
-
-.secondary:active:enabled {
-  transform: translateY(1px);
 }
 
 .secondary:disabled {
@@ -523,13 +560,14 @@ button:disabled {
 .stage-log {
   position: absolute;
   top: var(--space-4);
-  right: var(--space-5);
-  z-index: 1;
+  right: var(--space-4);
+  z-index: 2;
 }
 
 .stage-text {
   position: relative;
   z-index: 1;
+  width: fit-content;
 }
 
 .game-name {
@@ -545,13 +583,13 @@ button:disabled {
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: -0.02em;
-  animation: version-in var(--duration-grow) var(--ease);
+  animation: version-in var(--duration-grow) var(--spring);
 }
 
 @keyframes version-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(14px) scale(0.97);
   }
 }
 
@@ -570,11 +608,26 @@ button:disabled {
   fill: var(--color-hill-front);
 }
 
+.sapling-sway {
+  transform-origin: 100px 226px;
+  animation: breeze var(--breeze) ease-in-out infinite;
+}
+
+@keyframes breeze {
+  0%,
+  100% {
+    transform: rotate(-0.9deg);
+  }
+
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+
 .sapling-extra {
   fill: var(--color-accent-leaf);
-  transform-origin: center;
-  transform-box: fill-box;
-  animation: leaf-intro var(--duration-grow) var(--ease) backwards;
+  transform-origin: 0 0;
+  animation: leaf-intro var(--duration-grow) var(--spring) backwards;
 }
 
 .sapling-stem {
@@ -587,7 +640,7 @@ button:disabled {
 }
 
 .sapling-leaf {
-  transition: transform var(--duration-grow) var(--ease);
+  transition: transform var(--duration-grow) var(--spring);
 }
 
 .sapling-leaf-right {
@@ -666,18 +719,29 @@ button:disabled {
 }
 
 .status-error {
+  animation: shake var(--duration-grow) var(--ease);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   color: var(--color-danger);
   font-size: 14px;
   background: var(--color-danger-soft);
   user-select: text;
 }
 
+@keyframes shake {
+  25% {
+    transform: translateX(-4px);
+  }
+
+  60% {
+    transform: translateX(3px);
+  }
+}
+
 .progress {
   height: 8px;
   overflow: hidden;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-pill);
   background: var(--color-sunken);
 }
 
@@ -702,21 +766,12 @@ button:disabled {
   font-weight: 700;
   background: var(--color-accent);
   box-shadow: var(--shadow-button);
-  transition:
-    background var(--duration-quick) var(--ease),
-    box-shadow var(--duration-quick) var(--ease),
-    transform var(--duration-quick) var(--ease);
 }
 
 .primary:hover:enabled {
+  border-radius: var(--radius-leaf-flip);
   background: var(--color-accent-deep);
   box-shadow: var(--shadow-button-hover);
-  transform: translateY(-1px);
-}
-
-.primary:active:enabled {
-  box-shadow: none;
-  transform: translateY(2px);
 }
 
 .primary:disabled {
@@ -824,7 +879,7 @@ button:disabled {
 
 .setting input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   background: linear-gradient(
     to right,
     var(--color-accent) var(--fill),
@@ -854,7 +909,7 @@ button:disabled {
   height: var(--control-height);
   padding: 0 var(--space-3);
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   background: var(--color-surface);
   user-select: text;
 }
@@ -983,7 +1038,7 @@ button:disabled {
   left: calc(var(--space-6) * -1);
   width: var(--node-size);
   height: var(--node-size);
-  border-radius: 2px 10px 2px 10px;
+  border-radius: var(--radius-leaf-small);
   background: var(--color-sunken);
   transform: translateY(-50%);
   transition: background var(--duration-grow) var(--ease);
@@ -991,6 +1046,13 @@ button:disabled {
 
 .vine-row.installed .vine-leaf {
   background: var(--color-accent);
+  animation: leaf-pop var(--duration-grow) var(--spring);
+}
+
+@keyframes leaf-pop {
+  from {
+    transform: translateY(-50%) scale(0.5);
+  }
 }
 
 .vine-row.active .vine-leaf {
