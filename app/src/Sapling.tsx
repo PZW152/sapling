@@ -1,11 +1,14 @@
-/** 目前版本卡片裡的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1。 */
-export function Sapling({ growth }: { growth: number }) {
+/** 首頁的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1，完成時用 `celebrate` 抖一下葉子。 */
+export function Sapling({ growth, celebrate }: { growth: number; celebrate: boolean }) {
   const rightLeaf = stageOf(growth, 0.35, 0.8);
   const leftLeaf = stageOf(growth, 0.6, 1);
 
   return (
-    <svg className="sapling" viewBox="0 0 200 240" aria-hidden="true">
-      <ellipse className="sapling-soil" cx="100" cy="222" rx="58" ry="10" />
+    <svg
+      className={celebrate ? "sapling celebrate" : "sapling"}
+      viewBox="0 0 200 240"
+      aria-hidden="true"
+    >
       <path
         className="sapling-stem"
         d="M100 222 C100 186 100 150 100 114"

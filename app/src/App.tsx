@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -58,6 +58,10 @@ function TitleBar({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) => v
         <span data-tauri-drag-region>Sapling</span>
       </div>
       <nav className="tabs" aria-label="主要分頁">
+        <span
+          className="tab-indicator"
+          style={{ transform: `translateX(${TABS.findIndex(({ id }) => id === tab) * 100}%)` }}
+        />
         {TABS.map(({ id, label }) => (
           <button
             key={id}
@@ -144,84 +148,149 @@ function LaunchPage() {
   return (
     <div className="launch">
       <aside className="side">
-        <div className="account">
+        <section className="panel account">
           <svg className="avatar" viewBox="0 0 56 56" aria-hidden="true">
             <circle cx="28" cy="22" r="10" />
             <path d="M10 56c0-13 8-20 18-20s18 7 18 20z" />
           </svg>
-          <h2>尚未登入</h2>
+          <div>
+            <h2>尚未登入</h2>
+            <p>需要正版微軟帳號才能進入遊戲</p>
+          </div>
           <button className="secondary" disabled>
             用微軟帳號登入
           </button>
+        </section>
+
+        <section className="panel version">
+          <h2 className="panel-title">遊戲版本</h2>
+          {listError ? (
+            <>
+              <p className="error">{listError}</p>
+              <button className="secondary" onClick={loadVersions}>
+                重新取得版本
+              </button>
+            </>
+          ) : (
+            <VersionPicker
+              list={list}
+              selected={selected}
+              disabled={preparing}
+              onSelect={selectVersion}
+            />
+          )}
+        </section>
+      </aside>
+
+      <section className="stage">
+        <div className="stage-text">
+          <p className="game-name">Minecraft</p>
+          <h1 key={selected}>{selected || "…"}</h1>
+          <p className="edition">原版</p>
         </div>
 
-        <div className="launch-box">
-          <label htmlFor="version">遊戲版本</label>
-          {listError ? (
-            <button className="secondary" onClick={loadVersions}>
-              重新取得版本
-            </button>
-          ) : (
-            <select
-              id="version"
-              value={selected}
-              disabled={!list || preparing}
-              onChange={(event) => selectVersion(event.target.value)}
+        <Sapling growth={preparing ? overall : 1} celebrate={phase === "ready"} />
+
+        <svg className="hills" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
+          <path className="hill-back" d="M0 170C190 130 430 190 800 40V220H0Z" />
+          <path className="hill-front" d="M0 196C260 180 520 200 800 110V220H0Z" />
+        </svg>
+
+        <div className="stage-action">
+          <StatusLine phase={phase} progress={progress} error={error} percent={overall} />
+          {preparing && (
+            <div
+              className="progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(overall * 100)}
             >
-              {!list && <option value="">正在取得版本</option>}
-              {list?.versions.map((id) => (
-                <option key={id} value={id}>
-                  {id === list.latest ? `${id}（最新）` : id}
-                </option>
-              ))}
-            </select>
+              <div style={{ transform: `scaleX(${overall})` }} />
+            </div>
           )}
           <button className="primary" disabled={!selected || preparing} onClick={prepareGame}>
             {preparing ? "準備中" : "啟動遊戲"}
           </button>
         </div>
-      </aside>
-
-      <div className="cards">
-        <section className="card current">
-          <div className="current-text">
-            <h2>目前版本</h2>
-            <p className="version-name">Minecraft {selected || "…"}</p>
-            {listError && <p className="error">{listError}</p>}
-            <StatusLine phase={phase} progress={progress} error={error} />
-            {preparing && (
-              <div
-                className="progress"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(overall * 100)}
-              >
-                <div style={{ transform: `scaleX(${overall})` }} />
-              </div>
-            )}
-          </div>
-          <Sapling growth={preparing ? overall : 1} />
-        </section>
-
-        <section className="card">
-          <h2>開始遊戲</h2>
-          <ol className="steps">
-            <Step done={false} text="用微軟帳號登入（功能製作中）" />
-            <Step done={Boolean(selected)} text="在左邊選好遊戲版本" />
-            <Step done={phase === "ready"} text="按下「啟動遊戲」" />
-          </ol>
-        </section>
-      </div>
+      </section>
     </div>
   );
 }
 
-function Step({ done, text }: { done: boolean; text: string }) {
+function VersionPicker({
+  list,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  list: VersionList | null;
+  selected: string;
+  disabled: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function closeOnOutsideClick(event: PointerEvent) {
+      if (!root.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
   return (
-    <li className={done ? "step done" : "step"}>
-      <span>{text}</span>
-    </li>
+    <div className="picker" ref={root}>
+      {open && list && (
+        <ul className="picker-list" aria-label="選擇遊戲版本">
+          {list.versions.map((id) => (
+            <li key={id}>
+              <button
+                className="picker-option"
+                aria-current={id === selected ? "true" : undefined}
+                onClick={() => {
+                  onSelect(id);
+                  setOpen(false);
+                  trigger.current?.focus();
+                }}
+              >
+                <span>{id}</span>
+                {id === list.latest && <small>最新</small>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        ref={trigger}
+        className="picker-trigger"
+        aria-expanded={open}
+        disabled={!list || disabled}
+        onClick={() => setOpen(!open)}
+      >
+        <span>{list ? selected : "正在取得版本"}</span>
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 7.5 6 4l3.5 3.5" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -229,10 +298,12 @@ function StatusLine({
   phase,
   progress,
   error,
+  percent,
 }: {
   phase: Phase;
   progress: Progress | null;
   error: string;
+  percent: number;
 }) {
   if (phase === "failed") {
     return <p className="status error">{error}</p>;
@@ -246,12 +317,20 @@ function StatusLine({
     }
     const what = progress.stage === "game" ? "遊戲檔案" : "Java";
     return (
-      <p className="status">
-        正在檢查和下載{what}：{progress.finishedFiles} / {progress.totalFiles}
+      <p className="status status-row">
+        <span>
+          正在檢查和下載{what}：{toMegabytes(progress.finishedBytes)} /{" "}
+          {toMegabytes(progress.totalBytes)} MB
+        </span>
+        <span>{Math.round(percent * 100)}%</span>
       </p>
     );
   }
-  return <p className="status">原版，按「啟動遊戲」後會自動下載需要的檔案和 Java。</p>;
+  return <p className="status">第一次啟動會自動下載遊戲檔案和 Java。</p>;
+}
+
+function toMegabytes(bytes: number) {
+  return Math.round(bytes / 1024 / 1024);
 }
 
 function overallProgress(progress: Progress | null) {
