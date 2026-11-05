@@ -51,6 +51,7 @@
   /* 字體 */
   --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-display: "Segoe UI Variable Display", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, "Microsoft JhengHei UI", monospace;
 
   color: var(--color-ink);
   background: var(--color-canvas);
@@ -196,6 +197,10 @@ button:disabled {
 }
 
 /* 頁面 */
+.page[hidden] {
+  display: none;
+}
+
 .page {
   flex: 1;
   min-height: 0;
@@ -559,14 +564,197 @@ button:disabled {
   box-shadow: none;
 }
 
-.coming-later {
+.notice {
   display: grid;
   place-items: center;
   height: 100%;
+  padding: var(--space-5);
   border-radius: var(--radius-large);
   color: var(--color-muted);
+  text-align: center;
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
+}
+
+.about {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+
+.about h2 {
+  margin-top: var(--space-2);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* 帳號 */
+.skin-head {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--radius-small);
+  background: var(--color-sunken);
+}
+
+.skin-face,
+.skin-hat {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: 448px auto;
+  image-rendering: pixelated;
+}
+
+.skin-face {
+  background-position: -56px -56px;
+}
+
+.skin-hat {
+  background-position: -280px -56px;
+}
+
+.login-code {
+  padding: var(--space-2);
+  border-radius: var(--radius-small);
+  color: var(--color-accent-deep);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: var(--color-accent-soft);
+  user-select: text;
+}
+
+.account .error {
+  font-size: 13px;
+}
+
+/* 日誌 */
+.text-button {
+  justify-self: start;
+  padding: 2px 0;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.text-button:hover {
+  text-decoration: underline;
+}
+
+.log-panel {
+  position: absolute;
+  inset: var(--space-3);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  animation: popover-in var(--duration-quick) var(--ease);
+}
+
+.log-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.log-panel h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.log-lines {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  overflow: auto;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}
+
+/* 設定 */
+.settings {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  max-width: 640px;
+  height: 100%;
+  margin: 0 auto;
+  overflow-y: auto;
+}
+
+.setting {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.setting p {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.setting-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.setting-head output {
+  color: var(--color-accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.setting input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.setting input[type="text"] {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+  font: inherit;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  user-select: text;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.save-button {
+  height: 40px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-small);
+  color: var(--color-on-accent);
+  font-weight: 600;
+  background: var(--color-accent);
+  transition: background var(--duration-quick) var(--ease);
+}
+
+.save-button:hover {
+  background: var(--color-accent-deep);
 }
 
 @media (prefers-reduced-motion: reduce) {

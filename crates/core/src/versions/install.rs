@@ -13,7 +13,7 @@ use crate::download::{
     DownloadError, DownloadProgress, DownloadTask, download_all, download_file, new_client,
 };
 use crate::java::{JavaError, install_runtime};
-use crate::platform::{DataDirs, PlatformError};
+use crate::platform::DataDirs;
 
 const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
 
@@ -25,8 +25,6 @@ pub enum InstallError {
     Versions(#[from] VersionsError),
     #[error(transparent)]
     Java(#[from] JavaError),
-    #[error(transparent)]
-    Platform(#[from] PlatformError),
     #[error("版本清單裡找不到 {id}")]
     UnknownVersion { id: String },
     #[error("無法讀取已下載的檔案：{}", path.display())]
@@ -57,13 +55,20 @@ pub enum PrepareStage {
     Java,
 }
 
+/// 已經準備好、可以啟動的版本。
+#[derive(Debug, Clone)]
+pub struct PreparedVersion {
+    pub details: VersionDetails,
+    pub java: PathBuf,
+}
+
 /// 準備好某個版本需要的一切：遊戲檔案和對應的 Java。
 pub async fn prepare_version(
     id: &str,
+    dirs: &DataDirs,
     concurrency: usize,
     mut on_progress: impl FnMut(PrepareStage, DownloadProgress) + Send,
-) -> Result<(), InstallError> {
-    let dirs = DataDirs::for_this_user()?;
+) -> Result<PreparedVersion, InstallError> {
     let client = new_client()?;
     let manifest = fetch_manifest().await?;
     let entry = manifest
@@ -72,19 +77,19 @@ pub async fn prepare_version(
         .find(|entry| entry.id == id)
         .ok_or_else(|| InstallError::UnknownVersion { id: id.to_string() })?;
 
-    let details = install_version(&client, entry, &dirs, concurrency, |progress| {
+    let details = install_version(&client, entry, dirs, concurrency, |progress| {
         on_progress(PrepareStage::Game, progress)
     })
     .await?;
-    install_runtime(
+    let java = install_runtime(
         &client,
         &details.java_version.component,
-        &dirs,
+        dirs,
         concurrency,
         |progress| on_progress(PrepareStage::Java, progress),
     )
     .await?;
-    Ok(())
+    Ok(PreparedVersion { details, java })
 }
 
 /// 下載一個版本需要的全部檔案。已存在且 SHA1 正確的檔案會跳過。
