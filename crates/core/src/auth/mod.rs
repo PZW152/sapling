@@ -44,6 +44,8 @@ pub enum AuthError {
     XboxRefused { code: u64 },
     #[error("這個應用程式還沒獲得 Mojang 批准使用 Minecraft 登入，需要先到 aka.ms/mce-reviewappid 申請")]
     AppNotApproved,
+    #[error("登入請求太頻繁，Minecraft 伺服器暫時拒絕，請等幾分鐘再試")]
+    RateLimited,
     #[error("這個微軟帳號沒有購買 Minecraft Java 版")]
     GameNotOwned,
     #[error("這個帳號還沒建立 Minecraft 玩家檔案，請先用官方啟動器登入一次")]
@@ -377,6 +379,7 @@ async fn minecraft_login(
         .await?;
     match response.status().as_u16() {
         403 => Err(AuthError::AppNotApproved),
+        429 => Err(AuthError::RateLimited),
         status if !response.status().is_success() => Err(AuthError::Unexpected {
             step: "minecraft",
             status,

@@ -11,6 +11,7 @@ use sapling_core::launch::{LaunchEvent, play};
 use sapling_core::platform::{DataDirs, open_in_browser};
 use sapling_core::versions::fetch_manifest;
 use serde::{Deserialize, Serialize};
+use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::{AppHandle, Emitter, State};
 
 const LAUNCH_EVENT: &str = "launch-event";
@@ -20,6 +21,8 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 struct AppState {
     session: Mutex<Option<Session>>,
     device_login: Mutex<Option<DeviceLogin>>,
+    /// 同一時間只做一次恢復登入，避免短時間重複請求被 Minecraft 伺服器限流。
+    restoring: AsyncMutex<()>,
 }
 
 impl AppState {
@@ -95,11 +98,7 @@ async fn save_settings(settings: Settings) -> Result<(), String> {
 
 #[tauri::command]
 async fn restore_account(state: State<'_, AppState>) -> Result<Option<Profile>, String> {
-    let client = new_client().map_err(text)?;
-    let session = auth::restore_session(&client).await.map_err(text)?;
-    let profile = session.as_ref().map(|session| session.profile.clone());
-    state.set_session(session)?;
-    Ok(profile)
+    Ok(current_session(&state).await?.map(|session| session.profile))
 }
 
 #[tauri::command]
@@ -166,18 +165,21 @@ async fn play_game(app: AppHandle, state: State<'_, AppState>, version: String) 
 
 /// 取得可用的登入狀態，過期就自動刷新。
 async fn fresh_session(state: &State<'_, AppState>) -> Result<Session, String> {
-    match state.session()? {
-        Some(session) if !session.is_expired() => Ok(session),
-        _ => {
-            let client = new_client().map_err(text)?;
-            let session = auth::restore_session(&client)
-                .await
-                .map_err(text)?
-                .ok_or("請先登入微軟帳號")?;
-            state.set_session(Some(session.clone()))?;
-            Ok(session)
-        }
+    current_session(state)
+        .await?
+        .ok_or_else(|| "請先登入微軟帳號".to_string())
+}
+
+/// 目前有效的登入狀態；沒有或已過期時用保存的 refresh token 恢復。
+async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>, String> {
+    let _restoring = state.restoring.lock().await;
+    if let Some(session) = state.session()?.filter(|session| !session.is_expired()) {
+        return Ok(Some(session));
     }
+    let client = new_client().map_err(text)?;
+    let session = auth::restore_session(&client).await.map_err(text)?;
+    state.set_session(session.clone())?;
+    Ok(session)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
