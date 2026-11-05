@@ -75,14 +75,18 @@ mod tests {
     #[tokio::test]
     async fn saves_and_loads_settings() {
         let dirs = temp_dirs("instance");
-        let mut instance = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID).await.unwrap();
+        let mut instance = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID)
+            .await
+            .unwrap();
         assert_eq!(instance.memory_mb, DEFAULT_MEMORY_MB);
 
         instance.version = "26.3".to_string();
         instance.memory_mb = 8192;
         instance.save(&dirs).await.unwrap();
 
-        let loaded = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID).await.unwrap();
+        let loaded = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID)
+            .await
+            .unwrap();
         assert_eq!(loaded, instance);
     }
 
@@ -93,7 +97,9 @@ mod tests {
         instance.memory_mb = 1;
         instance.save(&dirs).await.unwrap();
 
-        let loaded = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID).await.unwrap();
+        let loaded = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID)
+            .await
+            .unwrap();
         assert_eq!(loaded.memory_mb, MIN_MEMORY_MB);
     }
 }

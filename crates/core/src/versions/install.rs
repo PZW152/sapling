@@ -70,7 +70,7 @@ pub async fn prepare_version(
     mut on_progress: impl FnMut(PrepareStage, DownloadProgress) + Send,
 ) -> Result<PreparedVersion, InstallError> {
     let client = new_client()?;
-    let manifest = fetch_manifest().await?;
+    let manifest = fetch_manifest(&client).await?;
     let entry = manifest
         .versions
         .iter()

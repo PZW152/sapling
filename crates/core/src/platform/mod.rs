@@ -33,7 +33,10 @@ pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// 用系統預設瀏覽器打開網址。只接受 https，避免把其他內容交給系統執行。
 pub fn open_in_browser(url: &str) -> io::Result<()> {
     if !url.starts_with("https://") {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "只能打開 https 網址"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "只能打開 https 網址",
+        ));
     }
     Command::new("rundll32")
         .args(["url.dll,FileProtocolHandler", url])

@@ -1,11 +1,13 @@
 //! 手動測試：下載版本清單並列出 v1 支援的正式版。
 //! 執行：cargo run -p sapling-core --example list_versions
 
+use sapling_core::download::new_client;
 use sapling_core::versions::{VersionsError, fetch_manifest};
 
 #[tokio::main]
 async fn main() -> Result<(), VersionsError> {
-    let manifest = fetch_manifest().await?;
+    let client = new_client()?;
+    let manifest = fetch_manifest(&client).await?;
     let supported = manifest.supported_releases()?;
 
     println!("最新正式版：{}", manifest.latest.release);

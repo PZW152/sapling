@@ -14,7 +14,8 @@ const BYTES_PER_MB: f64 = 1024.0 * 1024.0;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let manifest = fetch_manifest().await?;
+    let client = new_client()?;
+    let manifest = fetch_manifest(&client).await?;
     let latest = manifest
         .versions
         .iter()
@@ -26,26 +27,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let started = Instant::now();
     let mut last_percent = 0;
     let mut finished = (0, 0.0);
-    install_version(
-        &new_client()?,
-        latest,
-        &dirs,
-        DEFAULT_CONCURRENCY,
-        |progress| {
-            let percent = progress.finished_bytes * 100 / progress.total_bytes.max(1);
-            finished = (
-                progress.finished_files,
-                progress.finished_bytes as f64 / BYTES_PER_MB,
+    install_version(&client, latest, &dirs, DEFAULT_CONCURRENCY, |progress| {
+        let percent = progress.finished_bytes * 100 / progress.total_bytes.max(1);
+        finished = (
+            progress.finished_files,
+            progress.finished_bytes as f64 / BYTES_PER_MB,
+        );
+        if percent >= last_percent + 10 {
+            last_percent = percent;
+            println!(
+                "{percent:>3}%  {}/{} 個檔案",
+                progress.finished_files, progress.total_files
             );
-            if percent >= last_percent + 10 {
-                last_percent = percent;
-                println!(
-                    "{percent:>3}%  {}/{} 個檔案",
-                    progress.finished_files, progress.total_files
-                );
-            }
-        },
-    )
+        }
+    })
     .await?;
 
     println!(

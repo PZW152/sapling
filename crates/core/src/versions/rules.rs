@@ -33,14 +33,20 @@ pub struct OsCondition {
 impl Rule {
     fn matches_this_machine(&self) -> bool {
         let features_match = self.features.values().all(|wanted| !wanted);
-        let os_matches = self.os.as_ref().is_none_or(OsCondition::matches_this_machine);
+        let os_matches = self
+            .os
+            .as_ref()
+            .is_none_or(OsCondition::matches_this_machine);
         features_match && os_matches
     }
 }
 
 impl OsCondition {
     fn matches_this_machine(&self) -> bool {
-        let name_matches = self.name.as_deref().is_none_or(|name| name == MOJANG_OS_NAME);
+        let name_matches = self
+            .name
+            .as_deref()
+            .is_none_or(|name| name == MOJANG_OS_NAME);
         let arch_matches = self.arch.as_deref().is_none_or(|arch| arch == MOJANG_ARCH);
         let version_matches = self.version.as_deref().is_none_or(version_prefix_matches);
         name_matches && arch_matches && version_matches

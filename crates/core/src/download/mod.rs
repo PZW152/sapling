@@ -153,10 +153,12 @@ pub async fn download_file(
         return Ok(DownloadOutcome::AlreadyValid);
     }
     if let Some(parent) = task.path.parent() {
-        fs::create_dir_all(parent).await.map_err(|source| DownloadError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
+        fs::create_dir_all(parent)
+            .await
+            .map_err(|source| DownloadError::Io {
+                path: parent.to_path_buf(),
+                source,
+            })?;
     }
 
     let part_path = part_path(&task.path);
@@ -353,7 +355,10 @@ mod tests {
         )
         .await;
 
-        assert!(matches!(result, Err(DownloadError::ChecksumMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(DownloadError::ChecksumMismatch { .. })
+        ));
     }
 
     #[tokio::test]
@@ -433,7 +438,10 @@ mod tests {
 
         let result = download_file(&new_client().unwrap(), &task).await;
 
-        assert!(matches!(result, Err(DownloadError::ChecksumMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(DownloadError::ChecksumMismatch { .. })
+        ));
         assert_eq!(requests.load(Ordering::SeqCst), 3);
         assert!(!task.path.exists());
         assert!(!part_path(&task.path).exists());

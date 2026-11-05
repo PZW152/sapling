@@ -4,11 +4,10 @@ pub mod details;
 pub mod install;
 pub mod rules;
 
-use std::time::Duration;
-
 use serde::Deserialize;
 use thiserror::Error;
 
+use crate::download::{DownloadError, fetch_text};
 use details::VersionDetails;
 
 const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -19,12 +18,10 @@ const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manif
 /// 而是靠清單順序（最新的排最前）判斷新舊。
 const OLDEST_SUPPORTED_RELEASE: &str = "1.19";
 
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
-
 #[derive(Debug, Error)]
 pub enum VersionsError {
     #[error("無法取得版本資料，請檢查網絡連線後再試一次")]
-    Network(#[from] reqwest::Error),
+    Network(#[from] DownloadError),
     #[error("版本資料的格式看不懂，可能是 Mojang 改了格式")]
     Parse(#[from] serde_json::Error),
     #[error("版本清單裡找不到 {OLDEST_SUPPORTED_RELEASE}，無法判斷哪些版本受支援")]
@@ -85,27 +82,16 @@ impl VersionManifest {
 }
 
 /// 從 Mojang 下載並解析版本清單。
-pub async fn fetch_manifest() -> Result<VersionManifest, VersionsError> {
-    VersionManifest::parse(&fetch_text(MANIFEST_URL).await?)
+pub async fn fetch_manifest(client: &reqwest::Client) -> Result<VersionManifest, VersionsError> {
+    VersionManifest::parse(&fetch_text(client, MANIFEST_URL).await?)
 }
 
 /// 下載並解析單個版本的版本 JSON。
-pub async fn fetch_details(entry: &VersionEntry) -> Result<VersionDetails, VersionsError> {
-    VersionDetails::parse(&fetch_text(&entry.url).await?)
-}
-
-async fn fetch_text(url: &str) -> Result<String, VersionsError> {
-    let client = reqwest::Client::builder()
-        .timeout(REQUEST_TIMEOUT)
-        .build()?;
-    let body = client
-        .get(url)
-        .send()
-        .await?
-        .error_for_status()?
-        .text()
-        .await?;
-    Ok(body)
+pub async fn fetch_details(
+    client: &reqwest::Client,
+    entry: &VersionEntry,
+) -> Result<VersionDetails, VersionsError> {
+    VersionDetails::parse(&fetch_text(client, &entry.url).await?)
 }
 
 #[cfg(test)]

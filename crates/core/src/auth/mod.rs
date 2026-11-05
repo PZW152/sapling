@@ -6,15 +6,13 @@ mod token_store;
 use std::fmt;
 use std::time::{Duration, Instant};
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
 const CLIENT_ID: &str = "86a1a1e1-09d1-45f9-9ab7-62bb903d85ce";
 const SCOPE: &str = "XboxLive.signin offline_access";
-const DEVICE_CODE_URL: &str =
-    "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
+const DEVICE_CODE_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
 const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
 const XBOX_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
@@ -42,7 +40,9 @@ pub enum AuthError {
     SessionExpired,
     #[error("{}", xsts_error_message(*.code))]
     XboxRefused { code: u64 },
-    #[error("這個應用程式還沒獲得 Mojang 批准使用 Minecraft 登入，需要先到 aka.ms/mce-reviewappid 申請")]
+    #[error(
+        "這個應用程式還沒獲得 Mojang 批准使用 Minecraft 登入，需要先到 aka.ms/mce-reviewappid 申請"
+    )]
     AppNotApproved,
     #[error("登入請求太頻繁，Minecraft 伺服器暫時拒絕，請等幾分鐘再試")]
     RateLimited,
@@ -59,7 +59,9 @@ pub enum AuthError {
 fn xsts_error_message(code: u64) -> String {
     match code {
         2148916227 => "這個帳號已被 Xbox 封禁".to_string(),
-        2148916233 => "這個微軟帳號還沒有 Xbox 檔案，請先到 minecraft.net 登入一次來建立".to_string(),
+        2148916233 => {
+            "這個微軟帳號還沒有 Xbox 檔案，請先到 minecraft.net 登入一次來建立".to_string()
+        }
         2148916235 => "你所在的地區無法使用 Xbox Live".to_string(),
         2148916236 | 2148916237 => "這個帳號需要先在 Xbox 網站完成成年驗證".to_string(),
         2148916238 => "這是未成年帳號，需要由成年人把它加入微軟家庭群組".to_string(),
@@ -283,8 +285,7 @@ async fn complete_login(
     let minecraft = minecraft_login(client, &user_hash, &xsts_token).await?;
     let token = &minecraft.access_token;
 
-    let entitlements: Entitlements = get_with_token(client, ENTITLEMENTS_URL, token, "entitlements").await?;
-    if entitlements.items.is_empty() {
+    if fetch_entitlements(client, token).await?.items.is_empty() {
         return Err(AuthError::GameNotOwned);
     }
     let profile = fetch_profile(client, token).await?;
@@ -388,6 +389,24 @@ async fn minecraft_login(
     }
 }
 
+async fn fetch_entitlements(
+    client: &reqwest::Client,
+    token: &str,
+) -> Result<Entitlements, AuthError> {
+    let response = client
+        .get(ENTITLEMENTS_URL)
+        .bearer_auth(token)
+        .send()
+        .await?;
+    if !response.status().is_success() {
+        return Err(AuthError::Unexpected {
+            step: "entitlements",
+            status: response.status().as_u16(),
+        });
+    }
+    Ok(response.json().await?)
+}
+
 async fn fetch_profile(client: &reqwest::Client, token: &str) -> Result<Profile, AuthError> {
     let response = client.get(PROFILE_URL).bearer_auth(token).send().await?;
     match response.status().as_u16() {
@@ -413,22 +432,6 @@ fn active_skin_url(skins: &[MinecraftSkin]) -> Option<String> {
         .iter()
         .find(|skin| skin.state == "ACTIVE")
         .map(|skin| skin.url.clone())
-}
-
-async fn get_with_token<T: DeserializeOwned>(
-    client: &reqwest::Client,
-    url: &str,
-    token: &str,
-    step: &'static str,
-) -> Result<T, AuthError> {
-    let response = client.get(url).bearer_auth(token).send().await?;
-    if !response.status().is_success() {
-        return Err(AuthError::Unexpected {
-            step,
-            status: response.status().as_u16(),
-        });
-    }
-    Ok(response.json().await?)
 }
 
 #[cfg(test)]

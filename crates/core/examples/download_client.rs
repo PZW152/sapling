@@ -11,13 +11,14 @@ use sapling_core::versions::{fetch_details, fetch_manifest};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let manifest = fetch_manifest().await?;
+    let client = new_client()?;
+    let manifest = fetch_manifest(&client).await?;
     let latest = manifest
         .versions
         .iter()
         .find(|entry| entry.id == manifest.latest.release)
         .ok_or("版本清單裡找不到最新正式版")?;
-    let details = fetch_details(latest).await?;
+    let details = fetch_details(&client, latest).await?;
     let client_jar = &details.downloads.client;
 
     let task = DownloadTask {
@@ -30,7 +31,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let started = Instant::now();
-    let outcome = download_file(&new_client()?, &task).await?;
+    let outcome = download_file(&client, &task).await?;
     let result = match outcome {
         DownloadOutcome::AlreadyValid => "檔案已存在且 SHA1 正確，跳過下載",
         DownloadOutcome::Downloaded => "下載完成，SHA1 校驗通過",

@@ -92,13 +92,12 @@ pub async fn install_runtime(
         size: manifest_ref.size,
     };
     download_file(client, &manifest_task).await?;
-    let manifest_text =
-        tokio::fs::read_to_string(&manifest_path)
-            .await
-            .map_err(|source| JavaError::Read {
-                path: manifest_path.clone(),
-                source,
-            })?;
+    let manifest_text = tokio::fs::read_to_string(&manifest_path)
+        .await
+        .map_err(|source| JavaError::Read {
+            path: manifest_path.clone(),
+            source,
+        })?;
     let manifest: RuntimeManifest = serde_json::from_str(&manifest_text)?;
 
     let runtime_dir = dirs.runtimes().join(component);
@@ -121,7 +120,10 @@ fn find_manifest<'a>(
         })
 }
 
-fn runtime_file_tasks(manifest: &RuntimeManifest, runtime_dir: &std::path::Path) -> Vec<DownloadTask> {
+fn runtime_file_tasks(
+    manifest: &RuntimeManifest,
+    runtime_dir: &std::path::Path,
+) -> Vec<DownloadTask> {
     manifest
         .files
         .iter()

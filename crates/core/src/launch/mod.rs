@@ -7,7 +7,7 @@ use std::process::Stdio;
 
 use serde::Serialize;
 use thiserror::Error;
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 
@@ -25,6 +25,8 @@ const CLASSPATH_SEPARATOR: &str = ";";
 const UNUSED_ID: &str = "0";
 const HIDDEN_TOKEN: &str = "***";
 const LOG_CHANNEL_SIZE: usize = 256;
+/// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
+const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
@@ -70,7 +72,10 @@ pub async fn play(
     })
     .await?;
     let details = instance.loader.loader().apply(prepared.details.clone());
-    let prepared = PreparedVersion { details, ..prepared };
+    let prepared = PreparedVersion {
+        details,
+        ..prepared
+    };
 
     let game_dir = instance.game_dir(dirs);
     let natives_dir = dirs.versions().join(&prepared.details.id).join("natives");
@@ -91,7 +96,6 @@ pub async fn play(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .creation_flags(CREATE_NO_WINDOW)
-        .kill_on_drop(false)
         .spawn()
         .map_err(LaunchError::Spawn)?;
     on_event(LaunchEvent::Started);
@@ -119,13 +123,22 @@ pub async fn play(
     }
 }
 
+/// 一直讀到遊戲關閉輸出為止。如果中途停止讀取，輸出管道填滿後遊戲會卡死。
 async fn forward_lines(stream: impl AsyncRead + Unpin, sender: mpsc::Sender<String>) {
-    let mut lines = BufReader::new(stream).lines();
-    // 遊戲輸出不一定是 UTF-8，讀不了的那一行就結束轉發，不影響遊戲本身。
-    while let Ok(Some(line)) = lines.next_line().await {
+    let mut reader = BufReader::new(stream);
+    while let Some(line) = read_line_lossy(&mut reader).await {
         if sender.send(line).await.is_err() {
             break;
         }
+    }
+}
+
+/// 讀取一行。遊戲輸出不一定是 UTF-8，無法解碼的字元會被替換，不會中斷讀取。
+async fn read_line_lossy(reader: &mut (impl AsyncBufRead + Unpin)) -> Option<String> {
+    let mut bytes = Vec::new();
+    match reader.read_until(b'\n', &mut bytes).await {
+        Ok(0) | Err(_) => None,
+        Ok(_) => Some(String::from_utf8_lossy(&bytes).trim_end().to_string()),
     }
 }
 
@@ -144,6 +157,7 @@ fn build_arguments(
     let values = placeholder_values(session, instance, details, dirs, natives_dir);
 
     let mut arguments = vec![format!("-Xmx{}M", instance.memory_mb)];
+    arguments.extend(OUTPUT_ENCODING_ARGUMENTS.map(str::to_string));
     arguments.extend(instance.java_args.split_whitespace().map(str::to_string));
     arguments.extend(expand(&details.arguments.jvm, &values));
     arguments.push(details.main_class.clone());
@@ -160,9 +174,11 @@ fn expand(arguments: &[Argument], values: &HashMap<&str, String>) -> Vec<String>
 }
 
 fn fill_placeholders(argument: &str, values: &HashMap<&str, String>) -> String {
-    values.iter().fold(argument.to_string(), |text, (key, value)| {
-        text.replace(&format!("${{{key}}}"), value)
-    })
+    values
+        .iter()
+        .fold(argument.to_string(), |text, (key, value)| {
+            text.replace(&format!("${{{key}}}"), value)
+        })
 }
 
 fn placeholder_values(
@@ -258,6 +274,20 @@ mod tests {
         assert_eq!(parts.len(), 2);
         assert!(parts[0].ends_with("b.jar"));
         assert!(parts[1].ends_with("26.3.jar"));
+    }
+
+    #[tokio::test]
+    async fn keeps_reading_after_a_line_that_is_not_utf8() {
+        let mut reader: &[u8] = b"first\r\n\xB4\xFA\xB8\xD5\nlast";
+
+        let first = read_line_lossy(&mut reader).await;
+        let broken = read_line_lossy(&mut reader).await;
+        let last = read_line_lossy(&mut reader).await;
+
+        assert_eq!(first.as_deref(), Some("first"));
+        assert!(broken.is_some());
+        assert_eq!(last.as_deref(), Some("last"));
+        assert_eq!(read_line_lossy(&mut reader).await, None);
     }
 
     #[test]

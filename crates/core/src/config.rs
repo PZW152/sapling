@@ -34,7 +34,9 @@ impl LauncherConfig {
     }
 
     fn normalized(mut self) -> Self {
-        self.download_concurrency = self.download_concurrency.clamp(MIN_CONCURRENCY, MAX_CONCURRENCY);
+        self.download_concurrency = self
+            .download_concurrency
+            .clamp(MIN_CONCURRENCY, MAX_CONCURRENCY);
         self
     }
 }

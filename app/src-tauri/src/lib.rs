@@ -65,7 +65,8 @@ fn text<E: ToString>(error: E) -> String {
 
 #[tauri::command]
 async fn list_versions() -> Result<VersionList, String> {
-    let manifest = fetch_manifest().await.map_err(text)?;
+    let client = new_client().map_err(text)?;
+    let manifest = fetch_manifest(&client).await.map_err(text)?;
     let versions = manifest
         .supported_releases()
         .map_err(text)?
@@ -98,7 +99,9 @@ async fn save_settings(settings: Settings) -> Result<(), String> {
 
 #[tauri::command]
 async fn restore_account(state: State<'_, AppState>) -> Result<Option<Profile>, String> {
-    Ok(current_session(&state).await?.map(|session| session.profile))
+    Ok(current_session(&state)
+        .await?
+        .map(|session| session.profile))
 }
 
 #[tauri::command]
@@ -137,7 +140,16 @@ fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn play_game(app: AppHandle, state: State<'_, AppState>, version: String) -> Result<(), String> {
+fn open_link(url: String) -> Result<(), String> {
+    open_in_browser(&url).map_err(text)
+}
+
+#[tauri::command]
+async fn play_game(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    version: String,
+) -> Result<(), String> {
     let session = fresh_session(&state).await?;
     let dirs = DataDirs::for_this_user().map_err(text)?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
@@ -148,17 +160,23 @@ async fn play_game(app: AppHandle, state: State<'_, AppState>, version: String) 
     instance.save(&dirs).await.map_err(text)?;
 
     let mut last_progress = Instant::now();
-    play(&session, &instance, &dirs, config.download_concurrency, move |event| {
-        if let LaunchEvent::Progress { progress, .. } = &event {
-            let is_last = progress.finished_files == progress.total_files;
-            if !is_last && last_progress.elapsed() < PROGRESS_INTERVAL {
-                return;
+    play(
+        &session,
+        &instance,
+        &dirs,
+        config.download_concurrency,
+        move |event| {
+            if let LaunchEvent::Progress { progress, .. } = &event {
+                let is_last = progress.finished_files == progress.total_files;
+                if !is_last && last_progress.elapsed() < PROGRESS_INTERVAL {
+                    return;
+                }
+                last_progress = Instant::now();
             }
-            last_progress = Instant::now();
-        }
-        // 事件只用於顯示，送不出去不影響遊戲本身。
-        let _ = app.emit(LAUNCH_EVENT, event);
-    })
+            // 事件只用於顯示，送不出去不影響遊戲本身。
+            let _ = app.emit(LAUNCH_EVENT, event);
+        },
+    )
     .await
     .map_err(text)
 }
@@ -194,6 +212,7 @@ pub fn run() {
             login_start,
             login_finish,
             sign_out,
+            open_link,
             play_game
         ])
         .run(tauri::generate_context!())
