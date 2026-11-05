@@ -1,0 +1,56 @@
+Sapling Launcher 授權條款
+Copyright (c) 2026 PZW152。保留一切權利。
+
+中文版
+
+1. 本專案的原始碼、介面設計、圖示、文字和其他內容（以下稱「本作品」）的所有
+   權利均由 PZW152 保留。本作品不是開源軟體。
+
+2. 你可以：
+   (a) 下載並安裝 PZW152 發佈的官方版本，供個人使用；
+   (b) 在 GitHub 上閱讀本作品，以及使用 GitHub 服務條款要求公開倉庫提供的
+       查看和 fork 功能。
+
+3. 未經 PZW152 事先書面許可，你不可以：
+   (a) 複製、修改、翻譯或重構本作品，或以本作品為基礎製作衍生作品；
+   (b) 散佈、轉載、出售或出租本作品或其修改版本；
+   (c) 把本作品用於訓練、微調或評估機器學習模型；
+   (d) 使用人工智慧工具或其他自動化方式，重現、改寫或仿製本作品的原始碼、
+       設計或其他受保護的內容；
+   (e) 移除本作品的版權聲明或本條款。
+
+4. 本作品中的第三方元件仍依其各自的授權條款使用，本條款不改變這些授權。
+
+5. 本作品按「現狀」提供，不附帶任何明示或默示的保證。在適用法律允許的最大範圍
+   內，PZW152 不對因使用本作品而產生的任何損失負責。
+
+6. Minecraft 是 Mojang Synergies AB 的商標。本作品不是 Minecraft 官方產品，
+   與 Mojang 和 Microsoft 無關。
+
+如需其他授權，請在 GitHub 上聯絡 PZW152。
+
+English version
+
+Copyright (c) 2026 PZW152. All rights reserved.
+
+This project, including its source code, interface design, icons and text
+(the "Work"), is not open source software.
+
+You may download and install official releases published by PZW152 for personal
+use, and view the Work on GitHub, including the viewing and forking functions
+that the GitHub Terms of Service require for public repositories.
+
+Without prior written permission from PZW152, you may not: copy, modify,
+translate or refactor the Work or create derivative works; distribute, republish,
+sell or rent the Work or modified versions of it; use the Work to train, fine-tune
+or evaluate machine learning models; use artificial intelligence tools or other
+automated means to reproduce, rewrite or imitate the Work's source code, design or
+other protected content; or remove copyright notices or these terms.
+
+Third-party components remain under their own licenses.
+
+The Work is provided "as is", without warranty of any kind. To the maximum extent
+permitted by law, PZW152 is not liable for any loss arising from use of the Work.
+
+Minecraft is a trademark of Mojang Synergies AB. The Work is not an official
+Minecraft product and is not affiliated with Mojang or Microsoft.

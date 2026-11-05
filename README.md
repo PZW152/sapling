@@ -37,6 +37,12 @@ npm install
 npm run tauri dev
 ```
 
+## 授權
+
+Copyright (c) 2026 PZW152，保留一切權利。本專案不是開源軟體。
+
+你可以下載官方版本供個人使用，也可以在 GitHub 上閱讀原始碼。未經書面許可，不可以複製、修改、重構、散佈、仿製本作品，或用於訓練 AI。完整條款見 [LICENSE](LICENSE)，AI 工具請參閱 [AGENTS.md](AGENTS.md)。
+
 ## 聲明
 
 非 Minecraft 官方產品，與 Mojang 和 Microsoft 無關。
