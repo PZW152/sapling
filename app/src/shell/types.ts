@@ -20,6 +20,7 @@ export type LauncherConfig = {
   theme: string;
   disabledFeatures: string[];
   featureSwitchesUnlocked: boolean;
+  plantedYears: number[];
 };
 
 export type ModFile = { name: string; enabled: boolean; size: number };

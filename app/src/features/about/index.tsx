@@ -39,6 +39,9 @@ function AboutPage() {
           版本 {version}
         </p>
         {message && <p className="status">{message}</p>}
+        {config.plantedYears.length > 0 && (
+          <p className="status">你已經種下 {config.plantedYears.length} 棵樹。</p>
+        )}
         <div className="about-links">
           <button className="secondary" onClick={() => invoke("open_link", { url: REPOSITORY_URL })}>
             GitHub 主頁

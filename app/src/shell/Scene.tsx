@@ -3,6 +3,7 @@ export function Scene() {
   return (
     <div className="scene" aria-hidden="true">
       <div className="glow" />
+      <p className="motto">天下為公</p>
       <svg className="hills hills-back" viewBox="0 0 800 220" preserveAspectRatio="none">
         <defs>
           <linearGradient id="hill-fade" x1="0" y1="0" x2="0" y2="1">

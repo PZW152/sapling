@@ -8,6 +8,17 @@ const EXTRA_LEAVES = [
   { y: 138, size: 0.26, flip: false },
 ];
 const EXTRA_LEAF_PATH = "M0 0 C0 -46 32 -76 76 -80 C76 -32 46 0 0 0 Z";
+/** 種樹後開出的梅花位置和大小。 */
+const BLOSSOMS = [
+  { x: 176, y: 34, size: 1 },
+  { x: 150, y: 58, size: 0.8 },
+  { x: 126, y: 84, size: 0.7 },
+  { x: 100, y: 112, size: 0.9 },
+  { x: 58, y: 118, size: 0.75 },
+  { x: 30, y: 104, size: 0.95 },
+  { x: 104, y: 176, size: 0.6 },
+];
+const PETAL_ANGLES = [0, 72, 144, 216, 288];
 
 /**
  * 首頁的樹苗。`growth` 由 0 到 1，下載時就是它長高的過程。
@@ -17,10 +28,15 @@ export function Sapling({
   growth,
   leaves,
   celebrate,
+  blossoms = false,
+  onPlant,
 }: {
   growth: number;
   leaves: number;
   celebrate: boolean;
+  blossoms?: boolean;
+  /** 植樹節當天點擊樹苗時呼叫。 */
+  onPlant?: () => void;
 }) {
   // 開場動畫只在打開啟動器時播放一次，之後由 growth 控制。
   const [intro, setIntro] = useState(true);
@@ -31,9 +47,12 @@ export function Sapling({
 
   return (
     <svg
-      className={`sapling${intro ? " intro" : ""}${celebrate ? " celebrate" : ""}`}
+      className={`sapling${intro ? " intro" : ""}${celebrate ? " celebrate" : ""}${
+        onPlant ? " plantable" : ""
+      }`}
       viewBox="0 0 200 240"
       aria-hidden="true"
+      onClick={onPlant}
       onAnimationEnd={(event) => {
         // 右葉最後長完，它結束才算開場動畫完成。
         if ((event.target as Element).classList.contains("sapling-leaf-right")) {
@@ -77,6 +96,17 @@ export function Sapling({
           <path fill="url(#leaf-soft)" d="M100 158 C100 122 70 102 28 102 C28 140 58 164 100 158 Z" />
           <path className="sapling-vein" d="M100 158 C78 138 54 118 32 104" />
         </g>
+        {blossoms &&
+          BLOSSOMS.map(({ x, y, size }, index) => (
+            <g key={index} transform={`translate(${x} ${y}) scale(${size})`}>
+              <g className="blossom" style={{ animationDelay: `${index * 90}ms` }}>
+                {PETAL_ANGLES.map((angle) => (
+                  <circle key={angle} className="petal" r="4" cy="-5" transform={`rotate(${angle})`} />
+                ))}
+                <circle className="blossom-heart" r="2" />
+              </g>
+            </g>
+          ))}
       </g>
     </svg>
   );

@@ -1,10 +1,12 @@
 import type { MouseEvent } from "react";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
-import { THEMES, applyTheme } from "./theme";
+import { THEMES, ZHONGSHAN_THEME, applyTheme } from "./theme";
 
 function AppearanceSettings() {
   const { config, updateConfig } = useApp();
+
+  const themes = config.plantedYears.length > 0 ? [...THEMES, ZHONGSHAN_THEME] : THEMES;
 
   function choose(id: string, event: MouseEvent) {
     applyTheme(id, { x: event.clientX, y: event.clientY });
@@ -17,7 +19,7 @@ function AppearanceSettings() {
         <span>主題</span>
       </div>
       <div className="themes">
-        {THEMES.map(({ id, name, color }) => (
+        {themes.map(({ id, name, color }) => (
           <button
             key={id}
             className="theme"

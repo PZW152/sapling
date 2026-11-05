@@ -23,6 +23,8 @@
   --color-danger: #a8503c;
   --color-danger-soft: #f8ebe7;
   --color-close: #c4483a;
+  --color-blossom: #e38aa0;
+  --color-blossom-heart: #e9c46a;
 
   /* 圓角：Sapling 的招牌是對角葉形。 */
   --radius-leaf: 3px 18px 3px 18px;
@@ -74,6 +76,7 @@
   --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-display: "Segoe UI Variable Display", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "Microsoft JhengHei UI", monospace;
+  --font-brush: "DFKai-SB", "BiauKai", "KaiTi", serif;
 
   color-scheme: light;
   color: var(--color-ink);
@@ -130,6 +133,20 @@
   --color-hill: #aed0be;
   --color-tint: rgba(31, 111, 74, 0.08);
   --color-tint-strong: rgba(31, 111, 74, 0.16);
+}
+
+:root[data-theme="zhongshan"] {
+  --color-accent: #1e5a4c;
+  --color-accent-deep: #15463b;
+  --color-accent-leaf: #4b8a78;
+  --color-accent-pale: #a9cbbf;
+  --color-accent-soft: #e4efeb;
+  --color-sky-top: #fdfcf8;
+  --color-sky-bottom: #ece9dd;
+  --color-glow: rgba(255, 228, 214, 0.8);
+  --color-hill: #b8c9bd;
+  --color-tint: rgba(30, 90, 76, 0.08);
+  --color-tint-strong: rgba(30, 90, 76, 0.15);
 }
 
 ::view-transition-old(root),
@@ -227,6 +244,24 @@ button:disabled {
   height: 520px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--color-glow), transparent 68%);
+}
+
+/* 隱藏主題的題字。 */
+.motto {
+  display: none;
+  position: absolute;
+  top: 76px;
+  right: 34%;
+  color: var(--color-accent);
+  font-family: var(--font-brush);
+  font-size: 34px;
+  letter-spacing: 0.22em;
+  opacity: 0.16;
+  writing-mode: vertical-rl;
+}
+
+:root[data-theme="zhongshan"] .motto {
+  display: block;
 }
 
 .hills {
@@ -839,6 +874,34 @@ button:disabled {
   }
 }
 
+/* 植樹節：可以點擊種樹，種下後開出梅花。 */
+.sapling.plantable {
+  cursor: pointer;
+}
+
+.sapling.plantable .sapling-sway {
+  animation-duration: 3s;
+}
+
+.blossom {
+  animation: blossom-open var(--duration-grow) var(--spring) backwards;
+}
+
+@keyframes blossom-open {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-40deg);
+  }
+}
+
+.petal {
+  fill: var(--color-blossom);
+}
+
+.blossom-heart {
+  fill: var(--color-blossom-heart);
+}
+
 .sapling.celebrate .sapling-leaf-right {
   animation: leaf-bounce 620ms var(--ease);
 }
@@ -1212,7 +1275,8 @@ button:disabled {
 
 .themes {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   gap: var(--space-2);
 }
 

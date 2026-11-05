@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "../../shell/AppContext";
-import { isArborDay } from "../arbor-day";
+import { HIDDEN_THEME, isArborDay } from "../arbor-day";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { LaunchEvent, Profile, Progress } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
@@ -18,7 +18,8 @@ const ARBOR_DAY_LEAVES = 5;
 type Phase = "idle" | "preparing" | "running" | "failed";
 
 export function LaunchPage() {
-  const { instances, selected, listError, selectInstance, goTo, loadVersions } = useApp();
+  const { instances, selected, listError, config, selectInstance, goTo, loadVersions, updateConfig } =
+    useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -26,6 +27,7 @@ export function LaunchPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [plantings, setPlantings] = useState(0);
 
   useEffect(() => {
     const stopListening = listen<LaunchEvent>("launch-event", ({ payload }) => {
@@ -61,6 +63,15 @@ export function LaunchPage() {
       setError(String(reason));
       setPhase("failed");
     }
+  }
+
+  const today = new Date();
+  const arborDay = isArborDay(today);
+  const plantedToday = config.plantedYears.includes(today.getFullYear());
+
+  function plant() {
+    updateConfig({ plantedYears: [...config.plantedYears, today.getFullYear()] });
+    setPlantings(plantings + 1);
   }
 
   function choose(id: string) {
@@ -108,9 +119,12 @@ export function LaunchPage() {
 
         {/* 檔案都已存在時只是快速檢查，樹苗保持長大的樣子，不用重新長一次。 */}
         <Sapling
+          key={plantings}
           growth={preparing && downloading ? overall : 1}
-          leaves={isArborDay(new Date()) ? ARBOR_DAY_LEAVES : instances.length}
+          leaves={arborDay ? ARBOR_DAY_LEAVES : instances.length}
           celebrate={phase === "running"}
+          blossoms={config.theme === HIDDEN_THEME || (arborDay && plantedToday)}
+          onPlant={arborDay && !plantedToday ? plant : undefined}
         />
 
         <div className="stage-action">

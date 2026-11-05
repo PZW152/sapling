@@ -14,6 +14,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   theme: "sapling",
   disabledFeatures: [],
   featureSwitchesUnlocked: false,
+  plantedYears: [],
 };
 
 /** 目前的下載。失敗時保留 `error`，讓對應版本顯示原因。 */

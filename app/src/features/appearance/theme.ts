@@ -7,6 +7,9 @@ export const THEMES = [
   { id: "forest", name: "深林", color: "#1f6f4a" },
 ];
 
+/** 隱藏主題，在植樹節種過樹才會出現。 */
+export const ZHONGSHAN_THEME = { id: "zhongshan", name: "中山", color: "#1e5a4c" };
+
 const REVEAL_MS = 700;
 
 /** 切換主題。傳入點擊位置時，新顏色會從那裡擴散開來。 */

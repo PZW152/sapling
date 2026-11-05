@@ -22,6 +22,8 @@ pub struct LauncherConfig {
     pub disabled_features: Vec<String>,
     /// 功能模塊開關平時隱藏，在關於頁連按版本號才顯示。
     pub feature_switches_unlocked: bool,
+    /// 植樹節種過樹的年份，種過就解鎖隱藏主題。
+    pub planted_years: Vec<i32>,
 }
 
 impl Default for LauncherConfig {
@@ -32,6 +34,7 @@ impl Default for LauncherConfig {
             theme: DEFAULT_THEME.to_string(),
             disabled_features: Vec::new(),
             feature_switches_unlocked: false,
+            planted_years: Vec::new(),
         }
     }
 }
