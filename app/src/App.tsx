@@ -49,7 +49,7 @@ function TitleBar({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) => v
     <header className="titlebar" data-tauri-drag-region>
       <div className="brand" data-tauri-drag-region>
         <img src="/logo.svg" alt="" width={26} height={26} data-tauri-drag-region />
-        <span data-tauri-drag-region>Sapling</span>
+        <span data-tauri-drag-region>SPL</span>
       </div>
       <nav className="tabs" aria-label="主要分頁">
         <span

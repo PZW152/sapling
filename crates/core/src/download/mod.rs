@@ -63,6 +63,8 @@ pub struct DownloadTask {
 #[serde(rename_all = "camelCase")]
 pub struct DownloadProgress {
     pub finished_files: usize,
+    /// 真正下載的檔案數，其餘是已存在而跳過的。
+    pub downloaded_files: usize,
     pub total_files: usize,
     pub finished_bytes: u64,
     pub total_bytes: u64,
@@ -111,6 +113,7 @@ pub async fn download_all(
 ) -> Result<(), DownloadError> {
     let mut progress = DownloadProgress {
         finished_files: 0,
+        downloaded_files: 0,
         total_files: tasks.len(),
         finished_bytes: 0,
         total_bytes: tasks.iter().map(|task| task.size).sum(),
@@ -124,15 +127,18 @@ pub async fn download_all(
             };
             let client = client.clone();
             running.spawn(async move {
-                download_file(&client, &task).await?;
-                Ok::<u64, DownloadError>(task.size)
+                let outcome = download_file(&client, &task).await?;
+                Ok::<_, DownloadError>((task.size, outcome))
             });
         }
         let Some(finished) = running.join_next().await else {
             return Ok(());
         };
-        let size = finished.map_err(DownloadError::Interrupted)??;
+        let (size, outcome) = finished.map_err(DownloadError::Interrupted)??;
         progress.finished_files += 1;
+        if outcome == DownloadOutcome::Downloaded {
+            progress.downloaded_files += 1;
+        }
         progress.finished_bytes += size;
         on_progress(progress);
     }
@@ -326,6 +332,7 @@ mod tests {
             updates.last(),
             Some(&DownloadProgress {
                 finished_files: 5,
+                downloaded_files: 5,
                 total_files: 5,
                 finished_bytes: 25,
                 total_bytes: 25,

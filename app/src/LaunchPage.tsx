@@ -21,6 +21,7 @@ export function LaunchPage() {
   const [error, setError] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const loadVersions = useCallback(() => {
     setListError(null);
@@ -39,6 +40,9 @@ export function LaunchPage() {
     const stopListening = listen<LaunchEvent>("launch-event", ({ payload }) => {
       if (payload.kind === "progress") {
         setProgress(payload);
+        if (payload.downloadedFiles > 0) {
+          setDownloading(true);
+        }
       } else if (payload.kind === "started") {
         setPhase("running");
       } else {
@@ -53,6 +57,7 @@ export function LaunchPage() {
   async function startGame() {
     setPhase("preparing");
     setProgress(null);
+    setDownloading(false);
     setError("");
     setLogs([]);
     try {
@@ -106,7 +111,8 @@ export function LaunchPage() {
           <p className="edition">原版</p>
         </div>
 
-        <Sapling growth={preparing ? overall : 1} celebrate={phase === "running"} />
+        {/* 檔案都已存在時只是快速檢查，樹苗保持長大的樣子，不用重新長一次。 */}
+        <Sapling growth={preparing && downloading ? overall : 1} celebrate={phase === "running"} />
 
         <svg className="hills" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
           <path className="hill-back" d="M0 170C190 130 430 190 800 40V220H0Z" />

@@ -1,7 +1,8 @@
 /** 首頁的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1，完成時用 `celebrate` 抖一下葉子。 */
 export function Sapling({ growth, celebrate }: { growth: number; celebrate: boolean }) {
-  const rightLeaf = stageOf(growth, 0.35, 0.8);
-  const leftLeaf = stageOf(growth, 0.6, 1);
+  // 葉子要等莖長到它的位置才開始長，否則會浮在半空。
+  const leftLeaf = stageOf(growth, 0.36, 0.72);
+  const rightLeaf = stageOf(growth, 0.6, 1);
 
   return (
     <svg

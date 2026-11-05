@@ -21,6 +21,7 @@ export type Settings = {
 export type Progress = {
   stage: "game" | "java";
   finishedFiles: number;
+  downloadedFiles: number;
   totalFiles: number;
   finishedBytes: number;
   totalBytes: number;
