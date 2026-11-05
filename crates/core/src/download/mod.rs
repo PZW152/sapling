@@ -9,6 +9,10 @@ use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::task::{JoinError, JoinSet};
+
+/// 同時下載的檔案數量上限的預設值。
+pub const DEFAULT_CONCURRENCY: usize = 16;
 
 const MAX_ATTEMPTS: u32 = 3;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
@@ -39,6 +43,8 @@ pub enum DownloadError {
         #[source]
         source: io::Error,
     },
+    #[error("下載工作意外中斷，請再試一次")]
+    Interrupted(#[source] JoinError),
 }
 
 /// 一個要下載的檔案。
@@ -47,6 +53,17 @@ pub struct DownloadTask {
     pub url: String,
     pub path: PathBuf,
     pub sha1: String,
+    /// 檔案大小，用來計算進度。
+    pub size: u64,
+}
+
+/// 整批下載的進度。檔案完成一個才更新一次。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DownloadProgress {
+    pub finished_files: usize,
+    pub total_files: usize,
+    pub finished_bytes: u64,
+    pub total_bytes: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +79,61 @@ pub fn new_client() -> Result<reqwest::Client, DownloadError> {
         .read_timeout(READ_TIMEOUT)
         .build()
         .map_err(DownloadError::ClientSetup)
+}
+
+/// 下載一小段文字內容（例如清單），不寫入硬碟。
+pub async fn fetch_text(client: &reqwest::Client, url: &str) -> Result<String, DownloadError> {
+    let network_error = |source| DownloadError::Network {
+        url: url.to_string(),
+        source,
+    };
+    client
+        .get(url)
+        .send()
+        .await
+        .and_then(|response| response.error_for_status())
+        .map_err(network_error)?
+        .text()
+        .await
+        .map_err(network_error)
+}
+
+/// 並行下載一批檔案。任何一個檔案最終失敗，就取消其餘工作並回傳該錯誤。
+///
+/// `tasks` 裡不可有重複的路徑，否則兩個工作會同時寫同一個暫存檔。
+pub async fn download_all(
+    client: &reqwest::Client,
+    tasks: Vec<DownloadTask>,
+    concurrency: usize,
+    mut on_progress: impl FnMut(DownloadProgress),
+) -> Result<(), DownloadError> {
+    let mut progress = DownloadProgress {
+        finished_files: 0,
+        total_files: tasks.len(),
+        finished_bytes: 0,
+        total_bytes: tasks.iter().map(|task| task.size).sum(),
+    };
+    let mut pending = tasks.into_iter();
+    let mut running = JoinSet::new();
+    loop {
+        while running.len() < concurrency.max(1) {
+            let Some(task) = pending.next() else {
+                break;
+            };
+            let client = client.clone();
+            running.spawn(async move {
+                download_file(&client, &task).await?;
+                Ok::<u64, DownloadError>(task.size)
+            });
+        }
+        let Some(finished) = running.join_next().await else {
+            return Ok(());
+        };
+        let size = finished.map_err(DownloadError::Interrupted)??;
+        progress.finished_files += 1;
+        progress.finished_bytes += size;
+        on_progress(progress);
+    }
 }
 
 /// 確保 `task.path` 是一個 SHA1 正確的檔案。
@@ -224,7 +296,61 @@ mod tests {
             url: url.to_string(),
             path: dir.join("sub").join("file.txt"),
             sha1: HELLO_SHA1.to_string(),
+            size: 5,
         }
+    }
+
+    #[tokio::test]
+    async fn downloads_a_batch_and_reports_progress() {
+        let dir = empty_test_dir("batch");
+        let (url, requests) = serve(vec![("200 OK", "hello"); 5]).await;
+        let tasks: Vec<DownloadTask> = (0..5)
+            .map(|index| DownloadTask {
+                path: dir.join(format!("{index}.txt")),
+                ..task(&url, &dir)
+            })
+            .collect();
+        let mut updates = Vec::new();
+
+        download_all(&new_client().unwrap(), tasks, 2, |progress| {
+            updates.push(progress)
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(requests.load(Ordering::SeqCst), 5);
+        assert_eq!(updates.len(), 5);
+        assert_eq!(
+            updates.last(),
+            Some(&DownloadProgress {
+                finished_files: 5,
+                total_files: 5,
+                finished_bytes: 25,
+                total_bytes: 25,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn batch_stops_with_the_error_of_a_failed_file() {
+        let dir = empty_test_dir("batch-fail");
+        let (url, _) = serve(vec![("200 OK", "wrong"); 3]).await;
+
+        let result = download_all(
+            &new_client().unwrap(),
+            vec![task(&url, &dir)],
+            DEFAULT_CONCURRENCY,
+            |_| {},
+        )
+        .await;
+
+        assert!(matches!(result, Err(DownloadError::ChecksumMismatch { .. })));
+    }
+
+    #[tokio::test]
+    async fn empty_batch_finishes_immediately() {
+        let result = download_all(&new_client().unwrap(), vec![], 4, |_| {}).await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]

@@ -1,6 +1,7 @@
 //! 版本清單：從 Mojang 取得所有 Minecraft 版本，並篩選出 v1 支援的正式版。
 
 pub mod details;
+pub mod install;
 pub mod rules;
 
 use std::time::Duration;

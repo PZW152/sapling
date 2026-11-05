@@ -26,6 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .join(&details.id)
             .join("client.jar"),
         sha1: client_jar.sha1.clone(),
+        size: client_jar.size,
     };
 
     let started = Instant::now();
