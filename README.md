@@ -1,0 +1,35 @@
+<p align="center"><img src="assets/logo.svg" width="96" alt="Sapling Launcher logo"></p>
+
+<h1 align="center">Sapling Launcher</h1>
+
+<p align="center">樹苗：一個簡單好用的 Minecraft Java 版啟動器（簡稱 SPL）</p>
+
+## 功能
+
+- 使用正版微軟帳號登入，重開後保持登入
+- 自動下載遊戲檔案和所需的 Java，並用 SHA1 校驗
+- 支援 1.19 及以後的原版正式版
+- 實時顯示遊戲日誌
+- 可調整遊戲記憶體、Java 參數和同時下載數
+
+本啟動器不提供離線登入，你需要擁有正版 Minecraft Java 版。
+
+## 安裝
+
+到 [Releases](https://github.com/PZW152/sapling/releases) 下載最新的安裝檔。
+
+目前只支援 Windows 11 x64。安裝檔尚未數位簽章，Windows 可能會顯示安全警告。
+
+## 從原始碼建置
+
+需要 Rust（MSVC 工具鏈）、Node.js 和 Microsoft C++ Build Tools。
+
+```bash
+cd app
+npm install
+npm run tauri dev
+```
+
+## 聲明
+
+非 Minecraft 官方產品，與 Mojang 和 Microsoft 無關。

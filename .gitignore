@@ -1,2 +1,5 @@
 # Rust build output (workspace root)
 /target/
+
+# Private AI working notes, kept out of the public repository
+/CLAUDE.md
