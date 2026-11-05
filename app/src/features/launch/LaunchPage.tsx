@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "../../shell/AppContext";
+import { isArborDay } from "../arbor-day";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { LaunchEvent, Profile, Progress } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
@@ -11,6 +12,8 @@ import { Sapling } from "./Sapling";
 
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
+/** 植樹節當天樹苗長滿所有葉子。 */
+const ARBOR_DAY_LEAVES = 5;
 
 type Phase = "idle" | "preparing" | "running" | "failed";
 
@@ -106,7 +109,7 @@ export function LaunchPage() {
         {/* 檔案都已存在時只是快速檢查，樹苗保持長大的樣子，不用重新長一次。 */}
         <Sapling
           growth={preparing && downloading ? overall : 1}
-          leaves={instances.length}
+          leaves={isArborDay(new Date()) ? ARBOR_DAY_LEAVES : instances.length}
           celebrate={phase === "running"}
         />
 

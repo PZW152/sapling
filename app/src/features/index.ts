@@ -1,6 +1,7 @@
 import type { Feature } from "../shell/feature";
 import { about } from "./about";
 import { appearance } from "./appearance";
+import { arborDay } from "./arbor-day";
 import { crash } from "./crash";
 import { download } from "./download";
 import { instances } from "./instances";
@@ -20,4 +21,5 @@ export const FEATURES: Feature[] = [
   update,
   settings,
   about,
+  arborDay,
 ];

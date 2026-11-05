@@ -1371,6 +1371,45 @@ button:disabled {
   animation: popover-in var(--duration-grow) var(--spring);
 }
 
+/* 植樹節彩蛋 */
+.arbor-note {
+  position: absolute;
+  top: calc(var(--titlebar-height) + var(--space-3));
+  right: var(--space-4);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 400px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-leaf);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-popover);
+  animation: popover-in var(--duration-grow) var(--spring);
+}
+
+.arbor-note strong {
+  font-weight: 600;
+}
+
+.arbor-note p {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.arbor-note .text-button {
+  flex: none;
+}
+
+.arbor-leaf {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 2px 9px 2px 9px;
+  background: var(--color-accent);
+}
+
 /* 下載頁：版本長在一條藤蔓上。 */
 .download {
   display: grid;
