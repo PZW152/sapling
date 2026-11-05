@@ -4,8 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useApp } from "../../shell/AppContext";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { LaunchEvent, Profile, Progress } from "../../shell/types";
-import { AccountChip } from "./AccountPanel";
-import { InstancePicker } from "./InstancePicker";
+import { AccountPanel } from "./AccountPanel";
 import { LogPanel } from "./LogPanel";
 
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
@@ -67,39 +66,9 @@ export function LaunchPage() {
 
   return (
     <div className="launch">
-      <AccountChip profile={profile} onProfileChange={setProfile} disabled={busy} />
-
-      <div className="stage-text">
-        <p className="game-name">{selected?.name ?? "還沒有實例"}</p>
-        <h1 key={selected?.id ?? "empty"}>{selected?.version ?? "待播種"}</h1>
-      </div>
-
-      <div className="stage-action">
-        <StatusLine
-          phase={phase}
-          progress={progress}
-          error={error}
-          percent={overall}
-          signedIn={profile !== null}
-          noInstance={noInstance}
-        />
-        {phase === "failed" && logs.length > 0 && (
-          <button className="text-button problem-button" onClick={() => setLogOpen(true)}>
-            查看問題記錄
-          </button>
-        )}
-        {preparing && (
-          <div
-            className="progress"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(overall * 100)}
-          >
-            <div style={{ transform: `scaleX(${overall})` }} />
-          </div>
-        )}
-        <div className="action-row">
+      <aside className="side">
+        <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
+        <div className="side-launch">
           {noInstance ? (
             <button className="primary" onClick={() => goTo("download")}>
               前往下載
@@ -110,22 +79,70 @@ export function LaunchPage() {
               disabled={!selected || !profile || busy}
               onClick={startGame}
             >
-              {launchLabel(phase)}
+              <span>{launchLabel(phase)}</span>
+              <small>{selected?.name}</small>
             </button>
-          )}
-          {listError ? (
-            <button className="outline" onClick={loadVersions}>
-              重新取得版本
-            </button>
-          ) : (
-            <InstancePicker
-              instances={instances}
-              selected={selected}
-              disabled={busy}
-              onSelect={choose}
-            />
           )}
         </div>
+      </aside>
+
+      <div className="cards">
+        <section className="panel">
+          <h2 className="card-title">目前實例</h2>
+          <p className="current-name">{selected ? `Minecraft ${selected.version}` : "還沒有實例"}</p>
+          <StatusLine
+            phase={phase}
+            progress={progress}
+            error={error}
+            percent={overall}
+            signedIn={profile !== null}
+            noInstance={noInstance}
+          />
+          {preparing && (
+            <div
+              className="progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(overall * 100)}
+            >
+              <div style={{ transform: `scaleX(${overall})` }} />
+            </div>
+          )}
+          {phase === "failed" && logs.length > 0 && (
+            <button className="text-button" onClick={() => setLogOpen(true)}>
+              查看問題記錄
+            </button>
+          )}
+        </section>
+
+        <section className="panel instance-card">
+          <h2 className="card-title">我的實例</h2>
+          {listError && (
+            <div className="inline-error">
+              <p className="error">{listError}</p>
+              <button className="text-button" onClick={loadVersions}>
+                重試
+              </button>
+            </div>
+          )}
+          {noInstance && !listError && <p className="status">到下載頁下載一個版本，就會出現在這裡。</p>}
+          <ul className="row-list">
+            {instances.map((instance) => (
+              <li key={instance.id}>
+                <button
+                  className="row"
+                  disabled={busy}
+                  aria-current={instance.id === selected?.id ? "true" : undefined}
+                  onClick={() => choose(instance.id)}
+                >
+                  <span>{instance.name}</span>
+                  <small>{instance.version}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
 
       {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}

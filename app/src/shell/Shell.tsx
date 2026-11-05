@@ -33,7 +33,7 @@ function Frame() {
   const current = tabs[index]?.id ?? HOME_TAB;
 
   return (
-    <div className="app" style={{ "--scene": index } as CSSProperties}>
+    <div className="app">
       <Scene />
       <header className="titlebar" data-tauri-drag-region>
         <div className="brand" data-tauri-drag-region>

@@ -2,33 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { LoginCode, Profile } from "../../shell/types";
 
-/** 首頁左上角的帳號標籤，點開才顯示登入或登出。 */
-export function AccountChip({
-  profile,
-  onProfileChange,
-  disabled,
-}: {
-  profile: Profile | null;
-  onProfileChange: (profile: Profile | null) => void;
-  disabled: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="account-chip-wrap">
-      <button className="account-chip" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {profile ? <Avatar skinUrl={profile.skinUrl} /> : null}
-        <span>{profile?.name ?? "登入微軟帳號"}</span>
-      </button>
-      {/* 保持掛載：打開啟動器時要在這裡恢復登入。 */}
-      <div className="account-popover" hidden={!open}>
-        <AccountPanel profile={profile} onProfileChange={onProfileChange} disabled={disabled} />
-      </div>
-    </div>
-  );
-}
-
-function AccountPanel({
+export function AccountPanel({
   profile,
   onProfileChange,
   disabled,
@@ -79,7 +53,7 @@ function AccountPanel({
 
   if (code) {
     return (
-      <section className="panel account">
+      <section className="account">
         <h2>在瀏覽器輸入代碼</h2>
         <button
           className="login-code"
@@ -96,14 +70,10 @@ function AccountPanel({
   }
 
   return (
-    <section className="panel account">
-      <div className="account-identity">
-        <Avatar skinUrl={profile?.skinUrl ?? null} />
-        <div>
-          <h2>{profile?.name ?? (restoring ? "正在恢復登入" : "尚未登入")}</h2>
-          <p>{profile ? "正版帳號" : "需要正版微軟帳號"}</p>
-        </div>
-      </div>
+    <section className="account">
+      <Avatar skinUrl={profile?.skinUrl ?? null} />
+      <h2>{profile?.name ?? (restoring ? "正在恢復登入" : "尚未登入")}</h2>
+      <p>{profile ? "正版帳號" : "需要正版微軟帳號"}</p>
       {profile ? (
         <button className="secondary" disabled={disabled} onClick={signOut}>
           登出
