@@ -1,5 +1,5 @@
 import { useApp } from "../../shell/AppContext";
-import { Slider } from "../settings/Slider";
+import { Slider } from "../../shell/Slider";
 
 const MIN_CONCURRENCY = 1;
 const MAX_CONCURRENCY = 64;

@@ -98,7 +98,13 @@ function Rail({ tabs, current }: { tabs: Feature[]; current: string }) {
 }
 
 function WindowControls() {
+  const { flushSaves } = useApp();
   const appWindow = getCurrentWindow();
+
+  async function close() {
+    await flushSaves();
+    await appWindow.close();
+  }
 
   return (
     <div className="window-controls">
@@ -112,7 +118,7 @@ function WindowControls() {
           <rect x="2.5" y="2.5" width="7" height="7" rx="1" />
         </svg>
       </button>
-      <button className="close" aria-label="關閉" onClick={() => appWindow.close()}>
+      <button className="close" aria-label="關閉" onClick={close}>
         <svg viewBox="0 0 12 12" aria-hidden="true">
           <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
         </svg>

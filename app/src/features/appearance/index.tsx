@@ -1,7 +1,9 @@
 import type { MouseEvent } from "react";
+import { applyTheme } from "../../shell/applyTheme";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
-import { THEMES, ZHONGSHAN_THEME, applyTheme } from "./theme";
+import { THEMES, ZHONGSHAN_THEME } from "./theme";
+import "./appearance.css";
 
 function AppearanceSettings() {
   const { config, updateConfig } = useApp();

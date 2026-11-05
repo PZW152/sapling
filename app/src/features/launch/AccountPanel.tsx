@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "../../shell/api";
 import type { LoginCode, Profile } from "../../shell/types";
 
 export function AccountPanel({
@@ -18,7 +18,7 @@ export function AccountPanel({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    invoke<Profile | null>("restore_account")
+    api.restoreAccount()
       .then(onProfileChange)
       .catch((reason) => setError(String(reason)))
       .finally(() => setRestoring(false));
@@ -28,11 +28,11 @@ export function AccountPanel({
     setError("");
     setStarting(true);
     try {
-      const loginCode = await invoke<LoginCode>("login_start");
+      const loginCode = await api.loginStart();
       setCode(loginCode);
       setCopied(await copyText(loginCode.userCode));
       setStarting(false);
-      onProfileChange(await invoke<Profile>("login_finish"));
+      onProfileChange(await api.loginFinish());
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -44,7 +44,7 @@ export function AccountPanel({
   async function signOut() {
     setError("");
     try {
-      await invoke("sign_out");
+      await api.signOut();
       onProfileChange(null);
     } catch (reason) {
       setError(String(reason));

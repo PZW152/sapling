@@ -1,0 +1,22 @@
+.arbor-note {
+  top: calc(var(--top-height) + var(--space-3));
+  right: var(--space-3);
+  max-width: 400px;
+}
+
+.arbor-note strong {
+  font-weight: 600;
+}
+
+.arbor-note p {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.arbor-leaf {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-hero);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "../../shell/api";
 import type { Feature } from "../../shell/feature";
 import type { UpdateInfo } from "../../shell/types";
 
@@ -17,7 +17,7 @@ function useUpdate() {
   async function check() {
     setState({ kind: "checking" });
     try {
-      const found = await invoke<UpdateInfo | null>("check_update");
+      const found = await api.checkUpdate();
       setState(found ? { kind: "available", update: found } : { kind: "latest" });
     } catch (reason) {
       setState({ kind: "failed", message: String(reason) });
@@ -27,7 +27,7 @@ function useUpdate() {
   async function install(update: UpdateInfo) {
     setState({ kind: "installing" });
     try {
-      await invoke("apply_update", { update });
+      await api.applyUpdate(update);
     } catch (reason) {
       setState({ kind: "failed", message: String(reason) });
     }
@@ -67,7 +67,7 @@ function UpdateNotice() {
   const [installing, setInstalling] = useState(false);
 
   useEffect(() => {
-    invoke<UpdateInfo | null>("check_update")
+    api.checkUpdate()
       .then(setUpdate)
       .catch(() => {});
   }, []);
@@ -84,7 +84,7 @@ function UpdateNotice() {
         disabled={installing}
         onClick={() => {
           setInstalling(true);
-          invoke("apply_update", { update }).catch((reason) => {
+          api.applyUpdate(update).catch((reason) => {
             setError(String(reason));
             setInstalling(false);
           });

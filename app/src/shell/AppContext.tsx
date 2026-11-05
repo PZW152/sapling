@@ -1,10 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { applyTheme } from "../features/appearance/theme";
-import { overallProgress } from "./progress";
-import type { Instance, LaunchEvent, LauncherConfig, Progress, VersionList } from "./types";
+import { api } from "./api";
+import { applyTheme } from "./applyTheme";
+import { createSaveQueue } from "./saveQueue";
+import type { Instance, LauncherConfig, VersionList } from "./types";
 
 /** 停止調整多久後自動保存。 */
 const SAVE_DELAY_MS = 400;
@@ -17,14 +16,6 @@ const DEFAULT_CONFIG: LauncherConfig = {
   plantedYears: [],
 };
 
-/** 目前的下載。失敗時保留 `error`，讓對應版本顯示原因。 */
-export type InstallState = {
-  id: string;
-  progress: Progress | null;
-  percent: number;
-  error: string;
-};
-
 type AppState = {
   /** 實例和設定第一次載入完成前為 false。 */
   loaded: boolean;
@@ -33,7 +24,6 @@ type AppState = {
   instances: Instance[];
   selected: Instance | null;
   config: LauncherConfig;
-  install: InstallState | null;
   saveError: string;
   isEnabled: (featureId: string) => boolean;
   goTo: (featureId: string) => void;
@@ -43,8 +33,8 @@ type AppState = {
   selectInstance: (id: string) => void;
   updateConfig: (change: Partial<LauncherConfig>) => void;
   updateInstance: (change: Partial<Instance>) => void;
-  installGame: (version: string) => Promise<void>;
-  playVersion: (version: string) => Promise<void>;
+  /** 立刻保存等待中的改動。 */
+  flushSaves: () => Promise<void>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -71,30 +61,32 @@ export function AppProvider({
   const [listError, setListError] = useState<string | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [install, setInstall] = useState<InstallState | null>(null);
   const [saveError, setSaveError] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [saves] = useState(() => createSaveQueue(SAVE_DELAY_MS, setSaveError));
+  // 長時間的操作結束後才改設定時，要以最新的設定為基礎，不能用當初的舊值。
+  const latestConfig = useRef(config);
 
   const selected =
     instances.find((instance) => instance.id === config.selectedInstance) ?? instances[0] ?? null;
 
   const loadInstances = useCallback(async () => {
-    setInstances(await invoke<Instance[]>("list_instances"));
+    setInstances(await api.listInstances());
   }, []);
 
   const loadVersions = useCallback(async () => {
     setListError(null);
     try {
-      setList(await invoke<VersionList>("list_versions"));
+      setList(await api.listVersions());
     } catch (reason) {
       setListError(String(reason));
     }
   }, []);
 
   useEffect(() => {
-    Promise.all([invoke<LauncherConfig>("load_config"), loadInstances()])
+    Promise.all([api.loadConfig(), loadInstances()])
       .then(([saved]) => {
+        latestConfig.current = saved;
         setConfig(saved);
         applyTheme(saved.theme);
       })
@@ -102,36 +94,14 @@ export function AppProvider({
     loadVersions();
   }, [loadInstances, loadVersions]);
 
-  useEffect(() => {
-    const stopListening = listen<LaunchEvent>("install-event", ({ payload }) => {
-      if (payload.kind === "progress") {
-        setInstall(
-          (current) =>
-            current && { ...current, progress: payload, percent: overallProgress(payload) },
-        );
-      }
-    });
-    return () => {
-      stopListening.then((stop) => stop());
-    };
-  }, []);
-
-  const queueSave = useCallback((save: () => Promise<unknown>) => {
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      save()
-        .then(() => setSaveError(""))
-        .catch((reason) => setSaveError(String(reason)));
-    }, SAVE_DELAY_MS);
-  }, []);
-
   const updateConfig = useCallback(
     (change: Partial<LauncherConfig>) => {
-      const next = { ...config, ...change };
+      const next = { ...latestConfig.current, ...change };
+      latestConfig.current = next;
       setConfig(next);
-      queueSave(() => invoke("save_config", { config: next }));
+      saves.schedule("config", () => api.saveConfig(next));
     },
-    [config, queueSave],
+    [saves],
   );
 
   const updateInstance = useCallback(
@@ -143,51 +113,14 @@ export function AppProvider({
       setInstances((current) =>
         current.map((instance) => (instance.id === next.id ? next : instance)),
       );
-      queueSave(() => invoke("save_instance", { instance: next }));
+      saves.schedule(`instance:${next.id}`, () => api.saveInstance(next));
     },
-    [selected, queueSave],
+    [selected, saves],
   );
 
   const selectInstance = useCallback(
     (id: string) => updateConfig({ selectedInstance: id }),
     [updateConfig],
-  );
-
-  /** 找到這個版本的實例；沒有就建立一個，以版本號為名稱。 */
-  const instanceForVersion = useCallback(
-    async (version: string) => {
-      const existing = instances.find((instance) => instance.version === version);
-      if (existing) {
-        return existing;
-      }
-      const created = await invoke<Instance>("create_instance", { name: version, version });
-      await loadInstances();
-      return created;
-    },
-    [instances, loadInstances],
-  );
-
-  const installGame = useCallback(
-    async (version: string) => {
-      setInstall({ id: version, progress: null, percent: 0, error: "" });
-      try {
-        await invoke("install_game", { version });
-        selectInstance((await instanceForVersion(version)).id);
-        setInstall(null);
-        await loadVersions();
-      } catch (reason) {
-        setInstall({ id: version, progress: null, percent: 0, error: String(reason) });
-      }
-    },
-    [instanceForVersion, loadVersions, selectInstance],
-  );
-
-  const playVersion = useCallback(
-    async (version: string) => {
-      selectInstance((await instanceForVersion(version)).id);
-      goTo("launch");
-    },
-    [goTo, instanceForVersion, selectInstance],
   );
 
   const value = useMemo(
@@ -198,7 +131,6 @@ export function AppProvider({
       instances,
       selected,
       config,
-      install,
       saveError,
       activeTab,
       isEnabled: (featureId: string) => !config.disabledFeatures.includes(featureId),
@@ -208,8 +140,7 @@ export function AppProvider({
       selectInstance,
       updateConfig,
       updateInstance,
-      installGame,
-      playVersion,
+      flushSaves: saves.flush,
     }),
     [
       loaded,
@@ -218,7 +149,6 @@ export function AppProvider({
       instances,
       selected,
       config,
-      install,
       saveError,
       activeTab,
       goTo,
@@ -227,8 +157,7 @@ export function AppProvider({
       selectInstance,
       updateConfig,
       updateInstance,
-      installGame,
-      playVersion,
+      saves,
     ],
   );
 

@@ -1,5 +1,6 @@
 import type { Feature } from "../../shell/feature";
 import { InstancePage } from "./InstancePage";
+import "./instances.css";
 
 export const instances: Feature = {
   id: "instances",

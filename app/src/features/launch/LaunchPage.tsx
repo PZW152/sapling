@@ -1,99 +1,43 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useApp } from "../../shell/AppContext";
 import { useSlideMark } from "../../shell/motion";
-import type { Instance, LaunchEvent, Profile, Progress } from "../../shell/types";
+import type { Instance, Profile } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
 import { LaunchOverlay } from "./LaunchOverlay";
-import type { OverlayOrigin } from "./LaunchOverlay";
 import { LogPanel } from "./LogPanel";
-
-/** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
-const MAX_LOG_LINES = 2000;
-/** 遊戲開始後等多久才收起窗口，讓用戶看到轉場完成。 */
-const MINIMIZE_DELAY_MS = 1200;
-
-type Phase = "idle" | "preparing" | "running" | "failed";
+import { useLaunch } from "./useLaunch";
+import type { Phase } from "./useLaunch";
 
 export function LaunchPage() {
   const { loaded, instances, selected, listError, selectInstance, goTo, loadVersions, isEnabled } =
     useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState<Progress | null>(null);
-  const [error, setError] = useState("");
-  const [logs, setLogs] = useState<string[]>([]);
+  const { phase, progress, error, logs, origin, start, reset, clearOrigin } = useLaunch();
   const [logOpen, setLogOpen] = useState(false);
-  const [origin, setOrigin] = useState<OverlayOrigin | null>(null);
   const hero = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const stopListening = listen<LaunchEvent>("launch-event", ({ payload }) => {
-      if (payload.kind === "progress") {
-        setProgress(payload);
-      } else if (payload.kind === "started") {
-        setPhase("running");
-      } else {
-        setLogs((lines) => [...lines, payload.line].slice(-MAX_LOG_LINES));
-      }
-    });
-    return () => {
-      stopListening.then((stop) => stop());
-    };
-  }, []);
-
-  useEffect(() => {
-    if (phase !== "running") {
-      return;
-    }
-    // 收起後移除轉場，用戶中途打開窗口時仍然可以使用啟動器。
-    const timer = setTimeout(async () => {
-      await getCurrentWindow().minimize();
-      setOrigin(null);
-    }, MINIMIZE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [phase]);
-
-  async function returnToLauncher() {
-    const appWindow = getCurrentWindow();
-    await appWindow.unminimize();
-    await appWindow.setFocus();
-  }
-
-  async function startGame() {
+  function startGame() {
     if (!selected) {
       return;
     }
     const bounds = hero.current?.getBoundingClientRect();
-    if (bounds) {
-      setOrigin({
-        top: bounds.top,
-        right: window.innerWidth - bounds.right,
-        bottom: window.innerHeight - bounds.bottom,
-        left: bounds.left,
-      });
-    }
-    setPhase("preparing");
-    setProgress(null);
-    setError("");
-    setLogs([]);
-    try {
-      await invoke("play_game", { instanceId: selected.id });
-      setPhase("idle");
-    } catch (reason) {
-      setError(String(reason));
-      setPhase("failed");
-    }
-    returnToLauncher();
+    start(
+      selected.id,
+      bounds
+        ? {
+            top: bounds.top,
+            right: window.innerWidth - bounds.right,
+            bottom: window.innerHeight - bounds.bottom,
+            left: bounds.left,
+          }
+        : null,
+    );
   }
 
   function choose(id: string) {
     selectInstance(id);
-    setPhase("idle");
-    setProgress(null);
+    reset();
   }
 
   const busy = phase === "preparing" || phase === "running";
@@ -161,7 +105,7 @@ export function LaunchPage() {
           name={selected.name}
           version={selected.version}
           progress={progress}
-          onClosed={() => setOrigin(null)}
+          onClosed={clearOrigin}
         />
       )}
 

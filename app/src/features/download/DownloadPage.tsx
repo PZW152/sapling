@@ -1,9 +1,12 @@
 import type { CSSProperties } from "react";
 import { useApp } from "../../shell/AppContext";
-import type { InstallState } from "../../shell/AppContext";
+import { groupBySeries } from "./series";
+import { useInstall } from "./useInstall";
+import type { InstallState } from "./useInstall";
 
 export function DownloadPage() {
-  const { list, listError, install, loadVersions, installGame, playVersion } = useApp();
+  const { list, listError, loadVersions } = useApp();
+  const { install, installGame, playVersion } = useInstall();
 
   if (!list && !listError) {
     return (
@@ -121,24 +124,4 @@ function VersionRow({
       {failed && <p className="error vine-progress">{install.error}</p>}
     </div>
   );
-}
-
-function groupBySeries(versions: string[]) {
-  const groups: { series: string; versions: string[] }[] = [];
-  for (const id of versions) {
-    const series = seriesOf(id);
-    const last = groups[groups.length - 1];
-    if (last?.series === series) {
-      last.versions.push(id);
-    } else {
-      groups.push({ series, versions: [id] });
-    }
-  }
-  return groups;
-}
-
-/** `1.21.4` 屬於 1.21，`26.1.2` 屬於 26。 */
-function seriesOf(id: string) {
-  const parts = id.split(".");
-  return parts[0] === "1" ? `${parts[0]}.${parts[1]}` : parts[0];
 }

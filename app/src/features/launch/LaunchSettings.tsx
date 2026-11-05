@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
-import { Slider } from "../settings/Slider";
+import { Slider } from "../../shell/Slider";
 
 const MEMORY_STEP_MB = 512;
 const MIN_MEMORY_MB = 1024;
@@ -15,7 +15,7 @@ export function LaunchSettings() {
   const [totalMemory, setTotalMemory] = useState(0);
 
   useEffect(() => {
-    invoke<number>("system_memory_mb").then(setTotalMemory);
+    api.systemMemoryMb().then(setTotalMemory);
   }, []);
 
   const memoryMb = selected?.memoryMb ?? AUTO_MEMORY;

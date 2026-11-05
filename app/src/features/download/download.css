@@ -1,0 +1,118 @@
+/* 下載頁 */
+.download {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  height: 100%;
+}
+
+.download-head h2 {
+  display: none;
+}
+
+.download-head p {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.vine {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}
+
+.vine-series {
+  animation: tile-in var(--slow) var(--spring) backwards;
+  animation-delay: calc(var(--i) * var(--stagger));
+}
+
+.vine-title {
+  padding: var(--space-3) var(--space-2) var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.vine-row {
+  display: grid;
+  grid-template-columns: var(--node-size) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 42px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  transition: background-color var(--fast) var(--ease);
+}
+
+.vine-row:hover {
+  background: var(--color-tint);
+}
+
+.vine-leaf {
+  width: var(--node-size);
+  height: var(--node-size);
+  border-radius: 50%;
+  background: var(--color-line);
+  transition:
+    background-color var(--medium) var(--ease),
+    transform var(--medium) var(--spring);
+}
+
+.vine-row:hover .vine-leaf {
+  transform: scale(1.4);
+}
+
+.vine-row.installed .vine-leaf {
+  background: var(--color-hero);
+  animation: pop var(--slow) var(--spring);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.3);
+  }
+}
+
+.vine-row.active .vine-leaf {
+  background: var(--color-accent);
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
+.vine-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.vine-id small {
+  color: var(--color-strong);
+  font-size: var(--text-xs);
+}
+
+.vine-actions .secondary {
+  height: 32px;
+  min-width: 68px;
+  font-size: var(--text-sm);
+}
+
+.vine-progress {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-1);
+  animation: title-in var(--medium) var(--ease);
+}
+
+@media (min-width: 1040px) {
+  .vine {
+    columns: 2;
+    column-gap: var(--space-5);
+  }
+
+  .vine-series {
+    break-inside: avoid;
+  }
+}

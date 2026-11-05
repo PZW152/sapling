@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
+import "./about.css";
 
 const REPOSITORY_URL = "https://github.com/PZW152/sapling";
 const USAGE_URL = `${REPOSITORY_URL}/blob/main/USAGE.md`;
@@ -43,10 +44,10 @@ function AboutPage() {
           <p className="status">你已經種下 {config.plantedYears.length} 棵樹。</p>
         )}
         <div className="about-links">
-          <button className="secondary" onClick={() => invoke("open_link", { url: REPOSITORY_URL })}>
+          <button className="secondary" onClick={() => api.openLink(REPOSITORY_URL)}>
             GitHub 主頁
           </button>
-          <button className="secondary" onClick={() => invoke("open_link", { url: USAGE_URL })}>
+          <button className="secondary" onClick={() => api.openLink(USAGE_URL)}>
             使用指南
           </button>
         </div>

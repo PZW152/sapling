@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { CSSProperties } from "react";
+import { api } from "../../shell/api";
 import { useTween } from "../../shell/motion";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
@@ -73,6 +74,11 @@ export function LaunchOverlay({
               progress &&
               `正在檢查${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB`}
           </p>
+          {!running && !closing && (
+            <button className="overlay-cancel" onClick={api.cancelLaunch}>
+              取消
+            </button>
+          )}
         </div>
       </div>
     </div>

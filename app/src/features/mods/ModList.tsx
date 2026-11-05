@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "../../shell/api";
+import type { ModAction } from "../../shell/api";
 import type { ModFile } from "../../shell/types";
 
 const BYTES_PER_MB = 1024 * 1024;
@@ -9,16 +10,20 @@ export function ModList({ instanceId }: { instanceId: string }) {
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
-    invoke<ModFile[]>("list_mods", { id: instanceId })
+    api.listMods(instanceId)
       .then(setMods)
       .catch((reason) => setError(String(reason)));
   }, [instanceId]);
 
   useEffect(load, [load]);
 
-  function act(command: string, file: ModFile, enabled = file.enabled) {
+  function act(
+    request: (action: ModAction) => Promise<void>,
+    file: ModFile,
+    enabled = file.enabled,
+  ) {
     setError("");
-    invoke(command, { action: { instanceId, name: file.name, enabled } })
+    request({ instanceId, name: file.name, enabled })
       .then(load)
       .catch((reason) => setError(String(reason)));
   }
@@ -30,9 +35,7 @@ export function ModList({ instanceId }: { instanceId: string }) {
         <button
           className="text-button"
           onClick={() =>
-            invoke("open_mods_folder", { id: instanceId }).catch((reason) =>
-              setError(String(reason)),
-            )
+            api.openModsFolder(instanceId).catch((reason) => setError(String(reason)))
           }
         >
           打開模組資料夾
@@ -51,11 +54,11 @@ export function ModList({ instanceId }: { instanceId: string }) {
               role="switch"
               aria-checked={file.enabled}
               aria-label={`${file.enabled ? "停用" : "啟用"} ${file.name}`}
-              onClick={() => act("set_mod_enabled", file, !file.enabled)}
+              onClick={() => act(api.setModEnabled, file, !file.enabled)}
             />
             <span className="mod-name">{file.name}</span>
             <small>{(file.size / BYTES_PER_MB).toFixed(1)} MB</small>
-            <button className="text-button" onClick={() => act("delete_mod", file)}>
+            <button className="text-button" onClick={() => act(api.deleteMod, file)}>
               刪除
             </button>
           </li>

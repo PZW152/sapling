@@ -1,12 +1,12 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { FEATURES } from "..";
+import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { Instance } from "../../shell/types";
-import { ModList } from "../mods/ModList";
 
 export function InstancePage() {
-  const { instances, list, selected, selectInstance, loadInstances, isEnabled } = useApp();
+  const { instances, list, selected, selectInstance, loadInstances } = useApp();
   const [creating, setCreating] = useState(false);
 
   return (
@@ -48,7 +48,6 @@ export function InstancePage() {
         <InstanceDetail
           key={selected.id}
           instance={selected}
-          showMods={isEnabled("mods")}
           onChanged={loadInstances}
         />
       ) : (
@@ -76,7 +75,7 @@ function CreateInstance({
   async function create() {
     setError("");
     try {
-      const instance = await invoke<Instance>("create_instance", { name, version });
+      const instance = await api.createInstance(name, version);
       await onCreated(instance.id);
     } catch (reason) {
       setError(String(reason));
@@ -133,13 +132,13 @@ function CreateInstance({
 
 function InstanceDetail({
   instance,
-  showMods,
   onChanged,
 }: {
   instance: Instance;
-  showMods: boolean;
   onChanged: () => Promise<void>;
 }) {
+  const { isEnabled } = useApp();
+  const panels = FEATURES.filter((feature) => feature.InstancePanel && isEnabled(feature.id));
   const [name, setName] = useState(instance.name);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
@@ -156,7 +155,7 @@ function InstanceDetail({
   function rename() {
     if (name.trim() !== instance.name) {
       run(async () => {
-        await invoke("save_instance", { instance: { ...instance, name } });
+        await api.saveInstance({ ...instance, name });
         await onChanged();
       });
     }
@@ -168,7 +167,7 @@ function InstanceDetail({
       return;
     }
     run(async () => {
-      await invoke("delete_instance", { id: instance.id });
+      await api.deleteInstance(instance.id);
       await onChanged();
     });
   }
@@ -186,13 +185,20 @@ function InstanceDetail({
       </label>
       <p className="detail-meta">Minecraft {instance.version}，原版</p>
 
-      {showMods ? <ModList instanceId={instance.id} /> : <div className="detail-spacer" />}
+      {panels.length > 0 ? (
+        panels.map(
+          ({ id, InstancePanel }) =>
+            InstancePanel && <InstancePanel key={id} instanceId={instance.id} />,
+        )
+      ) : (
+        <div className="detail-spacer" />
+      )}
 
       {error && <p className="error">{error}</p>}
       <div className="detail-actions">
         <button
           className="secondary"
-          onClick={() => run(() => invoke("open_instance_folder", { id: instance.id }))}
+          onClick={() => run(() => api.openInstanceFolder(instance.id))}
         >
           打開實例資料夾
         </button>

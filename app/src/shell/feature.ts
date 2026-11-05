@@ -21,6 +21,8 @@ export type Feature = {
   Settings?: ComponentType;
   /** 放進設定頁「進階設定」的區塊，平時收起。 */
   AdvancedSettings?: ComponentType;
+  /** 放進實例頁的區塊。 */
+  InstancePanel?: ComponentType<{ instanceId: string }>;
   /** 浮在所有頁面上的內容，例如更新提示。 */
   Overlay?: ComponentType;
 };

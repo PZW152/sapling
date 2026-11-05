@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
+import "./settings.css";
 
 function SettingsPage() {
   const { config, isEnabled, saveError } = useApp();

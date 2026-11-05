@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
+import "./arbor-day.css";
 
 const MARCH = 2;
 const ARBOR_DAY = 12;

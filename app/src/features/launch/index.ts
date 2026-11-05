@@ -2,6 +2,7 @@ import type { Feature } from "../../shell/feature";
 import { LaunchAdvanced } from "./LaunchAdvanced";
 import { LaunchPage } from "./LaunchPage";
 import { LaunchSettings } from "./LaunchSettings";
+import "./launch.css";
 
 export const launch: Feature = {
   id: "launch",
