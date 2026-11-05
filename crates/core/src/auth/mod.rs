@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-const CLIENT_ID: &str = "847cfa56-a8dc-4c4c-9106-e24b444c74a0";
+const CLIENT_ID: &str = "86a1a1e1-09d1-45f9-9ab7-62bb903d85ce";
 const SCOPE: &str = "XboxLive.signin offline_access";
 const DEVICE_CODE_URL: &str =
     "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode";
