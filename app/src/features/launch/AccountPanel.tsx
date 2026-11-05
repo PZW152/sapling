@@ -6,10 +6,13 @@ export function AccountPanel({
   profile,
   onProfileChange,
   disabled,
+  offline,
 }: {
   profile: Profile | null;
   onProfileChange: (profile: Profile | null) => void;
   disabled: boolean;
+  /** 這次改用離線名稱啟動，不會用到這個帳號。 */
+  offline: boolean;
 }) {
   const [restoring, setRestoring] = useState(true);
   const [code, setCode] = useState<LoginCode | null>(null);
@@ -76,7 +79,7 @@ export function AccountPanel({
           <Avatar skinUrl={profile.skinUrl} />
           <div className="me-text">
             <strong>{profile.name}</strong>
-            <small>正版帳號</small>
+            <small>{offline ? "正版帳號，這次不使用" : "正版帳號"}</small>
           </div>
           <button className="text-button" disabled={disabled} onClick={signOut}>
             登出

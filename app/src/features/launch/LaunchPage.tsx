@@ -30,7 +30,9 @@ export function LaunchPage() {
   const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
   const offlineName =
     active.map((feature) => feature.offlineName?.(config)).find((name) => name) ?? null;
-  const canStart = profile !== null || offlineName !== null;
+  const launchBlock =
+    active.map((feature) => feature.launchBlock?.(config)).find((reason) => reason) ?? null;
+  const canStart = launchBlock === null && (profile !== null || offlineName !== null);
 
   function startGame() {
     if (!selected) {
@@ -88,7 +90,7 @@ export function LaunchPage() {
           <HeroStatus
             phase={phase}
             error={error}
-            signedIn={canStart}
+            note={launchNote(launchBlock, offlineName, profile)}
             noInstance={noInstance}
             hasLogs={logs.length > 0}
             onShowLogs={() => setLogOpen(true)}
@@ -126,7 +128,12 @@ export function LaunchPage() {
       )}
 
       <aside className="side">
-        <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
+        <AccountPanel
+          profile={profile}
+          onProfileChange={setProfile}
+          disabled={busy}
+          offline={offlineName !== null}
+        />
         {active.map(
           ({ id, AccountPanel: Extra }) =>
             Extra && <Extra key={id} profile={profile} disabled={busy} />,
@@ -240,17 +247,28 @@ function launchLabel(phase: Phase) {
   return phase === "failed" ? "再試一次" : "啟動遊戲";
 }
 
+/** 按下啟動前要讓用戶知道的事，例如這次用哪個身分進遊戲。 */
+function launchNote(block: string | null, offlineName: string | null, profile: Profile | null) {
+  if (block) {
+    return block;
+  }
+  if (offlineName) {
+    return `這次用離線名稱 ${offlineName} 啟動。`;
+  }
+  return profile ? null : "登入微軟帳號後就能啟動遊戲。";
+}
+
 function HeroStatus({
   phase,
   error,
-  signedIn,
+  note,
   noInstance,
   hasLogs,
   onShowLogs,
 }: {
   phase: Phase;
   error: string;
-  signedIn: boolean;
+  note: string | null;
   noInstance: boolean;
   hasLogs: boolean;
   onShowLogs: () => void;
@@ -276,5 +294,5 @@ function HeroStatus({
   if (noInstance) {
     return <p className="hero-note">下載一個遊戲版本，再登入微軟帳號。</p>;
   }
-  return signedIn ? null : <p className="hero-note">登入微軟帳號後就能啟動遊戲。</p>;
+  return note && <p className="hero-note">{note}</p>;
 }

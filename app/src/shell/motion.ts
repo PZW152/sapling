@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 /** 讓標記平滑滑到容器裡目前選中的項目。 */
 export function useSlideMark<T extends HTMLElement>(dependency: unknown) {
@@ -16,31 +16,6 @@ export function useSlideMark<T extends HTMLElement>(dependency: unknown) {
   }, [dependency]);
 
   return container;
-}
-
-/** 數字平滑變化，例如進度百分比。 */
-export function useTween(target: number, duration = 320) {
-  const [value, setValue] = useState(target);
-  const current = useRef(target);
-
-  useEffect(() => {
-    const from = current.current;
-    const start = performance.now();
-    let frame = 0;
-    function tick(now: number) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - (1 - progress) ** 3;
-      current.current = from + (target - from) * eased;
-      setValue(current.current);
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      }
-    }
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [target, duration]);
-
-  return value;
 }
 
 /** 按下按鈕時，從點擊位置擴散一圈水波。 */

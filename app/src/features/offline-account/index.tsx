@@ -3,7 +3,7 @@ import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
 import type { LauncherConfig, Profile } from "../../shell/types";
-import { isValidPlayerName } from "./name";
+import { isValidPlayerName, offlineLaunchBlock } from "./name";
 import "./offline-account.css";
 
 function OfflinePanel({ profile, disabled }: { profile: Profile | null; disabled: boolean }) {
@@ -39,7 +39,12 @@ function OfflinePanel({ profile, disabled }: { profile: Profile | null; disabled
           aria-checked={config.offlineEnabled}
           aria-label="使用離線模式"
           disabled={disabled}
-          onClick={() => updateConfig({ offlineEnabled: !config.offlineEnabled })}
+          onClick={() =>
+            updateConfig({
+              offlineEnabled: !config.offlineEnabled,
+              offlineName: name || (profile?.name ?? ""),
+            })
+          }
         />
         <span>離線模式</span>
       </div>
@@ -75,4 +80,5 @@ export const offlineAccount: Feature = {
   optional: true,
   AccountPanel: OfflinePanel,
   offlineName,
+  launchBlock: offlineLaunchBlock,
 };

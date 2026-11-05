@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../shell/api";
-import { useTween } from "../../shell/motion";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
 
@@ -29,7 +28,7 @@ export function LaunchOverlay({
   progress: Progress | null;
   onClosed: () => void;
 }) {
-  const percent = useTween(overallProgress(progress) * 100);
+  const share = running ? 1 : overallProgress(progress);
   const what = progress?.stage === "java" ? "Java" : "遊戲檔案";
 
   // 用計時而不是等動畫事件：系統關閉動畫或窗口被遮住時事件不一定會來。
@@ -63,9 +62,9 @@ export function LaunchOverlay({
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(running ? 100 : percent)}
+            aria-valuenow={Math.round(share * 100)}
           >
-            <div style={{ transform: `scaleX(${running ? 1 : percent / 100})` }} />
+            <div style={{ transform: `scaleX(${share})` }} />
           </div>
           <p key={running ? "running" : "preparing"} className="overlay-note">
             {running && "遊戲已啟動"}

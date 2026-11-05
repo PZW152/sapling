@@ -28,6 +28,8 @@ export type Feature = {
   AccountPanel?: ComponentType<{ profile: Profile | null; disabled: boolean }>;
   /** 回傳名稱時，下次啟動用這個名稱離線遊玩。 */
   offlineName?: (config: LauncherConfig) => string | null;
+  /** 回傳文字時不能啟動，並把文字顯示在啟動按鈕旁邊。 */
+  launchBlock?: (config: LauncherConfig) => string | null;
   /** 浮在所有頁面上的內容，例如更新提示。 */
   Overlay?: ComponentType;
 };
