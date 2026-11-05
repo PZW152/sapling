@@ -23,9 +23,14 @@
 
 ## 安裝
 
-到 [Releases](https://github.com/PZW152/sapling/releases) 下載最新的安裝檔。
+到 [Releases](https://github.com/PZW152/sapling/releases) 下載：
 
-目前只支援 Windows 11 x64。安裝檔尚未數位簽章，Windows 可能會顯示安全警告。
+- **免安裝版**：`portable.exe`，下載後直接打開。
+- **安裝版**：`setup.exe` 或 `.msi`。
+
+目前只支援 Windows 11 x64。程式尚未數位簽章，Windows 可能會顯示安全警告。
+
+Sapling 目前是早期版本，1.0.0 才是第一個基礎版本。
 
 ## 從原始碼建置
 
