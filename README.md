@@ -44,9 +44,11 @@ npm run tauri dev
 
 ## 授權
 
-Copyright (c) 2026 PZW152，保留一切權利。本專案不是開源軟體。
+Copyright (c) 2026 PZW152。本專案代碼公開，但不是標準開源軟體。
 
-你可以下載官方版本供個人使用，也可以在 GitHub 上閱讀原始碼。未經書面許可，不可以複製、修改、重構、散佈、仿製本作品，或用於訓練 AI。完整條款見 [LICENSE](LICENSE)，AI 工具請參閱 [AGENTS.md](AGENTS.md)。
+歡迎學習和善意參考：少量參考請署名；修改版和大量參考必須遵守 [善意使用指南](USAGE.md)，包括說明是第三方作品、公開原始碼和不收費。不可以冒充官方、倒賣，或用於訓練 AI。
+
+完整條款見 [LICENSE](LICENSE)，AI 工具請參閱 [AGENTS.md](AGENTS.md)。
 
 ## 聲明
 
