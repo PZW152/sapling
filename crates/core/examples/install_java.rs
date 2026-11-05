@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let component = &details.java_version.component;
     println!("{} 需要 {component}", details.id);
 
-    let dirs = DataDirs::for_this_user()?;
+    let dirs = DataDirs::locate()?;
     let mut files = 0;
     let java = install_runtime(&client, component, &dirs, DEFAULT_CONCURRENCY, |progress| {
         files = progress.finished_files

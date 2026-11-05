@@ -1,14 +1,17 @@
 //! Tauri 命令：只做轉接，業務邏輯都在 sapling-core。
 
+use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use sapling_core::auth::{self, DeviceLogin, Profile, Session};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
-use sapling_core::instance::{DEFAULT_INSTANCE_ID, Instance};
+use sapling_core::instance::Instance;
+use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::launch::{LaunchEvent, play};
-use sapling_core::platform::{DataDirs, open_in_browser};
+use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
+use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
 use sapling_core::versions::install::{is_installed, prepare_version};
 use serde::{Deserialize, Serialize};
@@ -18,6 +21,7 @@ use tauri::{AppHandle, Emitter, State};
 const LAUNCH_EVENT: &str = "launch-event";
 const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 
 #[derive(Default)]
 struct AppState {
@@ -38,21 +42,12 @@ impl AppState {
     }
 }
 
-const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct VersionList {
     latest: String,
     versions: Vec<String>,
     installed: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Settings {
-    instance: Instance,
-    config: LauncherConfig,
 }
 
 #[derive(Serialize)]
@@ -62,15 +57,31 @@ struct LoginCode {
     verification_uri: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ModAction {
+    instance_id: String,
+    name: String,
+    enabled: bool,
+}
+
 fn text<E: ToString>(error: E) -> String {
     error.to_string()
+}
+
+fn data_dirs() -> Result<DataDirs, String> {
+    DataDirs::locate().map_err(text)
+}
+
+async fn load_instance(dirs: &DataDirs, id: &str) -> Result<Instance, String> {
+    Instance::load(dirs, id).await.map_err(text)
 }
 
 #[tauri::command]
 async fn list_versions() -> Result<VersionList, String> {
     let client = new_client().map_err(text)?;
     let manifest = fetch_manifest(&client).await.map_err(text)?;
-    let dirs = DataDirs::for_this_user().map_err(text)?;
+    let dirs = data_dirs()?;
     let versions: Vec<String> = manifest
         .supported_releases()
         .map_err(text)?
@@ -90,21 +101,83 @@ async fn list_versions() -> Result<VersionList, String> {
 }
 
 #[tauri::command]
-async fn load_settings() -> Result<Settings, String> {
-    let dirs = DataDirs::for_this_user().map_err(text)?;
-    Ok(Settings {
-        instance: Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID)
-            .await
-            .map_err(text)?,
-        config: LauncherConfig::load(&dirs).await.map_err(text)?,
-    })
+fn system_memory_mb() -> u32 {
+    total_memory_mb()
 }
 
 #[tauri::command]
-async fn save_settings(settings: Settings) -> Result<(), String> {
-    let dirs = DataDirs::for_this_user().map_err(text)?;
-    settings.instance.save(&dirs).await.map_err(text)?;
-    settings.config.save(&dirs).await.map_err(text)
+async fn load_config() -> Result<LauncherConfig, String> {
+    LauncherConfig::load(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn save_config(config: LauncherConfig) -> Result<(), String> {
+    config.save(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn list_instances() -> Result<Vec<Instance>, String> {
+    Instance::list(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn create_instance(name: String, version: String) -> Result<Instance, String> {
+    Instance::create(&data_dirs()?, &name, &version)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn save_instance(instance: Instance) -> Result<(), String> {
+    instance.save(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn delete_instance(id: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    instance.delete(&dirs).await.map_err(text)
+}
+
+#[tauri::command]
+async fn open_instance_folder(id: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    open_folder(&instance.game_dir(&dirs)).map_err(text)
+}
+
+#[tauri::command]
+async fn list_mods(id: String) -> Result<Vec<ModFile>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    mods::list(&instance.game_dir(&dirs)).await.map_err(text)
+}
+
+#[tauri::command]
+async fn set_mod_enabled(action: ModAction) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &action.instance_id).await?;
+    mods::set_enabled(&instance.game_dir(&dirs), &action.name, action.enabled)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn delete_mod(action: ModAction) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &action.instance_id).await?;
+    mods::delete(&instance.game_dir(&dirs), &action.name, action.enabled)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn open_mods_folder(id: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let folder = mods::mods_dir(&instance.game_dir(&dirs));
+    std::fs::create_dir_all(&folder).map_err(text)?;
+    open_folder(&folder).map_err(text)
 }
 
 #[tauri::command]
@@ -151,7 +224,7 @@ fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
 
 #[tauri::command]
 async fn install_game(app: AppHandle, version: String) -> Result<(), String> {
-    let dirs = DataDirs::for_this_user().map_err(text)?;
+    let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
     let mut last_progress = Instant::now();
     prepare_version(
@@ -178,19 +251,35 @@ fn open_link(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn check_update() -> Result<Option<UpdateInfo>, String> {
+    let client = new_client().map_err(text)?;
+    update::check(&client).await.map_err(text)
+}
+
+#[tauri::command]
+async fn apply_update(app: AppHandle, update: UpdateInfo) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        return Err("開發模式不能自動更新".to_string());
+    }
+    let client = new_client().map_err(text)?;
+    let exe = update::install(&client, &update).await.map_err(text)?;
+    Command::new(exe).spawn().map_err(text)?;
+    app.exit(0);
+    Ok(())
+}
+
+#[tauri::command]
 async fn play_game(
     app: AppHandle,
     state: State<'_, AppState>,
-    version: String,
+    instance_id: String,
 ) -> Result<(), String> {
-    let session = fresh_session(&state).await?;
-    let dirs = DataDirs::for_this_user().map_err(text)?;
+    let session = current_session(&state)
+        .await?
+        .ok_or_else(|| "請先登入微軟帳號".to_string())?;
+    let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
-    let mut instance = Instance::load_or_new(&dirs, DEFAULT_INSTANCE_ID)
-        .await
-        .map_err(text)?;
-    instance.version = version;
-    instance.save(&dirs).await.map_err(text)?;
+    let instance = load_instance(&dirs, &instance_id).await?;
 
     let mut last_progress = Instant::now();
     play(
@@ -214,13 +303,6 @@ async fn play_game(
     .map_err(text)
 }
 
-/// 取得可用的登入狀態，過期就自動刷新。
-async fn fresh_session(state: &State<'_, AppState>) -> Result<Session, String> {
-    current_session(state)
-        .await?
-        .ok_or_else(|| "請先登入微軟帳號".to_string())
-}
-
 /// 目前有效的登入狀態；沒有或已過期時用保存的 refresh token 恢復。
 async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>, String> {
     let _restoring = state.restoring.lock().await;
@@ -235,18 +317,31 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    update::remove_old_version();
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             list_versions,
-            load_settings,
-            save_settings,
+            system_memory_mb,
+            load_config,
+            save_config,
+            list_instances,
+            create_instance,
+            save_instance,
+            delete_instance,
+            open_instance_folder,
+            list_mods,
+            set_mod_enabled,
+            delete_mod,
+            open_mods_folder,
             restore_account,
             login_start,
             login_finish,
             sign_out,
-            open_link,
             install_game,
+            open_link,
+            check_update,
+            apply_update,
             play_game
         ])
         .run(tauri::generate_context!())

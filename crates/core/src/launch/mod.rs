@@ -1,4 +1,6 @@
-//! 啟動遊戲：組裝命令行、啟動進程、轉發日誌。
+//! 啟動遊戲：組裝命令行、啟動進程、轉發問題記錄。
+
+pub mod crash;
 
 use std::collections::HashMap;
 use std::io;
@@ -14,7 +16,7 @@ use tokio::sync::mpsc;
 use crate::auth::Session;
 use crate::download::DownloadProgress;
 use crate::instance::Instance;
-use crate::platform::{CREATE_NO_WINDOW, DataDirs};
+use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{InstallError, PrepareStage, PreparedVersion, prepare_version};
 
@@ -40,8 +42,8 @@ pub enum LaunchError {
     },
     #[error("無法啟動 Java，請重新下載遊戲檔案後再試一次")]
     Spawn(#[source] io::Error),
-    #[error("遊戲異常結束（代碼 {code}），請查看日誌")]
-    Crashed { code: i32 },
+    #[error("遊戲異常結束。{advice}")]
+    Crashed { advice: &'static str },
 }
 
 /// 啟動過程中發生的事，轉發給介面顯示。
@@ -119,8 +121,9 @@ pub async fn play(
     if status.success() {
         Ok(())
     } else {
+        let reports = crash::read_reports(&game_dir).await;
         Err(LaunchError::Crashed {
-            code: status.code().unwrap_or(-1),
+            advice: crash::analyze(&reports),
         })
     }
 }
@@ -171,7 +174,8 @@ fn build_arguments(
 ) -> Vec<String> {
     let values = placeholder_values(session, instance, details, dirs, natives_dir);
 
-    let mut arguments = vec![format!("-Xmx{}M", instance.memory_mb)];
+    let memory_mb = instance.effective_memory_mb(total_memory_mb());
+    let mut arguments = vec![format!("-Xmx{memory_mb}M")];
     arguments.extend(OUTPUT_ENCODING_ARGUMENTS.map(str::to_string));
     arguments.extend(instance.java_args.split_whitespace().map(str::to_string));
     arguments.extend(expand(&details.arguments.jvm, &values));

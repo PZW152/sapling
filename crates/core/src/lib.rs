@@ -9,4 +9,5 @@ pub mod launch;
 pub mod loader;
 pub mod platform;
 mod storage;
+pub mod update;
 pub mod versions;

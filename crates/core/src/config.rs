@@ -6,6 +6,7 @@ use crate::download::DEFAULT_CONCURRENCY;
 use crate::platform::DataDirs;
 use crate::storage::{StorageError, read_json, write_json};
 
+const DEFAULT_THEME: &str = "sapling";
 const MIN_CONCURRENCY: usize = 1;
 const MAX_CONCURRENCY: usize = 64;
 
@@ -13,12 +14,18 @@ const MAX_CONCURRENCY: usize = 64;
 #[serde(rename_all = "camelCase", default)]
 pub struct LauncherConfig {
     pub download_concurrency: usize,
+    /// 目前選中的實例，空字串代表還沒選。
+    pub selected_instance: String,
+    /// 預設綠色主題的名稱。
+    pub theme: String,
 }
 
 impl Default for LauncherConfig {
     fn default() -> Self {
         Self {
             download_concurrency: DEFAULT_CONCURRENCY,
+            selected_instance: String::new(),
+            theme: DEFAULT_THEME.to_string(),
         }
     }
 }
@@ -55,6 +62,7 @@ mod tests {
     fn concurrency_stays_in_a_safe_range() {
         let too_high = LauncherConfig {
             download_concurrency: 9999,
+            ..LauncherConfig::default()
         };
         assert_eq!(too_high.normalized().download_concurrency, MAX_CONCURRENCY);
     }

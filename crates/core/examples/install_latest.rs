@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .iter()
         .find(|entry| entry.id == manifest.latest.release)
         .ok_or("版本清單裡找不到最新正式版")?;
-    let dirs = DataDirs::for_this_user()?;
+    let dirs = DataDirs::locate()?;
     println!("安裝 {} 到 {}", latest.id, dirs.root().display());
 
     let started = Instant::now();

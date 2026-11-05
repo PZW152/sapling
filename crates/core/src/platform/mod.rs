@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use thiserror::Error;
+use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 
 /// Mojang 的 `rules` 裡用來代表本系統的名稱。
 pub const MOJANG_OS_NAME: &str = "windows";
@@ -30,6 +31,30 @@ pub const JAVA_EXE_PATH: &str = "bin/java.exe";
 /// 讓 `java.exe` 不彈出黑色命令行窗口的 Windows 旗標。
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// 便攜版把資料放在程式旁邊的這個資料夾。
+const PORTABLE_DATA_FOLDER: &str = "Sapling Data";
+/// 讀不到電腦記憶體時，按這個大小估算。
+const FALLBACK_MEMORY_MB: u32 = 8192;
+const BYTES_PER_MB: u64 = 1024 * 1024;
+
+/// 電腦的實體記憶體大小。
+pub fn total_memory_mb() -> u32 {
+    let mut status = MEMORYSTATUSEX {
+        dwLength: size_of::<MEMORYSTATUSEX>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: status 是有效的結構，且 dwLength 已按文檔設定。
+    if unsafe { GlobalMemoryStatusEx(&mut status) } == 0 {
+        return FALLBACK_MEMORY_MB;
+    }
+    u32::try_from(status.ullTotalPhys / BYTES_PER_MB).unwrap_or(u32::MAX)
+}
+
+/// 用檔案總管打開資料夾。
+pub fn open_folder(path: &Path) -> io::Result<()> {
+    Command::new("explorer").arg(path).spawn().map(|_| ())
+}
+
 /// 用系統預設瀏覽器打開網址。只接受 https，避免把其他內容交給系統執行。
 pub fn open_in_browser(url: &str) -> io::Result<()> {
     if !url.starts_with("https://") {
@@ -47,21 +72,26 @@ pub fn open_in_browser(url: &str) -> io::Result<()> {
 
 #[derive(Debug, Error)]
 pub enum PlatformError {
-    #[error("找不到系統的應用程式資料夾（%APPDATA%）")]
+    #[error("找不到資料存放位置")]
     NoDataFolder,
 }
 
-/// `%APPDATA%\Sapling\` 下各資料夾的位置。
+/// 資料資料夾下各資料夾的位置。
 #[derive(Debug, Clone)]
 pub struct DataDirs {
     root: PathBuf,
 }
 
 impl DataDirs {
-    /// 本機的正式資料位置。
-    pub fn for_this_user() -> Result<Self, PlatformError> {
-        let app_data = dirs::config_dir().ok_or(PlatformError::NoDataFolder)?;
-        Ok(Self::at(app_data.join("Sapling")))
+    /// 正式版把資料放在程式旁邊；開發版放在 `%APPDATA%`，避免資料混進編譯資料夾。
+    pub fn locate() -> Result<Self, PlatformError> {
+        if cfg!(debug_assertions) {
+            let app_data = dirs::config_dir().ok_or(PlatformError::NoDataFolder)?;
+            return Ok(Self::at(app_data.join("Sapling")));
+        }
+        let exe = std::env::current_exe().map_err(|_| PlatformError::NoDataFolder)?;
+        let folder = exe.parent().ok_or(PlatformError::NoDataFolder)?;
+        Ok(Self::at(folder.join(PORTABLE_DATA_FOLDER)))
     }
 
     pub fn at(root: impl Into<PathBuf>) -> Self {
