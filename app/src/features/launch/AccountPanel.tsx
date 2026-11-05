@@ -2,7 +2,33 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { LoginCode, Profile } from "../../shell/types";
 
-export function AccountPanel({
+/** 首頁左上角的帳號標籤，點開才顯示登入或登出。 */
+export function AccountChip({
+  profile,
+  onProfileChange,
+  disabled,
+}: {
+  profile: Profile | null;
+  onProfileChange: (profile: Profile | null) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="account-chip-wrap">
+      <button className="account-chip" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {profile ? <Avatar skinUrl={profile.skinUrl} /> : null}
+        <span>{profile?.name ?? "登入微軟帳號"}</span>
+      </button>
+      {/* 保持掛載：打開啟動器時要在這裡恢復登入。 */}
+      <div className="account-popover" hidden={!open}>
+        <AccountPanel profile={profile} onProfileChange={onProfileChange} disabled={disabled} />
+      </div>
+    </div>
+  );
+}
+
+function AccountPanel({
   profile,
   onProfileChange,
   disabled,

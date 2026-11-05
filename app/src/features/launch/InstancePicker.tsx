@@ -83,7 +83,7 @@ export function InstancePicker({
         disabled={instances.length === 0 || disabled}
         onClick={() => setOpen(!open)}
       >
-        <span>{selected?.name ?? "還沒有實例"}</span>
+        <span>切換實例</span>
         <svg viewBox="0 0 12 12" aria-hidden="true">
           <path d="M2.5 7.5 6 4l3.5 3.5" />
         </svg>
