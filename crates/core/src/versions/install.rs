@@ -4,15 +4,16 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::details::VersionDetails;
-use super::{VersionEntry, VersionsError};
+use super::{VersionEntry, VersionsError, fetch_manifest};
 use crate::download::{
-    DownloadError, DownloadProgress, DownloadTask, download_all, download_file,
+    DownloadError, DownloadProgress, DownloadTask, download_all, download_file, new_client,
 };
-use crate::platform::DataDirs;
+use crate::java::{JavaError, install_runtime};
+use crate::platform::{DataDirs, PlatformError};
 
 const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
 
@@ -22,6 +23,12 @@ pub enum InstallError {
     Download(#[from] DownloadError),
     #[error(transparent)]
     Versions(#[from] VersionsError),
+    #[error(transparent)]
+    Java(#[from] JavaError),
+    #[error(transparent)]
+    Platform(#[from] PlatformError),
+    #[error("版本清單裡找不到 {id}")]
+    UnknownVersion { id: String },
     #[error("無法讀取已下載的檔案：{}", path.display())]
     Read {
         path: PathBuf,
@@ -40,6 +47,44 @@ pub struct AssetIndexFile {
 pub struct AssetObject {
     pub hash: String,
     pub size: u64,
+}
+
+/// 準備遊戲時正在進行的階段。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PrepareStage {
+    Game,
+    Java,
+}
+
+/// 準備好某個版本需要的一切：遊戲檔案和對應的 Java。
+pub async fn prepare_version(
+    id: &str,
+    concurrency: usize,
+    mut on_progress: impl FnMut(PrepareStage, DownloadProgress) + Send,
+) -> Result<(), InstallError> {
+    let dirs = DataDirs::for_this_user()?;
+    let client = new_client()?;
+    let manifest = fetch_manifest().await?;
+    let entry = manifest
+        .versions
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| InstallError::UnknownVersion { id: id.to_string() })?;
+
+    let details = install_version(&client, entry, &dirs, concurrency, |progress| {
+        on_progress(PrepareStage::Game, progress)
+    })
+    .await?;
+    install_runtime(
+        &client,
+        &details.java_version.component,
+        &dirs,
+        concurrency,
+        |progress| on_progress(PrepareStage::Java, progress),
+    )
+    .await?;
+    Ok(())
 }
 
 /// 下載一個版本需要的全部檔案。已存在且 SHA1 正確的檔案會跳過。

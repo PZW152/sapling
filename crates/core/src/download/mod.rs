@@ -5,6 +5,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use serde::Serialize;
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::fs::{self, File};
@@ -58,7 +59,8 @@ pub struct DownloadTask {
 }
 
 /// 整批下載的進度。檔案完成一個才更新一次。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DownloadProgress {
     pub finished_files: usize,
     pub total_files: usize,
