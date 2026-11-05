@@ -27,6 +27,9 @@
   --radius-leaf: 4px 22px 4px 22px;
   --radius-leaf-small: 3px 12px 3px 12px;
   --radius-leaf-flip: 22px 4px 22px 4px;
+  /* 放在有內距容器裡的元素：圓角 = 外層圓角 - 內距，四角間隔才一致。 */
+  --radius-leaf-inner: 0 18px 0 18px;
+  --radius-leaf-small-inner: 0 8px 0 8px;
   --radius-leaf-small-flip: 12px 3px 12px 3px;
 
   /* 間距 */
@@ -40,6 +43,7 @@
   /* 尺寸 */
   --titlebar-height: 52px;
   --side-width: 264px;
+  --picker-gap: 52px;
   --vine-width: 2px;
   --node-size: 18px;
   --control-height: 40px;
@@ -49,8 +53,8 @@
 
   /* 陰影 */
   --shadow-panel: 0 1px 2px rgba(29, 43, 36, 0.06), 0 6px 18px rgba(29, 43, 36, 0.05);
-  --shadow-button: 0 2px 0 var(--color-accent-deep), 0 10px 22px rgba(37, 130, 74, 0.28);
-  --shadow-button-hover: 0 2px 0 var(--color-accent-deep), 0 14px 28px rgba(37, 130, 74, 0.34);
+  --shadow-button: 0 10px 22px rgba(37, 130, 74, 0.26);
+  --shadow-button-hover: 0 14px 28px rgba(37, 130, 74, 0.32);
   --shadow-popover: 0 2px 6px rgba(29, 43, 36, 0.08), 0 14px 34px rgba(29, 43, 36, 0.16);
 
   /* 動效 */
@@ -201,7 +205,7 @@ button:disabled {
   bottom: var(--space-1);
   left: var(--space-1);
   width: var(--tab-width);
-  border-radius: var(--radius-leaf-small);
+  border-radius: var(--radius-leaf-small-inner);
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
   transition: transform var(--duration-grow) var(--spring);
@@ -464,7 +468,7 @@ button:disabled {
 .picker-list {
   position: absolute;
   right: 0;
-  bottom: calc(100% + var(--space-2));
+  bottom: calc(100% + var(--picker-gap));
   left: 0;
   max-height: 280px;
   margin: 0;
@@ -493,7 +497,7 @@ button:disabled {
   justify-content: space-between;
   width: 100%;
   padding: 7px var(--space-3);
-  border-radius: var(--radius-leaf-small);
+  border-radius: var(--radius-leaf-inner);
   text-align: left;
 }
 
@@ -508,7 +512,8 @@ button:disabled {
 }
 
 .picker-option:focus-visible {
-  outline-offset: -2px;
+  outline: none;
+  background: var(--color-sunken);
 }
 
 .picker-option small {
@@ -547,6 +552,10 @@ button:disabled {
   text-decoration: underline;
 }
 
+.problem-button {
+  justify-self: start;
+}
+
 /* 主舞台：沒有卡片，直接站在山丘上。 */
 .stage {
   position: relative;
@@ -555,13 +564,6 @@ button:disabled {
   justify-content: space-between;
   min-height: 0;
   padding: var(--space-4) var(--space-4) 0;
-}
-
-.stage-log {
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-  z-index: 2;
 }
 
 .stage-text {

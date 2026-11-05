@@ -109,8 +109,10 @@ pub async fn play(
     }
     drop(sender);
     while let Some(line) = receiver.recv().await {
-        let line = hide_token(&line, session.access_token());
-        on_event(LaunchEvent::Log { line });
+        if is_problem_line(&line) {
+            let line = hide_token(&line, session.access_token());
+            on_event(LaunchEvent::Log { line });
+        }
     }
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
@@ -140,6 +142,19 @@ async fn read_line_lossy(reader: &mut (impl AsyncBufRead + Unpin)) -> Option<Str
         Ok(0) | Err(_) => None,
         Ok(_) => Some(String::from_utf8_lossy(&bytes).trim_end().to_string()),
     }
+}
+
+/// 只保留警告、錯誤和例外堆疊。完整日誌由遊戲自己寫在實例的 `logs/latest.log`。
+fn is_problem_line(line: &str) -> bool {
+    const MARKERS: [&str; 6] = [
+        "/WARN]",
+        "/ERROR]",
+        "/FATAL]",
+        "Exception",
+        "Caused by:",
+        "\tat ",
+    ];
+    MARKERS.iter().any(|marker| line.contains(marker))
 }
 
 fn hide_token(line: &str, token: &str) -> String {
@@ -288,6 +303,17 @@ mod tests {
         assert!(broken.is_some());
         assert_eq!(last.as_deref(), Some("last"));
         assert_eq!(read_line_lossy(&mut reader).await, None);
+    }
+
+    #[test]
+    fn keeps_only_warnings_errors_and_stack_traces() {
+        assert!(is_problem_line("[12:00:00] [Render thread/WARN]: slow"));
+        assert!(is_problem_line("[12:00:00] [main/ERROR]: failed"));
+        assert!(is_problem_line("java.lang.NullPointerException: x"));
+        assert!(is_problem_line(
+            "\tat net.minecraft.client.Main.main(Main.java:1)"
+        ));
+        assert!(!is_problem_line("[12:00:00] [Render thread/INFO]: Loaded"));
     }
 
     #[test]

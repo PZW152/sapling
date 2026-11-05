@@ -8,7 +8,7 @@ import { Sapling } from "./Sapling";
 import { VersionPicker } from "./VersionPicker";
 import type { LaunchEvent, Profile, Progress, VersionList } from "./types";
 
-/** 日誌最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
+/** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
 
 type Phase = "idle" | "preparing" | "running" | "failed";
@@ -106,12 +106,6 @@ export function LaunchPage({
       </aside>
 
       <section className="stage">
-        {logs.length > 0 && (
-          <button className="stage-log text-button" onClick={() => setLogOpen(true)}>
-            查看遊戲日誌
-          </button>
-        )}
-
         <div className="stage-text">
           <p className="game-name">Minecraft</p>
           <h1 key={selected}>{selected || (noVersion ? "待播種" : "…")}</h1>
@@ -134,6 +128,11 @@ export function LaunchPage({
             signedIn={profile !== null}
             noVersion={noVersion}
           />
+          {phase === "failed" && logs.length > 0 && (
+            <button className="text-button problem-button" onClick={() => setLogOpen(true)}>
+              查看問題記錄
+            </button>
+          )}
           {preparing && (
             <div
               className="progress"
