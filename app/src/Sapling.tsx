@@ -1,4 +1,4 @@
-/** 首頁的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1。 */
+/** 目前版本卡片裡的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1。 */
 export function Sapling({ growth }: { growth: number }) {
   const rightLeaf = stageOf(growth, 0.35, 0.8);
   const leftLeaf = stageOf(growth, 0.6, 1);

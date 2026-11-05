@@ -144,29 +144,23 @@ function LaunchPage() {
   return (
     <div className="launch">
       <aside className="side">
-        <section className="panel account">
+        <div className="account">
           <svg className="avatar" viewBox="0 0 56 56" aria-hidden="true">
             <circle cx="28" cy="22" r="10" />
             <path d="M10 56c0-13 8-20 18-20s18 7 18 20z" />
           </svg>
-          <div>
-            <h2>尚未登入</h2>
-            <p>需要正版微軟帳號才能進入遊戲</p>
-          </div>
+          <h2>尚未登入</h2>
           <button className="secondary" disabled>
             用微軟帳號登入
           </button>
-        </section>
+        </div>
 
-        <section className="panel version">
+        <div className="launch-box">
           <label htmlFor="version">遊戲版本</label>
           {listError ? (
-            <>
-              <p className="error">{listError}</p>
-              <button className="secondary" onClick={loadVersions}>
-                重新取得版本
-              </button>
-            </>
+            <button className="secondary" onClick={loadVersions}>
+              重新取得版本
+            </button>
           ) : (
             <select
               id="version"
@@ -182,37 +176,52 @@ function LaunchPage() {
               ))}
             </select>
           )}
-        </section>
-      </aside>
-
-      <section className="stage">
-        <div className="stage-text">
-          <p className="game-name">Minecraft</p>
-          <h1>{selected || "…"}</h1>
-          <p className="edition">原版</p>
-        </div>
-
-        <Sapling growth={preparing ? overall : 1} />
-
-        <div className="stage-action">
-          <StatusLine phase={phase} progress={progress} error={error} />
-          {preparing && (
-            <div
-              className="progress"
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(overall * 100)}
-            >
-              <div style={{ transform: `scaleX(${overall})` }} />
-            </div>
-          )}
           <button className="primary" disabled={!selected || preparing} onClick={prepareGame}>
             {preparing ? "準備中" : "啟動遊戲"}
           </button>
         </div>
-      </section>
+      </aside>
+
+      <div className="cards">
+        <section className="card current">
+          <div className="current-text">
+            <h2>目前版本</h2>
+            <p className="version-name">Minecraft {selected || "…"}</p>
+            {listError && <p className="error">{listError}</p>}
+            <StatusLine phase={phase} progress={progress} error={error} />
+            {preparing && (
+              <div
+                className="progress"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(overall * 100)}
+              >
+                <div style={{ transform: `scaleX(${overall})` }} />
+              </div>
+            )}
+          </div>
+          <Sapling growth={preparing ? overall : 1} />
+        </section>
+
+        <section className="card">
+          <h2>開始遊戲</h2>
+          <ol className="steps">
+            <Step done={false} text="用微軟帳號登入（功能製作中）" />
+            <Step done={Boolean(selected)} text="在左邊選好遊戲版本" />
+            <Step done={phase === "ready"} text="按下「啟動遊戲」" />
+          </ol>
+        </section>
+      </div>
     </div>
+  );
+}
+
+function Step({ done, text }: { done: boolean; text: string }) {
+  return (
+    <li className={done ? "step done" : "step"}>
+      <span>{text}</span>
+    </li>
   );
 }
 
@@ -242,7 +251,7 @@ function StatusLine({
       </p>
     );
   }
-  return null;
+  return <p className="status">原版，按「啟動遊戲」後會自動下載需要的檔案和 Java。</p>;
 }
 
 function overallProgress(progress: Progress | null) {
