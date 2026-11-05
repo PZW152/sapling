@@ -1,25 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Instance, ModFile, VersionList } from "./types";
+import { useApp } from "../../shell/AppContext";
+import type { Instance } from "../../shell/types";
+import { ModList } from "../mods/ModList";
 
-const BYTES_PER_MB = 1024 * 1024;
-
-export function InstancePage({
-  instances,
-  list,
-  selectedId,
-  onSelect,
-  onChanged,
-}: {
-  instances: Instance[];
-  list: VersionList | null;
-  selectedId: string;
-  onSelect: (id: string) => void;
-  onChanged: () => Promise<void>;
-}) {
+export function InstancePage() {
+  const { instances, list, selected, selectInstance, loadInstances, isEnabled } = useApp();
   const [creating, setCreating] = useState(false);
-  const current = instances.find((instance) => instance.id === selectedId) ?? null;
 
   return (
     <div className="instances">
@@ -29,10 +17,10 @@ export function InstancePage({
             <li key={instance.id} style={{ "--i": index } as CSSProperties}>
               <button
                 className="instance-item"
-                aria-current={instance.id === selectedId ? "true" : undefined}
+                aria-current={instance.id === selected?.id ? "true" : undefined}
                 onClick={() => {
                   setCreating(false);
-                  onSelect(instance.id);
+                  selectInstance(instance.id);
                 }}
               >
                 <span>{instance.name}</span>
@@ -51,13 +39,18 @@ export function InstancePage({
           versions={list?.installed ?? []}
           onCancel={() => setCreating(false)}
           onCreated={async (id) => {
-            await onChanged();
-            onSelect(id);
+            await loadInstances();
+            selectInstance(id);
             setCreating(false);
           }}
         />
-      ) : current ? (
-        <InstanceDetail key={current.id} instance={current} onChanged={onChanged} />
+      ) : selected ? (
+        <InstanceDetail
+          key={selected.id}
+          instance={selected}
+          showMods={isEnabled("mods")}
+          onChanged={loadInstances}
+        />
       ) : (
         <div className="panel instance-detail empty-detail">
           <p>還沒有實例。到下載頁下載一個版本，就會自動建立。</p>
@@ -140,23 +133,16 @@ function CreateInstance({
 
 function InstanceDetail({
   instance,
+  showMods,
   onChanged,
 }: {
   instance: Instance;
+  showMods: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [name, setName] = useState(instance.name);
-  const [mods, setMods] = useState<ModFile[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
-
-  const loadMods = useCallback(() => {
-    invoke<ModFile[]>("list_mods", { id: instance.id })
-      .then(setMods)
-      .catch((reason) => setError(String(reason)));
-  }, [instance.id]);
-
-  useEffect(loadMods, [loadMods]);
 
   async function run(action: () => Promise<unknown>) {
     setError("");
@@ -174,13 +160,6 @@ function InstanceDetail({
         await onChanged();
       });
     }
-  }
-
-  function modAction(command: string, file: ModFile, enabled = file.enabled) {
-    run(async () => {
-      await invoke(command, { action: { instanceId: instance.id, name: file.name, enabled } });
-      loadMods();
-    });
   }
 
   function deleteInstance() {
@@ -207,38 +186,7 @@ function InstanceDetail({
       </label>
       <p className="detail-meta">Minecraft {instance.version}，原版</p>
 
-      <div className="mods-head">
-        <h3>模組</h3>
-        <button
-          className="text-button"
-          onClick={() => run(() => invoke("open_mods_folder", { id: instance.id }))}
-        >
-          打開模組資料夾
-        </button>
-      </div>
-      <ul className="mods">
-        {mods.length === 0 && (
-          <li className="mods-empty">
-            沒有模組。把 .jar 放進模組資料夾就會出現在這裡。原版不會載入模組，要等之後支援載入器。
-          </li>
-        )}
-        {mods.map((file) => (
-          <li key={file.name} className={file.enabled ? "mod" : "mod off"}>
-            <button
-              className="switch"
-              role="switch"
-              aria-checked={file.enabled}
-              aria-label={`${file.enabled ? "停用" : "啟用"} ${file.name}`}
-              onClick={() => modAction("set_mod_enabled", file, !file.enabled)}
-            />
-            <span className="mod-name">{file.name}</span>
-            <small>{(file.size / BYTES_PER_MB).toFixed(1)} MB</small>
-            <button className="text-button" onClick={() => modAction("delete_mod", file)}>
-              刪除
-            </button>
-          </li>
-        ))}
-      </ul>
+      {showMods ? <ModList instanceId={instance.id} /> : <div className="detail-spacer" />}
 
       {error && <p className="error">{error}</p>}
       <div className="detail-actions">

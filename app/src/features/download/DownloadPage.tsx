@@ -1,29 +1,17 @@
 import type { CSSProperties } from "react";
-import type { InstallState } from "./App";
-import type { VersionList } from "./types";
+import { useApp } from "../../shell/AppContext";
+import type { InstallState } from "../../shell/AppContext";
 
-export function DownloadPage({
-  list,
-  listError,
-  install,
-  onRetry,
-  onInstall,
-  onPlay,
-}: {
-  list: VersionList | null;
-  listError: string | null;
-  install: InstallState | null;
-  onRetry: () => void;
-  onInstall: (id: string) => void;
-  onPlay: (id: string) => void;
-}) {
+export function DownloadPage() {
+  const { list, listError, install, loadVersions, installGame, playVersion } = useApp();
+
   if (!list) {
     return (
       <div className="notice">
         <div className="notice-card">
           <p className={listError ? "error" : undefined}>{listError ?? "正在取得版本"}</p>
           {listError && (
-            <button className="secondary" onClick={onRetry}>
+            <button className="secondary" onClick={loadVersions}>
               重新取得版本
             </button>
           )}
@@ -36,7 +24,7 @@ export function DownloadPage({
     <div className="download panel">
       <div className="download-head">
         <h2>下載遊戲</h2>
-        <p>下載好的版本會自動建立實例。需要的 Java 會一起下載。</p>
+        <p>下載好的版本會自動建立實例，需要的 Java 會一起下載。</p>
       </div>
       <ul className="vine">
         {groupBySeries(list.versions).map(({ series, versions }, index) => (
@@ -49,8 +37,8 @@ export function DownloadPage({
                 isLatest={id === list.latest}
                 isInstalled={list.installed.includes(id)}
                 install={install}
-                onInstall={onInstall}
-                onPlay={onPlay}
+                onInstall={installGame}
+                onPlay={playVersion}
               />
             ))}
           </li>

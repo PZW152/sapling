@@ -1,33 +1,21 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useApp } from "../../shell/AppContext";
+import { overallProgress, toMegabytes } from "../../shell/progress";
+import type { LaunchEvent, Profile, Progress } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
 import { InstancePicker } from "./InstancePicker";
 import { LogPanel } from "./LogPanel";
 import { Sapling } from "./Sapling";
-import { overallProgress, toMegabytes } from "./progress";
-import type { Instance, LaunchEvent, Profile, Progress } from "./types";
 
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
 
 type Phase = "idle" | "preparing" | "running" | "failed";
 
-export function LaunchPage({
-  instances,
-  selected,
-  listError,
-  onSelect,
-  onGoToDownload,
-  onRetry,
-}: {
-  instances: Instance[];
-  selected: Instance | null;
-  listError: string | null;
-  onSelect: (id: string) => void;
-  onGoToDownload: () => void;
-  onRetry: () => void;
-}) {
+export function LaunchPage() {
+  const { instances, selected, listError, selectInstance, goTo, loadVersions } = useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -72,8 +60,8 @@ export function LaunchPage({
     }
   }
 
-  function selectInstance(id: string) {
-    onSelect(id);
+  function choose(id: string) {
+    selectInstance(id);
     setPhase("idle");
     setProgress(null);
   }
@@ -93,7 +81,7 @@ export function LaunchPage({
           {listError ? (
             <>
               <p className="error">{listError}</p>
-              <button className="secondary" onClick={onRetry}>
+              <button className="secondary" onClick={loadVersions}>
                 重新取得版本
               </button>
             </>
@@ -102,7 +90,7 @@ export function LaunchPage({
               instances={instances}
               selected={selected}
               disabled={busy}
-              onSelect={selectInstance}
+              onSelect={choose}
             />
           )}
         </section>
@@ -148,7 +136,7 @@ export function LaunchPage({
             </div>
           )}
           {noInstance ? (
-            <button className="primary" onClick={onGoToDownload}>
+            <button className="primary" onClick={() => goTo("download")}>
               前往下載
             </button>
           ) : (

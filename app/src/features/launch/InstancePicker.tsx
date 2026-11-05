@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
-import type { Instance } from "./types";
+import type { Instance } from "../../shell/types";
 
 export function InstancePicker({
   instances,

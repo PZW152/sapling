@@ -44,6 +44,8 @@ pub enum LaunchError {
     Spawn(#[source] io::Error),
     #[error("遊戲異常結束。{advice}")]
     Crashed { advice: &'static str },
+    #[error("遊戲異常結束，請查看問題記錄。")]
+    CrashedWithoutAnalysis,
 }
 
 /// 啟動過程中發生的事，轉發給介面顯示。
@@ -67,6 +69,7 @@ pub async fn play(
     instance: &Instance,
     dirs: &DataDirs,
     concurrency: usize,
+    analyze_crash: bool,
     mut on_event: impl FnMut(LaunchEvent) + Send,
 ) -> Result<(), LaunchError> {
     let prepared = prepare_version(&instance.version, dirs, concurrency, |stage, progress| {
@@ -120,6 +123,8 @@ pub async fn play(
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
     if status.success() {
         Ok(())
+    } else if !analyze_crash {
+        Err(LaunchError::CrashedWithoutAnalysis)
     } else {
         let reports = crash::read_reports(&game_dir).await;
         Err(LaunchError::Crashed {

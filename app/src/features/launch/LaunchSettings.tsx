@@ -1,0 +1,77 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useApp } from "../../shell/AppContext";
+import { Slider } from "../settings/Slider";
+
+const MEMORY_STEP_MB = 512;
+const MIN_MEMORY_MB = 1024;
+const MAX_MEMORY_MB = 16384;
+const AUTO_MEMORY = 0;
+const DEFAULT_MANUAL_MEMORY_MB = 4096;
+const MB_PER_GB = 1024;
+
+export function LaunchSettings() {
+  const { selected, updateInstance } = useApp();
+  const [totalMemory, setTotalMemory] = useState(0);
+
+  useEffect(() => {
+    invoke<number>("system_memory_mb").then(setTotalMemory);
+  }, []);
+
+  const memoryMb = selected?.memoryMb ?? AUTO_MEMORY;
+  const autoMemory = memoryMb === AUTO_MEMORY;
+
+  return (
+    <>
+      <section className="panel setting">
+        <div className="setting-head">
+          <label htmlFor="memory">遊戲記憶體</label>
+          <output htmlFor="memory">
+            {autoMemory ? "自動" : `${(memoryMb / MB_PER_GB).toFixed(1)} GB`}
+          </output>
+        </div>
+        <div className="toggle-row">
+          <button
+            className="switch"
+            role="switch"
+            aria-checked={autoMemory}
+            aria-label="自動分配記憶體"
+            disabled={!selected}
+            onClick={() =>
+              updateInstance({ memoryMb: autoMemory ? DEFAULT_MANUAL_MEMORY_MB : AUTO_MEMORY })
+            }
+          />
+          <span>自動分配</span>
+        </div>
+        <Slider
+          id="memory"
+          min={MIN_MEMORY_MB}
+          max={MAX_MEMORY_MB}
+          step={MEMORY_STEP_MB}
+          disabled={autoMemory || !selected}
+          value={autoMemory ? MIN_MEMORY_MB : memoryMb}
+          onChange={(value) => updateInstance({ memoryMb: value })}
+        />
+        <p>
+          {selected ? `套用到實例「${selected.name}」。` : "建立實例後可以調整。"}
+          {totalMemory > 0 && `電腦共有 ${(totalMemory / MB_PER_GB).toFixed(0)} GB。`}
+        </p>
+      </section>
+
+      <section className="panel setting">
+        <div className="setting-head">
+          <label htmlFor="java-args">額外 Java 參數</label>
+        </div>
+        <input
+          id="java-args"
+          type="text"
+          spellCheck={false}
+          placeholder="不確定的話留空"
+          disabled={!selected}
+          value={selected?.javaArgs ?? ""}
+          onChange={(event) => updateInstance({ javaArgs: event.target.value })}
+        />
+      </section>
+    </>
+  );
+}

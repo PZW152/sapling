@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { LoginCode, Profile } from "./types";
+import type { LoginCode, Profile } from "../../shell/types";
 
 export function AccountPanel({
   profile,

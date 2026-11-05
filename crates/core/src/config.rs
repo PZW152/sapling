@@ -18,6 +18,10 @@ pub struct LauncherConfig {
     pub selected_instance: String,
     /// 預設綠色主題的名稱。
     pub theme: String,
+    /// 用戶關閉的可選功能模塊。
+    pub disabled_features: Vec<String>,
+    /// 功能模塊開關平時隱藏，在關於頁連按版本號才顯示。
+    pub feature_switches_unlocked: bool,
 }
 
 impl Default for LauncherConfig {
@@ -26,6 +30,8 @@ impl Default for LauncherConfig {
             download_concurrency: DEFAULT_CONCURRENCY,
             selected_instance: String::new(),
             theme: DEFAULT_THEME.to_string(),
+            disabled_features: Vec::new(),
+            feature_switches_unlocked: false,
         }
     }
 }
@@ -38,6 +44,10 @@ impl LauncherConfig {
 
     pub async fn save(&self, dirs: &DataDirs) -> Result<(), StorageError> {
         write_json(&dirs.config_file(), &self.clone().normalized()).await
+    }
+
+    pub fn is_feature_enabled(&self, id: &str) -> bool {
+        !self.disabled_features.iter().any(|disabled| disabled == id)
     }
 
     fn normalized(mut self) -> Self {

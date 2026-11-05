@@ -41,10 +41,20 @@ export function Sapling({
         }
       }}
     >
+      <defs>
+        <linearGradient id="leaf-main" x1="0" y1="1" x2="1" y2="0">
+          <stop className="leaf-stop-deep" offset="0" />
+          <stop className="leaf-stop-light" offset="1" />
+        </linearGradient>
+        <linearGradient id="leaf-soft" x1="1" y1="1" x2="0" y2="0">
+          <stop className="leaf-stop-main" offset="0" />
+          <stop className="leaf-stop-pale" offset="1" />
+        </linearGradient>
+      </defs>
       <g className="sapling-sway">
         <path
           className="sapling-stem"
-          d="M100 226 C100 190 100 150 100 114"
+          d="M100 240 C100 200 100 150 100 114"
           pathLength={1}
           style={{ strokeDashoffset: 1 - stageOf(growth, 0, 0.6) }}
         />
@@ -53,16 +63,20 @@ export function Sapling({
             <path className="sapling-extra" d={EXTRA_LEAF_PATH} />
           </g>
         ))}
-        <path
+        <g
           className="sapling-leaf sapling-leaf-right"
-          d="M100 112 C100 66 132 36 176 32 C176 80 146 112 100 112 Z"
           style={{ transform: `scale(${rightLeaf})`, opacity: rightLeaf > 0 ? 1 : 0 }}
-        />
-        <path
+        >
+          <path fill="url(#leaf-main)" d="M100 112 C100 66 132 36 176 32 C176 80 146 112 100 112 Z" />
+          <path className="sapling-vein" d="M100 112 C124 92 150 62 172 36" />
+        </g>
+        <g
           className="sapling-leaf sapling-leaf-left"
-          d="M100 158 C100 122 70 102 28 102 C28 140 58 164 100 158 Z"
           style={{ transform: `scale(${leftLeaf})`, opacity: leftLeaf > 0 ? 1 : 0 }}
-        />
+        >
+          <path fill="url(#leaf-soft)" d="M100 158 C100 122 70 102 28 102 C28 140 58 164 100 158 Z" />
+          <path className="sapling-vein" d="M100 158 C78 138 54 118 32 104" />
+        </g>
       </g>
     </svg>
   );

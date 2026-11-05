@@ -19,6 +19,8 @@ use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::{AppHandle, Emitter, State};
 
 const LAUNCH_EVENT: &str = "launch-event";
+/// 與前端功能模塊的 id 相同。
+const CRASH_FEATURE: &str = "crash";
 const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
@@ -287,6 +289,7 @@ async fn play_game(
         &instance,
         &dirs,
         config.download_concurrency,
+        config.is_feature_enabled(CRASH_FEATURE),
         move |event| {
             if let LaunchEvent::Progress { progress, .. } = &event {
                 let is_last = progress.finished_files == progress.total_files;

@@ -18,6 +18,8 @@ export type LauncherConfig = {
   downloadConcurrency: number;
   selectedInstance: string;
   theme: string;
+  disabledFeatures: string[];
+  featureSwitchesUnlocked: boolean;
 };
 
 export type ModFile = { name: string; enabled: boolean; size: number };
