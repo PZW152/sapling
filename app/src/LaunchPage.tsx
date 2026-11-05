@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import type { CSSProperties, MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AccountPanel } from "./AccountPanel";
 import { InstancePicker } from "./InstancePicker";
 import { LogPanel } from "./LogPanel";
 import { Sapling } from "./Sapling";
-import { burstLeaves } from "./Scene";
 import { overallProgress, toMegabytes } from "./progress";
 import type { Instance, LaunchEvent, Profile, Progress } from "./types";
 
@@ -56,12 +54,10 @@ export function LaunchPage({
     };
   }, []);
 
-  async function startGame(event: MouseEvent<HTMLButtonElement>) {
+  async function startGame() {
     if (!selected) {
       return;
     }
-    const button = event.currentTarget.getBoundingClientRect();
-    burstLeaves(button.left + button.width / 2, button.top + button.height / 3);
     setPhase("preparing");
     setProgress(null);
     setDownloading(false);
@@ -115,18 +111,7 @@ export function LaunchPage({
       <section className="stage">
         <div className="stage-text">
           <p className="game-name">{selected?.name ?? "Minecraft"}</p>
-          <h1 key={selected?.id ?? "empty"} aria-label={selected?.version ?? "待播種"}>
-            {[...(selected?.version ?? "待播種")].map((character, index) => (
-              <span
-                key={index}
-                className="char"
-                aria-hidden="true"
-                style={{ "--i": index } as CSSProperties}
-              >
-                {character}
-              </span>
-            ))}
-          </h1>
+          <h1 key={selected?.id ?? "empty"}>{selected?.version ?? "待播種"}</h1>
           <p className="edition">原版</p>
         </div>
 

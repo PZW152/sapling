@@ -7,15 +7,13 @@
   --color-sky-top: #f4faf4;
   --color-sky-bottom: #d9ecdf;
   --color-sun: rgba(255, 243, 200, 0.9);
-  --color-hill-far: #cfe6d6;
   --color-hill-back: #bcdcc7;
   --color-hill-front: #a4cfb3;
-  --color-pollen: #7cc896;
   --color-sunken: rgba(47, 158, 91, 0.1);
   --color-sunken-hover: rgba(47, 158, 91, 0.18);
 
   /* 中性色 */
-  --color-glass: rgba(255, 255, 255, 0.72);
+  --color-glass: rgba(255, 255, 255, 0.86);
   --color-glass-solid: rgba(255, 255, 255, 0.94);
   --color-glass-line: rgba(255, 255, 255, 0.7);
   --color-ink: #1d2b24;
@@ -62,26 +60,22 @@
   --shadow-button: 0 10px 24px color-mix(in srgb, var(--color-accent) 35%, transparent);
   --shadow-button-hover: 0 16px 32px color-mix(in srgb, var(--color-accent) 42%, transparent);
   --shadow-popover: 0 2px 6px rgba(29, 43, 36, 0.08), 0 18px 40px rgba(29, 43, 36, 0.18);
-  --glass-blur: blur(18px) saturate(1.35);
+  --glass-blur: blur(10px);
 
   /* 動效 */
   --ease: cubic-bezier(0.22, 0.8, 0.28, 1);
-  --spring: linear(0, 0.2 5%, 0.6 13%, 0.9 22%, 1.05 32%, 1.08 40%, 1.03 55%, 0.995 70%, 1);
+  --spring: linear(0, 0.25 6%, 0.65 15%, 0.92 25%, 1.02 35%, 1.03 45%, 1.005 65%, 1);
   --duration-quick: 160ms;
-  --duration-grow: 460ms;
+  --duration-grow: 380ms;
   --duration-intro: 900ms;
   --duration-scene: 900ms;
   --stagger: 45ms;
-  --breeze: 7s;
+  --breeze: 9s;
 
   /* 字體 */
   --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-display: "Segoe UI Variable Display", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "Microsoft JhengHei UI", monospace;
-
-  /* 滑鼠位置，由 Scene 更新，範圍 -1 到 1 */
-  --px: 0;
-  --py: 0;
 
   color-scheme: light;
   color: var(--color-ink);
@@ -98,10 +92,8 @@
   --color-accent-soft: #dcf3ee;
   --color-sky-top: #f2fbf9;
   --color-sky-bottom: #d4efe9;
-  --color-hill-far: #c9e9e2;
   --color-hill-back: #b3ded4;
   --color-hill-front: #99d0c3;
-  --color-pollen: #74d0bb;
   --color-sunken: rgba(43, 165, 138, 0.1);
   --color-sunken-hover: rgba(43, 165, 138, 0.18);
 }
@@ -114,10 +106,8 @@
   --color-sky-top: #f8faf0;
   --color-sky-bottom: #e4ecd0;
   --color-sun: rgba(255, 233, 170, 0.9);
-  --color-hill-far: #dbe6c4;
   --color-hill-back: #cadaab;
   --color-hill-front: #b5cb90;
-  --color-pollen: #a8c26f;
   --color-sunken: rgba(106, 143, 53, 0.12);
   --color-sunken-hover: rgba(106, 143, 53, 0.2);
 }
@@ -129,10 +119,8 @@
   --color-accent-soft: #e3f2dd;
   --color-sky-top: #f5fbf1;
   --color-sky-bottom: #dcefd2;
-  --color-hill-far: #d0e8c7;
   --color-hill-back: #bcdeb0;
   --color-hill-front: #a4d095;
-  --color-pollen: #8bcb78;
   --color-sunken: rgba(79, 158, 58, 0.11);
   --color-sunken-hover: rgba(79, 158, 58, 0.19);
 }
@@ -145,10 +133,8 @@
   --color-sky-top: #eff6f2;
   --color-sky-bottom: #cbe0d5;
   --color-sun: rgba(255, 238, 190, 0.75);
-  --color-hill-far: #b6d3c4;
   --color-hill-back: #9cc3af;
   --color-hill-front: #7fb097;
-  --color-pollen: #62ad88;
   --color-sunken: rgba(31, 111, 74, 0.11);
   --color-sunken-hover: rgba(31, 111, 74, 0.19);
 }
@@ -239,49 +225,15 @@ button:disabled {
   background: linear-gradient(170deg, var(--color-sky-top), var(--color-sky-bottom));
 }
 
-.scene-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
 .sun {
   position: absolute;
-  top: -120px;
-  right: 8%;
-  width: 360px;
-  height: 360px;
+  top: -140px;
+  right: 6%;
+  width: 380px;
+  height: 380px;
   border-radius: 50%;
   background: radial-gradient(circle, var(--color-sun), transparent 66%);
-  transform: translate(calc(var(--px) * -14px), calc(var(--py) * -10px));
-  animation: sun-breathe 9s ease-in-out infinite;
-}
-
-.sun-rays {
-  position: absolute;
-  top: -340px;
-  right: calc(8% - 220px);
-  width: 800px;
-  height: 800px;
-  border-radius: 50%;
-  background: repeating-conic-gradient(var(--color-sun) 0deg 5deg, transparent 5deg 24deg);
-  opacity: 0.16;
-  mask-image: radial-gradient(circle, black 12%, transparent 62%);
-  animation: sun-turn 80s linear infinite;
-}
-
-@keyframes sun-breathe {
-  50% {
-    opacity: 0.72;
-    scale: 1.06;
-  }
-}
-
-@keyframes sun-turn {
-  to {
-    rotate: 360deg;
-  }
+  opacity: 0.7;
 }
 
 .hills {
@@ -292,22 +244,16 @@ button:disabled {
   transition: translate var(--duration-scene) var(--ease);
 }
 
-.hills-far {
-  height: 44%;
-  fill: var(--color-hill-far);
-  translate: calc(var(--scene) * -8px + var(--px) * -8px) 0;
-}
-
 .hills-back {
   height: 36%;
   fill: var(--color-hill-back);
-  translate: calc(var(--scene) * -18px + var(--px) * -16px) 0;
+  translate: calc(var(--scene) * -10px) 0;
 }
 
 .hills-front {
   height: 30%;
   fill: var(--color-hill-front);
-  translate: calc(var(--scene) * -34px + var(--px) * -28px) 0;
+  translate: calc(var(--scene) * -20px) 0;
 }
 
 /* 標題列 */
@@ -417,7 +363,7 @@ button:disabled {
 @keyframes page-slide {
   from {
     opacity: 0;
-    transform: translateX(calc(var(--dir) * 26px));
+    transform: translateX(calc(var(--dir) * 12px));
   }
 }
 
@@ -428,7 +374,7 @@ button:disabled {
 .notice-card,
 .download,
 .instances > * {
-  animation: rise var(--duration-grow) var(--spring) backwards;
+  animation: rise var(--duration-grow) var(--ease) backwards;
 }
 
 .side > :nth-child(2),
@@ -454,7 +400,7 @@ button:disabled {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(8px);
   }
 }
 
@@ -800,19 +746,6 @@ button:disabled {
   letter-spacing: -0.02em;
 }
 
-.char {
-  display: inline-block;
-  animation: char-in var(--duration-grow) var(--spring) backwards;
-  animation-delay: calc(var(--i) * 32ms);
-}
-
-@keyframes char-in {
-  from {
-    opacity: 0;
-    transform: translateY(26px) rotate(5deg);
-  }
-}
-
 .edition {
   color: var(--color-muted);
 }
@@ -825,11 +758,6 @@ button:disabled {
   overflow: visible;
 }
 
-.sapling-lean {
-  transform-origin: 100px 226px;
-  transform: rotate(calc(var(--px) * 2.6deg));
-}
-
 .sapling-sway {
   transform-origin: 100px 226px;
   animation: breeze var(--breeze) ease-in-out infinite;
@@ -838,11 +766,11 @@ button:disabled {
 @keyframes breeze {
   0%,
   100% {
-    transform: rotate(-0.9deg);
+    transform: rotate(-0.5deg);
   }
 
   50% {
-    transform: rotate(1.2deg);
+    transform: rotate(0.6deg);
   }
 }
 
@@ -970,7 +898,7 @@ button:disabled {
 .progress div {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--color-accent-leaf), var(--color-accent));
+  background: var(--color-accent);
   transform-origin: left;
   transition: transform var(--duration-grow) var(--ease);
 }
@@ -982,34 +910,19 @@ button:disabled {
   justify-content: center;
   gap: var(--space-2);
   height: var(--primary-height);
-  overflow: hidden;
   border-radius: var(--radius-leaf);
   color: var(--color-on-accent);
   font-family: var(--font-display);
   font-size: 21px;
   font-weight: 700;
-  background: linear-gradient(120deg, var(--color-accent), var(--color-accent-deep));
+  background: var(--color-accent);
   box-shadow: var(--shadow-button);
-}
-
-/* 滑過時有一道光掃過。 */
-.primary::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.38) 50%, transparent 65%);
-  transform: translateX(-110%);
-  transition: transform 0s;
-  content: "";
 }
 
 .primary:hover:enabled {
   border-radius: var(--radius-leaf-flip);
+  background: var(--color-accent-deep);
   box-shadow: var(--shadow-button-hover);
-}
-
-.primary:hover:enabled::after {
-  transform: translateX(110%);
-  transition: transform var(--duration-scene) var(--ease);
 }
 
 .primary:disabled {
