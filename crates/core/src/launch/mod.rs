@@ -146,7 +146,12 @@ pub async fn play(
     drop(sender);
     while let Some(line) = receiver.recv().await {
         if is_problem_line(&line) {
-            let line = hide_token(&line, session.access_token());
+            // 離線的 token 只是佔位的 0，替換掉會弄亂記錄裡所有的數字。
+            let line = if session.is_offline() {
+                line
+            } else {
+                hide_token(&line, session.access_token())
+            };
             on_event(LaunchEvent::Log { line });
         }
     }
@@ -252,7 +257,7 @@ fn placeholder_values(
         ("auth_access_token", session.access_token().to_string()),
         ("auth_xuid", UNUSED_ID.to_string()),
         ("clientid", UNUSED_ID.to_string()),
-        ("user_type", "msa".to_string()),
+        ("user_type", session.user_type().to_string()),
         ("version_name", details.id.clone()),
         ("version_type", details.release_type.clone()),
         ("game_directory", path_text(&instance.game_dir(dirs))),

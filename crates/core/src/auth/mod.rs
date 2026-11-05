@@ -3,6 +3,7 @@
 
 mod token_store;
 
+use md5::{Digest, Md5};
 use std::fmt;
 use std::time::{Duration, Instant};
 
@@ -18,6 +19,10 @@ const XBOX_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MINECRAFT_LOGIN_URL: &str =
     "https://api.minecraftservices.com/authentication/login_with_xbox";
+const MIN_NAME_LENGTH: usize = 3;
+const MAX_NAME_LENGTH: usize = 16;
+/// 離線時遊戲不驗證 token，但參數不能留空。
+const OFFLINE_TOKEN: &str = "0";
 const ENTITLEMENTS_URL: &str = "https://api.minecraftservices.com/entitlements/mcstore";
 const PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
@@ -48,6 +53,10 @@ pub enum AuthError {
     RateLimited,
     #[error("這個微軟帳號沒有購買 Minecraft Java 版")]
     GameNotOwned,
+    #[error("離線模式需要先在這台電腦登入擁有 Minecraft 的微軟帳號")]
+    OfflineNeedsOwner,
+    #[error("玩家名稱要 3 到 16 個英文字母、數字或底線")]
+    InvalidPlayerName,
     #[error("這個帳號還沒建立 Minecraft 玩家檔案，請先用官方啟動器登入一次")]
     NoProfile,
     #[error("登入時收到看不懂的回應（{step}，狀態 {status}）")]
@@ -100,8 +109,37 @@ pub struct Session {
 }
 
 impl Session {
+    /// 離線玩家。UUID 的算法和遊戲相同，存檔和區域網路才認得同一個玩家。
+    fn offline(name: &str) -> Result<Self, AuthError> {
+        let valid = (MIN_NAME_LENGTH..=MAX_NAME_LENGTH).contains(&name.len())
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_');
+        if !valid {
+            return Err(AuthError::InvalidPlayerName);
+        }
+        Ok(Self {
+            profile: Profile {
+                id: offline_uuid(name),
+                name: name.to_string(),
+                skin_url: None,
+            },
+            access_token: OFFLINE_TOKEN.to_string(),
+            expires_at: Instant::now(),
+        })
+    }
+
     pub fn access_token(&self) -> &str {
         &self.access_token
+    }
+
+    pub fn is_offline(&self) -> bool {
+        self.access_token == OFFLINE_TOKEN
+    }
+
+    /// 遊戲參數 `user_type` 的值。
+    pub fn user_type(&self) -> &'static str {
+        if self.is_offline() { "legacy" } else { "msa" }
     }
 
     pub fn is_expired(&self) -> bool {
@@ -274,6 +312,27 @@ pub async fn restore_session(client: &reqwest::Client) -> Result<Option<Session>
 }
 
 /// 登出：刪除保存的 refresh token。
+/// 這台電腦是否保存了微軟帳號。只有確認擁有遊戲的帳號才會被保存。
+pub fn has_saved_account() -> Result<bool, AuthError> {
+    Ok(token_store::load()?.is_some())
+}
+
+/// 離線遊玩用的登入狀態。必須已保存擁有遊戲的帳號，不提供給沒有購買遊戲的人。
+pub fn offline_session(name: &str) -> Result<Session, AuthError> {
+    if !has_saved_account()? {
+        return Err(AuthError::OfflineNeedsOwner);
+    }
+    Session::offline(name)
+}
+
+/// 和 Java 的 `UUID.nameUUIDFromBytes` 相同：MD5 再標記為第 3 版 UUID。
+fn offline_uuid(name: &str) -> String {
+    let mut bytes: [u8; 16] = Md5::digest(format!("OfflinePlayer:{name}")).into();
+    bytes[6] = (bytes[6] & 0x0f) | 0x30;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 pub fn sign_out() -> Result<(), AuthError> {
     token_store::delete()?;
     Ok(())
@@ -440,6 +499,25 @@ fn active_skin_url(skins: &[MinecraftSkin]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offline_uuid_matches_the_game() {
+        let session = Session::offline("Steve").unwrap();
+
+        assert_eq!(session.profile.id, "5627dd98e6be3c21b8a8e92344183641");
+        assert!(session.is_offline());
+        assert_eq!(session.user_type(), "legacy");
+    }
+
+    #[test]
+    fn rejects_names_the_game_does_not_allow() {
+        for name in ["ab", "abcdefghijklmnopq", "樹苗玩家", "has space"] {
+            assert!(matches!(
+                Session::offline(name),
+                Err(AuthError::InvalidPlayerName)
+            ));
+        }
+    }
 
     #[test]
     fn explains_common_xbox_errors_in_plain_language() {

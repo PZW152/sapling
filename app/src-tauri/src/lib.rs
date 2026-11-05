@@ -21,6 +21,7 @@ use tauri::{AppHandle, Emitter, State};
 const LAUNCH_EVENT: &str = "launch-event";
 /// 與前端功能模塊的 id 相同。
 const CRASH_FEATURE: &str = "crash";
+const OFFLINE_FEATURE: &str = "offline-account";
 const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
@@ -220,6 +221,11 @@ async fn login_finish(state: State<'_, AppState>) -> Result<Profile, String> {
 }
 
 #[tauri::command]
+fn has_saved_account() -> Result<bool, String> {
+    auth::has_saved_account().map_err(text)
+}
+
+#[tauri::command]
 fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
     auth::sign_out().map_err(text)?;
     state.set_session(None)
@@ -276,13 +282,20 @@ async fn play_game(
     app: AppHandle,
     state: State<'_, AppState>,
     instance_id: String,
+    offline_name: Option<String>,
 ) -> Result<(), String> {
     state.launch_cancel.reset();
-    let session = current_session(&state)
-        .await?
-        .ok_or_else(|| "請先登入微軟帳號".to_string())?;
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let session = match offline_name {
+        Some(name) if config.is_feature_enabled(OFFLINE_FEATURE) => {
+            auth::offline_session(&name).map_err(text)?
+        }
+        Some(_) => return Err("離線模式已關閉".to_string()),
+        None => current_session(&state)
+            .await?
+            .ok_or_else(|| "請先登入微軟帳號".to_string())?,
+    };
     let instance = load_instance(&dirs, &instance_id).await?;
 
     let mut last_progress = Instant::now();
@@ -349,6 +362,7 @@ pub fn run() {
             login_start,
             login_finish,
             sign_out,
+            has_saved_account,
             install_game,
             open_link,
             check_update,

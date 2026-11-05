@@ -24,6 +24,9 @@ pub struct LauncherConfig {
     pub feature_switches_unlocked: bool,
     /// 植樹節種過樹的年份，種過就解鎖隱藏主題。
     pub planted_years: Vec<i32>,
+    /// 下次啟動是否用離線模式。
+    pub offline_enabled: bool,
+    pub offline_name: String,
 }
 
 impl Default for LauncherConfig {
@@ -35,6 +38,8 @@ impl Default for LauncherConfig {
             disabled_features: Vec::new(),
             feature_switches_unlocked: false,
             planted_years: Vec::new(),
+            offline_enabled: false,
+            offline_name: String::new(),
         }
     }
 }

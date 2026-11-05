@@ -37,9 +37,11 @@ export const api = {
   loginStart: () => invoke<LoginCode>("login_start"),
   loginFinish: () => invoke<Profile>("login_finish"),
   signOut: () => invoke<void>("sign_out"),
+  hasSavedAccount: () => invoke<boolean>("has_saved_account"),
 
   installGame: (version: string) => invoke<void>("install_game", { version }),
-  playGame: (instanceId: string) => invoke<void>("play_game", { instanceId }),
+  playGame: (instanceId: string, offlineName: string | null) =>
+    invoke<void>("play_game", { instanceId, offlineName }),
   cancelLaunch: () => invoke<void>("cancel_launch"),
 
   openLink: (url: string) => invoke<void>("open_link", { url }),

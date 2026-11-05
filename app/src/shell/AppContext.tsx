@@ -14,6 +14,8 @@ const DEFAULT_CONFIG: LauncherConfig = {
   disabledFeatures: [],
   featureSwitchesUnlocked: false,
   plantedYears: [],
+  offlineEnabled: false,
+  offlineName: "",
 };
 
 type AppState = {

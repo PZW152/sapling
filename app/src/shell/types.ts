@@ -21,6 +21,8 @@ export type LauncherConfig = {
   disabledFeatures: string[];
   featureSwitchesUnlocked: boolean;
   plantedYears: number[];
+  offlineEnabled: boolean;
+  offlineName: string;
 };
 
 export type ModFile = { name: string; enabled: boolean; size: number };

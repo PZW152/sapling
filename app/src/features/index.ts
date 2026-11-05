@@ -7,6 +7,7 @@ import { download } from "./download";
 import { instances } from "./instances";
 import { launch } from "./launch";
 import { mods } from "./mods";
+import { offlineAccount } from "./offline-account";
 import { settings } from "./settings";
 import { update } from "./update";
 
@@ -16,6 +17,7 @@ export const FEATURES: Feature[] = [
   launch,
   instances,
   mods,
+  offlineAccount,
   download,
   crash,
   update,

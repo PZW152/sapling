@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { LauncherConfig, Profile } from "./types";
 
 /** 一個內建功能模塊。新功能只需要實作這個結構並到 features/index.ts 註冊。 */
 export type Feature = {
@@ -23,6 +24,10 @@ export type Feature = {
   AdvancedSettings?: ComponentType;
   /** 放進實例頁的區塊。 */
   InstancePanel?: ComponentType<{ instanceId: string }>;
+  /** 放在啟動頁帳號區塊下面的內容。 */
+  AccountPanel?: ComponentType<{ profile: Profile | null; disabled: boolean }>;
+  /** 回傳名稱時，下次啟動用這個名稱離線遊玩。 */
+  offlineName?: (config: LauncherConfig) => string | null;
   /** 浮在所有頁面上的內容，例如更新提示。 */
   Overlay?: ComponentType;
 };

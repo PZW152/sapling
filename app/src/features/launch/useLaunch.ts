@@ -51,14 +51,14 @@ export function useLaunch() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  async function start(instanceId: string, from: OverlayOrigin | null) {
+  async function start(instanceId: string, offlineName: string | null, from: OverlayOrigin | null) {
     setOrigin(from);
     setPhase("preparing");
     setProgress(null);
     setError("");
     setLogs([]);
     try {
-      await api.playGame(instanceId);
+      await api.playGame(instanceId, offlineName);
       setPhase("idle");
     } catch (reason) {
       setError(String(reason));

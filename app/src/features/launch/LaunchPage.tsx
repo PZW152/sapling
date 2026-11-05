@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
 import { useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
@@ -10,12 +11,26 @@ import { useLaunch } from "./useLaunch";
 import type { Phase } from "./useLaunch";
 
 export function LaunchPage() {
-  const { loaded, instances, selected, listError, selectInstance, goTo, loadVersions, isEnabled } =
-    useApp();
+  const {
+    loaded,
+    config,
+    instances,
+    selected,
+    listError,
+    selectInstance,
+    goTo,
+    loadVersions,
+    isEnabled,
+  } = useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
   const { phase, progress, error, logs, origin, start, reset, clearOrigin } = useLaunch();
   const [logOpen, setLogOpen] = useState(false);
   const hero = useRef<HTMLElement>(null);
+
+  const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
+  const offlineName =
+    active.map((feature) => feature.offlineName?.(config)).find((name) => name) ?? null;
+  const canStart = profile !== null || offlineName !== null;
 
   function startGame() {
     if (!selected) {
@@ -24,6 +39,7 @@ export function LaunchPage() {
     const bounds = hero.current?.getBoundingClientRect();
     start(
       selected.id,
+      offlineName,
       bounds
         ? {
             top: bounds.top,
@@ -72,7 +88,7 @@ export function LaunchPage() {
           <HeroStatus
             phase={phase}
             error={error}
-            signedIn={profile !== null}
+            signedIn={canStart}
             noInstance={noInstance}
             hasLogs={logs.length > 0}
             onShowLogs={() => setLogOpen(true)}
@@ -84,7 +100,7 @@ export function LaunchPage() {
           ) : (
             <button
               className={phase === "running" ? "primary running" : "primary"}
-              disabled={!selected || !profile || busy}
+              disabled={!selected || !canStart || busy}
               onClick={startGame}
             >
               <span key={phase} className="primary-label">
@@ -111,6 +127,10 @@ export function LaunchPage() {
 
       <aside className="side">
         <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
+        {active.map(
+          ({ id, AccountPanel: Extra }) =>
+            Extra && <Extra key={id} profile={profile} disabled={busy} />,
+        )}
         <InstanceList
           loaded={loaded}
           instances={instances}
