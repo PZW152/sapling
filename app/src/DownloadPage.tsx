@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { InstallState } from "./App";
 import type { VersionList } from "./types";
 
@@ -32,14 +33,14 @@ export function DownloadPage({
   }
 
   return (
-    <div className="download">
+    <div className="download panel">
       <div className="download-head">
         <h2>下載遊戲</h2>
-        <p>選一個版本下載，下載好的版本會在啟動頁出現。需要的 Java 會一起下載。</p>
+        <p>下載好的版本會自動建立實例。需要的 Java 會一起下載。</p>
       </div>
       <ul className="vine">
-        {groupBySeries(list.versions).map(({ series, versions }) => (
-          <li key={series} className="vine-series">
+        {groupBySeries(list.versions).map(({ series, versions }, index) => (
+          <li key={series} className="vine-series" style={{ "--i": index } as CSSProperties}>
             <p className="vine-title">{series}</p>
             {versions.map((id) => (
               <VersionRow

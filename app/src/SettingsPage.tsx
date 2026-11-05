@@ -1,110 +1,180 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Settings } from "./types";
+import { THEMES, applyTheme } from "./theme";
+import type { Instance, LauncherConfig, UpdateInfo } from "./types";
 
 const MEMORY_STEP_MB = 512;
 const MIN_MEMORY_MB = 1024;
 const MAX_MEMORY_MB = 16384;
+const AUTO_MEMORY = 0;
+const DEFAULT_MANUAL_MEMORY_MB = 4096;
 const MB_PER_GB = 1024;
 const MIN_CONCURRENCY = 1;
 const MAX_CONCURRENCY = 64;
 /** 停止調整多久後自動保存。 */
 const SAVE_DELAY_MS = 400;
 
-type SaveState = "idle" | "saving" | "saved" | "failed";
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "latest" }
+  | { kind: "available"; update: UpdateInfo }
+  | { kind: "installing" }
+  | { kind: "failed"; message: string };
 
-export function SettingsPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+export function SettingsPage({
+  config,
+  instance,
+  onConfigChange,
+  onInstanceChange,
+}: {
+  config: LauncherConfig;
+  instance: Instance | null;
+  onConfigChange: (config: LauncherConfig) => void;
+  onInstanceChange: (instance: Instance) => void;
+}) {
   const [error, setError] = useState("");
-  const changed = useRef(false);
+  const [saved, setSaved] = useState(false);
+  const [totalMemory, setTotalMemory] = useState(0);
+  const [update, setUpdate] = useState<UpdateState>({ kind: "idle" });
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    invoke<Settings>("load_settings")
-      .then(setSettings)
-      .catch((reason) => setError(String(reason)));
+    invoke<number>("system_memory_mb").then(setTotalMemory);
   }, []);
 
-  useEffect(() => {
-    if (!changed.current) {
+  function queueSave(save: () => Promise<unknown>) {
+    setSaved(false);
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      save()
+        .then(() => {
+          setError("");
+          setSaved(true);
+        })
+        .catch((reason) => setError(String(reason)));
+    }, SAVE_DELAY_MS);
+  }
+
+  function changeConfig(change: Partial<LauncherConfig>) {
+    const next = { ...config, ...change };
+    onConfigChange(next);
+    queueSave(() => invoke("save_config", { config: next }));
+  }
+
+  function changeInstance(change: Partial<Instance>) {
+    if (!instance) {
       return;
     }
-    const timer = setTimeout(() => {
-      invoke("save_settings", { settings })
-        .then(() => setSaveState("saved"))
-        .catch((reason) => {
-          setError(String(reason));
-          setSaveState("failed");
-        });
-    }, SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [settings]);
-
-  function update(change: (current: Settings) => Settings) {
-    changed.current = true;
-    setSaveState("saving");
-    setSettings((current) => current && change(current));
+    const next = { ...instance, ...change };
+    onInstanceChange(next);
+    queueSave(() => invoke("save_instance", { instance: next }));
   }
 
-  function updateInstance(change: Partial<Settings["instance"]>) {
-    update((current) => ({ ...current, instance: { ...current.instance, ...change } }));
+  function chooseTheme(id: string, event: MouseEvent) {
+    applyTheme(id, { x: event.clientX, y: event.clientY });
+    changeConfig({ theme: id });
   }
 
-  if (!settings) {
-    return (
-      <div className="notice">
-        <p className={error ? "error" : undefined}>{error || "正在讀取設定"}</p>
-      </div>
-    );
+  async function checkUpdate() {
+    setUpdate({ kind: "checking" });
+    try {
+      const found = await invoke<UpdateInfo | null>("check_update");
+      setUpdate(found ? { kind: "available", update: found } : { kind: "latest" });
+    } catch (reason) {
+      setUpdate({ kind: "failed", message: String(reason) });
+    }
   }
 
-  const memoryMb = settings.instance.memoryMb;
-  const concurrency = settings.config.downloadConcurrency;
+  async function installUpdate(info: UpdateInfo) {
+    setUpdate({ kind: "installing" });
+    try {
+      await invoke("apply_update", { update: info });
+    } catch (reason) {
+      setUpdate({ kind: "failed", message: String(reason) });
+    }
+  }
+
+  const memoryMb = instance?.memoryMb ?? AUTO_MEMORY;
+  const autoMemory = memoryMb === AUTO_MEMORY;
 
   return (
     <div className="settings">
+      <section className="panel setting setting-wide">
+        <div className="setting-head">
+          <span>主題</span>
+        </div>
+        <div className="themes">
+          {THEMES.map(({ id, name, color }) => (
+            <button
+              key={id}
+              className="theme"
+              aria-pressed={config.theme === id}
+              onClick={(event) => chooseTheme(id, event)}
+            >
+              <span className="theme-leaf" style={{ background: color }} />
+              {name}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="panel setting">
         <div className="setting-head">
           <label htmlFor="memory">遊戲記憶體</label>
-          <output htmlFor="memory">{(memoryMb / MB_PER_GB).toFixed(1)} GB</output>
+          <output htmlFor="memory">
+            {autoMemory ? "自動" : `${(memoryMb / MB_PER_GB).toFixed(1)} GB`}
+          </output>
         </div>
+        <label className="toggle-row">
+          <button
+            className="switch"
+            role="switch"
+            aria-checked={autoMemory}
+            aria-label="自動分配記憶體"
+            disabled={!instance}
+            onClick={() =>
+              changeInstance({ memoryMb: autoMemory ? DEFAULT_MANUAL_MEMORY_MB : AUTO_MEMORY })
+            }
+          />
+          <span>自動分配</span>
+        </label>
         <input
           id="memory"
           type="range"
           min={MIN_MEMORY_MB}
           max={MAX_MEMORY_MB}
           step={MEMORY_STEP_MB}
-          value={memoryMb}
-          style={sliderFill(memoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)}
-          onChange={(event) => updateInstance({ memoryMb: Number(event.target.value) })}
+          disabled={autoMemory || !instance}
+          value={autoMemory ? MIN_MEMORY_MB : memoryMb}
+          style={sliderFill(autoMemory ? MIN_MEMORY_MB : memoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)}
+          onChange={(event) => changeInstance({ memoryMb: Number(event.target.value) })}
         />
-        <p>一般遊玩 4 GB 就夠。不要超過電腦實體記憶體的一半。</p>
+        <p>
+          {instance ? `套用到實例「${instance.name}」。` : "建立實例後可以調整。"}
+          {totalMemory > 0 && `電腦共有 ${(totalMemory / MB_PER_GB).toFixed(0)} GB。`}
+        </p>
       </section>
 
       <section className="panel setting">
         <div className="setting-head">
           <label htmlFor="concurrency">同時下載的檔案數</label>
-          <output htmlFor="concurrency">{concurrency}</output>
+          <output htmlFor="concurrency">{config.downloadConcurrency}</output>
         </div>
         <input
           id="concurrency"
           type="range"
           min={MIN_CONCURRENCY}
           max={MAX_CONCURRENCY}
-          value={concurrency}
-          style={sliderFill(concurrency, MIN_CONCURRENCY, MAX_CONCURRENCY)}
-          onChange={(event) =>
-            update((current) => ({
-              ...current,
-              config: { downloadConcurrency: Number(event.target.value) },
-            }))
-          }
+          value={config.downloadConcurrency}
+          style={sliderFill(config.downloadConcurrency, MIN_CONCURRENCY, MAX_CONCURRENCY)}
+          onChange={(event) => changeConfig({ downloadConcurrency: Number(event.target.value) })}
         />
         <p>網絡不穩定時可以調低。</p>
       </section>
 
-      <section className="panel setting setting-wide">
+      <section className="panel setting">
         <div className="setting-head">
           <label htmlFor="java-args">額外 Java 參數</label>
         </div>
@@ -113,28 +183,58 @@ export function SettingsPage() {
           type="text"
           spellCheck={false}
           placeholder="不確定的話留空"
-          value={settings.instance.javaArgs}
-          onChange={(event) => updateInstance({ javaArgs: event.target.value })}
+          disabled={!instance}
+          value={instance?.javaArgs ?? ""}
+          onChange={(event) => changeInstance({ javaArgs: event.target.value })}
         />
       </section>
 
-      <p className={saveState === "failed" ? "error setting-wide" : "status setting-wide"}>
-        {saveMessage(saveState, error)}
+      <section className="panel setting">
+        <div className="setting-head">
+          <span>啟動器更新</span>
+        </div>
+        <UpdateControls state={update} onCheck={checkUpdate} onInstall={installUpdate} />
+      </section>
+
+      <p className={error ? "error setting-wide" : "status setting-wide"}>
+        {error || (saved ? "已保存。" : "設定會自動保存。")}
       </p>
     </div>
   );
 }
 
-function sliderFill(value: number, min: number, max: number) {
-  return { "--fill": `${((value - min) / (max - min)) * 100}%` } as CSSProperties;
+function UpdateControls({
+  state,
+  onCheck,
+  onInstall,
+}: {
+  state: UpdateState;
+  onCheck: () => void;
+  onInstall: (update: UpdateInfo) => void;
+}) {
+  if (state.kind === "available") {
+    return (
+      <button className="secondary strong" onClick={() => onInstall(state.update)}>
+        更新到 {state.update.version}
+      </button>
+    );
+  }
+  const busy = state.kind === "checking" || state.kind === "installing";
+  return (
+    <>
+      <button className="secondary" disabled={busy} onClick={onCheck}>
+        {state.kind === "installing"
+          ? "正在更新"
+          : state.kind === "checking"
+            ? "正在檢查"
+            : "檢查更新"}
+      </button>
+      {state.kind === "latest" && <p>已經是最新版本。</p>}
+      {state.kind === "failed" && <p className="error">{state.message}</p>}
+    </>
+  );
 }
 
-function saveMessage(state: SaveState, error: string) {
-  if (state === "failed") {
-    return error;
-  }
-  if (state === "saving") {
-    return "正在保存";
-  }
-  return state === "saved" ? "已保存，下次啟動遊戲時生效。" : "設定會自動保存。";
+function sliderFill(value: number, min: number, max: number) {
+  return { "--fill": `${((value - min) / (max - min)) * 100}%` } as CSSProperties;
 }

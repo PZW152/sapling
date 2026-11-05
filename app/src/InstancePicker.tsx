@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
-import type { VersionList } from "./types";
+import type { CSSProperties, KeyboardEvent } from "react";
+import type { Instance } from "./types";
 
-export function VersionPicker({
-  list,
+export function InstancePicker({
+  instances,
   selected,
   disabled,
   onSelect,
 }: {
-  list: VersionList | null;
-  selected: string;
+  instances: Instance[];
+  selected: Instance | null;
   disabled: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -56,21 +56,21 @@ export function VersionPicker({
 
   return (
     <div className="picker" ref={root}>
-      {open && list && (
-        <ul className="picker-list" ref={options} aria-label="選擇遊戲版本" onKeyDown={moveFocus}>
-          {list.installed.map((id) => (
-            <li key={id}>
+      {open && (
+        <ul className="picker-list" ref={options} aria-label="選擇實例" onKeyDown={moveFocus}>
+          {instances.map((instance, index) => (
+            <li key={instance.id} style={{ "--i": index } as CSSProperties}>
               <button
                 className="picker-option"
-                aria-current={id === selected ? "true" : undefined}
+                aria-current={instance.id === selected?.id ? "true" : undefined}
                 onClick={() => {
-                  onSelect(id);
+                  onSelect(instance.id);
                   setOpen(false);
                   trigger.current?.focus();
                 }}
               >
-                <span>{id}</span>
-                {id === list.latest && <small>最新</small>}
+                <span>{instance.name}</span>
+                <small>{instance.version}</small>
               </button>
             </li>
           ))}
@@ -80,21 +80,14 @@ export function VersionPicker({
         ref={trigger}
         className="picker-trigger"
         aria-expanded={open}
-        disabled={!list || list.installed.length === 0 || disabled}
+        disabled={instances.length === 0 || disabled}
         onClick={() => setOpen(!open)}
       >
-        <span>{pickerLabel(list, selected)}</span>
+        <span>{selected?.name ?? "還沒有實例"}</span>
         <svg viewBox="0 0 12 12" aria-hidden="true">
           <path d="M2.5 7.5 6 4l3.5 3.5" />
         </svg>
       </button>
     </div>
   );
-}
-
-function pickerLabel(list: VersionList | null, selected: string) {
-  if (!list) {
-    return "正在取得版本";
-  }
-  return selected || "還沒有下載版本";
 }

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AccountPanel } from "./AccountPanel";
-import { overallProgress, toMegabytes } from "./progress";
+import { InstancePicker } from "./InstancePicker";
 import { LogPanel } from "./LogPanel";
 import { Sapling } from "./Sapling";
-import { VersionPicker } from "./VersionPicker";
-import type { LaunchEvent, Profile, Progress, VersionList } from "./types";
+import { burstLeaves } from "./Scene";
+import { overallProgress, toMegabytes } from "./progress";
+import type { Instance, LaunchEvent, Profile, Progress } from "./types";
 
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
@@ -14,16 +16,16 @@ const MAX_LOG_LINES = 2000;
 type Phase = "idle" | "preparing" | "running" | "failed";
 
 export function LaunchPage({
-  list,
-  listError,
+  instances,
   selected,
+  listError,
   onSelect,
   onGoToDownload,
   onRetry,
 }: {
-  list: VersionList | null;
+  instances: Instance[];
+  selected: Instance | null;
   listError: string | null;
-  selected: string;
   onSelect: (id: string) => void;
   onGoToDownload: () => void;
   onRetry: () => void;
@@ -54,14 +56,19 @@ export function LaunchPage({
     };
   }, []);
 
-  async function startGame() {
+  async function startGame(event: MouseEvent<HTMLButtonElement>) {
+    if (!selected) {
+      return;
+    }
+    const button = event.currentTarget.getBoundingClientRect();
+    burstLeaves(button.left + button.width / 2, button.top + button.height / 3);
     setPhase("preparing");
     setProgress(null);
     setDownloading(false);
     setError("");
     setLogs([]);
     try {
-      await invoke("play_game", { version: selected });
+      await invoke("play_game", { instanceId: selected.id });
       setPhase("idle");
     } catch (reason) {
       setError(String(reason));
@@ -69,7 +76,7 @@ export function LaunchPage({
     }
   }
 
-  function selectVersion(id: string) {
+  function selectInstance(id: string) {
     onSelect(id);
     setPhase("idle");
     setProgress(null);
@@ -78,7 +85,7 @@ export function LaunchPage({
   const overall = overallProgress(progress);
   const preparing = phase === "preparing";
   const busy = preparing || phase === "running";
-  const noVersion = list !== null && list.installed.length === 0;
+  const noInstance = instances.length === 0;
 
   return (
     <div className="launch">
@@ -86,7 +93,7 @@ export function LaunchPage({
         <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
 
         <section className="panel version">
-          <h2 className="panel-title">遊戲版本</h2>
+          <h2 className="panel-title">實例</h2>
           {listError ? (
             <>
               <p className="error">{listError}</p>
@@ -95,11 +102,11 @@ export function LaunchPage({
               </button>
             </>
           ) : (
-            <VersionPicker
-              list={list}
+            <InstancePicker
+              instances={instances}
               selected={selected}
               disabled={busy}
-              onSelect={selectVersion}
+              onSelect={selectInstance}
             />
           )}
         </section>
@@ -107,15 +114,26 @@ export function LaunchPage({
 
       <section className="stage">
         <div className="stage-text">
-          <p className="game-name">Minecraft</p>
-          <h1 key={selected}>{selected || (noVersion ? "待播種" : "…")}</h1>
+          <p className="game-name">{selected?.name ?? "Minecraft"}</p>
+          <h1 key={selected?.id ?? "empty"} aria-label={selected?.version ?? "待播種"}>
+            {[...(selected?.version ?? "待播種")].map((character, index) => (
+              <span
+                key={index}
+                className="char"
+                aria-hidden="true"
+                style={{ "--i": index } as CSSProperties}
+              >
+                {character}
+              </span>
+            ))}
+          </h1>
           <p className="edition">原版</p>
         </div>
 
         {/* 檔案都已存在時只是快速檢查，樹苗保持長大的樣子，不用重新長一次。 */}
         <Sapling
           growth={preparing && downloading ? overall : 1}
-          leaves={list?.installed.length ?? 0}
+          leaves={instances.length}
           celebrate={phase === "running"}
         />
 
@@ -126,7 +144,7 @@ export function LaunchPage({
             error={error}
             percent={overall}
             signedIn={profile !== null}
-            noVersion={noVersion}
+            noInstance={noInstance}
           />
           {phase === "failed" && logs.length > 0 && (
             <button className="text-button problem-button" onClick={() => setLogOpen(true)}>
@@ -144,7 +162,7 @@ export function LaunchPage({
               <div style={{ transform: `scaleX(${overall})` }} />
             </div>
           )}
-          {noVersion ? (
+          {noInstance ? (
             <button className="primary" onClick={onGoToDownload}>
               前往下載
             </button>
@@ -178,14 +196,14 @@ function StatusLine({
   error,
   percent,
   signedIn,
-  noVersion,
+  noInstance,
 }: {
   phase: Phase;
   progress: Progress | null;
   error: string;
   percent: number;
   signedIn: boolean;
-  noVersion: boolean;
+  noInstance: boolean;
 }) {
   if (phase === "failed") {
     return <p className="status-error">{error}</p>;
@@ -208,7 +226,7 @@ function StatusLine({
       </p>
     );
   }
-  if (noVersion) {
+  if (noInstance) {
     return <p className="status">先下載一個遊戲版本。</p>;
   }
   return <p className="status">{signedIn ? "準備好就開始吧。" : "登入微軟帳號後就能啟動遊戲。"}</p>;

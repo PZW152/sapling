@@ -9,14 +9,20 @@ export type Instance = {
   name: string;
   version: string;
   loader: string;
+  /** 0 代表自動分配。 */
   memoryMb: number;
   javaArgs: string;
 };
 
-export type Settings = {
-  instance: Instance;
-  config: { downloadConcurrency: number };
+export type LauncherConfig = {
+  downloadConcurrency: number;
+  selectedInstance: string;
+  theme: string;
 };
+
+export type ModFile = { name: string; enabled: boolean; size: number };
+
+export type UpdateInfo = { version: string; notes: string; url: string; sha256: string };
 
 export type Progress = {
   stage: "game" | "java";

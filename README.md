@@ -23,10 +23,9 @@
 
 ## 安裝
 
-到 [Releases](https://github.com/PZW152/sapling/releases) 下載：
+到 [Releases](https://github.com/PZW152/sapling/releases) 下載最新版本。
 
-- **免安裝版**：`portable.exe`，下載後直接打開。
-- **安裝版**：`setup.exe` 或 `.msi`。
+下載 `portable.exe`，放進一個資料夾後直接打開，不需要安裝。遊戲和設定會存在同一個資料夾的 `Sapling Data` 裡。
 
 目前只支援 Windows 11 x64。程式尚未數位簽章，Windows 可能會顯示安全警告。
 
