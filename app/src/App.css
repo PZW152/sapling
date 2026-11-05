@@ -53,6 +53,7 @@
   --font-display: "Segoe UI Variable Display", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "Microsoft JhengHei UI", monospace;
 
+  color-scheme: light;
   color: var(--color-ink);
   background: var(--color-canvas);
   font-family: var(--font-ui);
