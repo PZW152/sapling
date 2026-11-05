@@ -19,6 +19,8 @@ export type Feature = {
   };
   /** 放進設定頁的區塊。 */
   Settings?: ComponentType;
+  /** 放進設定頁「進階設定」的區塊，平時收起。 */
+  AdvancedSettings?: ComponentType;
   /** 浮在所有頁面上的內容，例如更新提示。 */
   Overlay?: ComponentType;
 };

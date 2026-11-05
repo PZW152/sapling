@@ -22,8 +22,7 @@ export function LaunchSettings() {
   const autoMemory = memoryMb === AUTO_MEMORY;
 
   return (
-    <>
-      <section className="panel setting">
+    <section className="panel setting">
         <div className="setting-head">
           <label htmlFor="memory">遊戲記憶體</label>
           <output htmlFor="memory">
@@ -56,22 +55,6 @@ export function LaunchSettings() {
           {selected ? `套用到實例「${selected.name}」。` : "建立實例後可以調整。"}
           {totalMemory > 0 && `電腦共有 ${(totalMemory / MB_PER_GB).toFixed(0)} GB。`}
         </p>
-      </section>
-
-      <section className="panel setting">
-        <div className="setting-head">
-          <label htmlFor="java-args">額外 Java 參數</label>
-        </div>
-        <input
-          id="java-args"
-          type="text"
-          spellCheck={false}
-          placeholder="不確定的話留空"
-          disabled={!selected}
-          value={selected?.javaArgs ?? ""}
-          onChange={(event) => updateInstance({ javaArgs: event.target.value })}
-        />
-      </section>
-    </>
+    </section>
   );
 }

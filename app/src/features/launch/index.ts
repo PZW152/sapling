@@ -1,4 +1,5 @@
 import type { Feature } from "../../shell/feature";
+import { LaunchAdvanced } from "./LaunchAdvanced";
 import { LaunchPage } from "./LaunchPage";
 import { LaunchSettings } from "./LaunchSettings";
 
@@ -9,4 +10,5 @@ export const launch: Feature = {
   optional: false,
   tab: { label: "啟動", Page: LaunchPage, keepAlive: true },
   Settings: LaunchSettings,
+  AdvancedSettings: LaunchAdvanced,
 };

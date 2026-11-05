@@ -5,16 +5,29 @@ import type { InstallState } from "../../shell/AppContext";
 export function DownloadPage() {
   const { list, listError, install, loadVersions, installGame, playVersion } = useApp();
 
+  if (!list && !listError) {
+    return (
+      <div className="download panel" aria-label="正在取得版本">
+        <span className="skeleton name-skeleton" />
+        <div className="skeleton-list">
+          <span className="skeleton row-skeleton" />
+          <span className="skeleton row-skeleton" />
+          <span className="skeleton row-skeleton" />
+          <span className="skeleton row-skeleton" />
+        </div>
+      </div>
+    );
+  }
+
   if (!list) {
     return (
       <div className="notice">
         <div className="notice-card">
-          <p className={listError ? "error" : undefined}>{listError ?? "正在取得版本"}</p>
-          {listError && (
-            <button className="secondary" onClick={loadVersions}>
-              重新取得版本
-            </button>
-          )}
+          <h2>無法取得版本</h2>
+          <p>{listError}</p>
+          <button className="secondary" onClick={loadVersions}>
+            重新取得版本
+          </button>
         </div>
       </div>
     );

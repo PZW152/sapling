@@ -8,5 +8,5 @@ export const download: Feature = {
   description: "下載遊戲版本和 Java",
   optional: false,
   tab: { label: "下載", Page: DownloadPage },
-  Settings: DownloadSettings,
+  AdvancedSettings: DownloadSettings,
 };

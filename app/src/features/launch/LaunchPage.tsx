@@ -1,27 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useApp } from "../../shell/AppContext";
-import { useSlideMark, useTween } from "../../shell/motion";
-import { overallProgress, toMegabytes } from "../../shell/progress";
+import { useSlideMark } from "../../shell/motion";
 import type { Instance, LaunchEvent, Profile, Progress } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
+import { LaunchOverlay } from "./LaunchOverlay";
+import type { OverlayOrigin } from "./LaunchOverlay";
 import { LogPanel } from "./LogPanel";
 
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
+/** 遊戲開始後等多久才收起窗口，讓用戶看到轉場完成。 */
+const MINIMIZE_DELAY_MS = 1200;
 
 type Phase = "idle" | "preparing" | "running" | "failed";
 
 export function LaunchPage() {
-  const { instances, selected, listError, selectInstance, goTo, loadVersions, isEnabled } = useApp();
+  const { loaded, instances, selected, listError, selectInstance, goTo, loadVersions, isEnabled } =
+    useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+  const [origin, setOrigin] = useState<OverlayOrigin | null>(null);
+  const hero = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const stopListening = listen<LaunchEvent>("launch-event", ({ payload }) => {
@@ -38,9 +45,36 @@ export function LaunchPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (phase !== "running") {
+      return;
+    }
+    // 收起後移除轉場，用戶中途打開窗口時仍然可以使用啟動器。
+    const timer = setTimeout(async () => {
+      await getCurrentWindow().minimize();
+      setOrigin(null);
+    }, MINIMIZE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  async function returnToLauncher() {
+    const appWindow = getCurrentWindow();
+    await appWindow.unminimize();
+    await appWindow.setFocus();
+  }
+
   async function startGame() {
     if (!selected) {
       return;
+    }
+    const bounds = hero.current?.getBoundingClientRect();
+    if (bounds) {
+      setOrigin({
+        top: bounds.top,
+        right: window.innerWidth - bounds.right,
+        bottom: window.innerHeight - bounds.bottom,
+        left: bounds.left,
+      });
     }
     setPhase("preparing");
     setProgress(null);
@@ -53,6 +87,7 @@ export function LaunchPage() {
       setError(String(reason));
       setPhase("failed");
     }
+    returnToLauncher();
   }
 
   function choose(id: string) {
@@ -66,11 +101,16 @@ export function LaunchPage() {
 
   return (
     <div className="launch">
-      <section className={`hero ${phase}`}>
+      <section className={`hero ${phase}`} ref={hero}>
         <p className="motto" aria-hidden="true">
           天下為公
         </p>
-        {noInstance ? (
+        {!loaded ? (
+          <div className="hero-top" aria-hidden="true">
+            <span className="skeleton on-dark name-skeleton" />
+            <span className="skeleton on-dark number-skeleton" />
+          </div>
+        ) : noInstance ? (
           <div className="hero-top">
             <p className="hero-name">歡迎使用 Sapling</p>
             <p className="hero-welcome">兩步就能開始玩</p>
@@ -87,14 +127,13 @@ export function LaunchPage() {
         <div className="hero-bottom">
           <HeroStatus
             phase={phase}
-            progress={progress}
             error={error}
             signedIn={profile !== null}
             noInstance={noInstance}
             hasLogs={logs.length > 0}
             onShowLogs={() => setLogOpen(true)}
           />
-          {noInstance ? (
+          {noInstance && loaded ? (
             <button className="primary" onClick={() => goTo("download")}>
               前往下載
             </button>
@@ -114,9 +153,22 @@ export function LaunchPage() {
         {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
       </section>
 
+      {origin && selected && (
+        <LaunchOverlay
+          origin={origin}
+          closing={!busy}
+          running={phase === "running"}
+          name={selected.name}
+          version={selected.version}
+          progress={progress}
+          onClosed={() => setOrigin(null)}
+        />
+      )}
+
       <aside className="side">
         <AccountPanel profile={profile} onProfileChange={setProfile} disabled={busy} />
         <InstanceList
+          loaded={loaded}
           instances={instances}
           selected={selected}
           disabled={busy}
@@ -150,6 +202,7 @@ function VersionNumber({ version }: { version: string }) {
 }
 
 function InstanceList({
+  loaded,
   instances,
   selected,
   disabled,
@@ -159,6 +212,7 @@ function InstanceList({
   onRetry,
   onChoose,
 }: {
+  loaded: boolean;
   instances: Instance[];
   selected: Instance | null;
   disabled: boolean;
@@ -188,7 +242,10 @@ function InstanceList({
           </button>
         </>
       )}
-      {instances.length === 0 && !error && <p className="hint">下載好的版本會出現在這裡。</p>}
+      {!loaded && <span className="skeleton row-skeleton" aria-hidden="true" />}
+      {loaded && instances.length === 0 && !error && (
+        <p className="hint">下載好的版本會出現在這裡。</p>
+      )}
       <ul className="row-list" ref={list}>
         <span className="slide-mark row-mark" />
         {instances.map((instance) => (
@@ -221,7 +278,6 @@ function launchLabel(phase: Phase) {
 
 function HeroStatus({
   phase,
-  progress,
   error,
   signedIn,
   noInstance,
@@ -229,15 +285,12 @@ function HeroStatus({
   onShowLogs,
 }: {
   phase: Phase;
-  progress: Progress | null;
   error: string;
   signedIn: boolean;
   noInstance: boolean;
   hasLogs: boolean;
   onShowLogs: () => void;
 }) {
-  const percent = useTween(overallProgress(progress) * 100);
-
   if (phase === "failed") {
     return (
       <div className="hero-error">
@@ -251,28 +304,7 @@ function HeroStatus({
     );
   }
   if (phase === "preparing") {
-    const what = progress?.stage === "java" ? "Java" : "遊戲檔案";
-    return (
-      <div className="hero-progress">
-        <p className="hero-note status-row">
-          <span>
-            {progress
-              ? `正在檢查${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB`
-              : "正在確認需要哪些檔案"}
-          </span>
-          <span>{Math.round(percent)}%</span>
-        </p>
-        <div
-          className="hero-bar"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(percent)}
-        >
-          <div style={{ transform: `scaleX(${percent / 100})` }} />
-        </div>
-      </div>
-    );
+    return null;
   }
   if (phase === "running") {
     return <p className="hero-note">遊戲已啟動，關閉遊戲後可以再次啟動。</p>;

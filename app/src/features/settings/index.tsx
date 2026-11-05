@@ -1,17 +1,34 @@
+import { useState } from "react";
 import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
 
 function SettingsPage() {
   const { config, isEnabled, saveError } = useApp();
-  const sections = FEATURES.filter(
-    (feature) => feature.Settings && (!feature.optional || isEnabled(feature.id)),
-  );
+  const [advanced, setAdvanced] = useState(false);
+  const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
 
   return (
     <div className="settings">
-      {sections.map(({ id, Settings }) => Settings && <Settings key={id} />)}
-      {config.featureSwitchesUnlocked && <FeatureSwitches />}
+      {active.map(({ id, Settings }) => Settings && <Settings key={id} />)}
+      <button
+        className="disclosure setting-wide"
+        aria-expanded={advanced}
+        onClick={() => setAdvanced(!advanced)}
+      >
+        進階設定
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 4.5 6 8l3.5-3.5" />
+        </svg>
+      </button>
+      <div className="collapsible setting-wide" data-open={advanced}>
+        <div className="collapsible-inner">
+          {active.map(
+            ({ id, AdvancedSettings }) => AdvancedSettings && <AdvancedSettings key={id} />,
+          )}
+          {config.featureSwitchesUnlocked && <FeatureSwitches />}
+        </div>
+      </div>
       <p className={saveError ? "error setting-wide" : "status setting-wide"}>
         {saveError || "設定會自動保存。"}
       </p>

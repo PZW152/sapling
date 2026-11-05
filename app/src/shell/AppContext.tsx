@@ -26,6 +26,8 @@ export type InstallState = {
 };
 
 type AppState = {
+  /** 實例和設定第一次載入完成前為 false。 */
+  loaded: boolean;
   list: VersionList | null;
   listError: string | null;
   instances: Instance[];
@@ -71,6 +73,7 @@ export function AppProvider({
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [install, setInstall] = useState<InstallState | null>(null);
   const [saveError, setSaveError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const selected =
@@ -90,11 +93,12 @@ export function AppProvider({
   }, []);
 
   useEffect(() => {
-    invoke<LauncherConfig>("load_config").then((saved) => {
-      setConfig(saved);
-      applyTheme(saved.theme);
-    });
-    loadInstances();
+    Promise.all([invoke<LauncherConfig>("load_config"), loadInstances()])
+      .then(([saved]) => {
+        setConfig(saved);
+        applyTheme(saved.theme);
+      })
+      .finally(() => setLoaded(true));
     loadVersions();
   }, [loadInstances, loadVersions]);
 
@@ -188,6 +192,7 @@ export function AppProvider({
 
   const value = useMemo(
     () => ({
+      loaded,
       list,
       listError,
       instances,
@@ -207,6 +212,7 @@ export function AppProvider({
       playVersion,
     }),
     [
+      loaded,
       list,
       listError,
       instances,
