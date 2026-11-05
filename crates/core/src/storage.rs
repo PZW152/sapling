@@ -56,5 +56,26 @@ pub async fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), Stor
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await.map_err(io_error)?;
     }
-    tokio::fs::write(path, text).await.map_err(io_error)
+    // 先寫到暫存檔再換名，中途斷電或崩潰時舊檔案仍然完整。
+    let temporary = path.with_extension("json.tmp");
+    tokio::fs::write(&temporary, text).await.map_err(io_error)?;
+    tokio::fs::rename(&temporary, path).await.map_err(io_error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn replaces_the_file_and_leaves_no_temporary_file() {
+        let dir = std::env::temp_dir().join(format!("sapling-storage-{}", std::process::id()));
+        let path = dir.join("config.json");
+
+        write_json(&path, &1).await.unwrap();
+        write_json(&path, &2).await.unwrap();
+
+        assert_eq!(read_json::<i32>(&path).await.unwrap(), Some(2));
+        assert!(!path.with_extension("json.tmp").exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

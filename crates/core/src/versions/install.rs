@@ -12,7 +12,7 @@ use super::{VersionEntry, VersionsError, fetch_manifest};
 use crate::download::{
     DownloadError, DownloadProgress, DownloadTask, download_all, download_file, new_client,
 };
-use crate::java::{JavaError, install_runtime};
+use crate::java::{JavaError, install_runtime, local_runtime};
 use crate::platform::DataDirs;
 
 const RESOURCES_URL: &str = "https://resources.download.minecraft.net";
@@ -69,12 +69,18 @@ pub struct PreparedVersion {
 }
 
 /// 準備好某個版本需要的一切：遊戲檔案和對應的 Java。
+///
+/// 已安裝的版本只確認檔案還在，不用網絡也不計算 SHA1；有問題才走完整校驗。
 pub async fn prepare_version(
     id: &str,
     dirs: &DataDirs,
     concurrency: usize,
     mut on_progress: impl FnMut(PrepareStage, DownloadProgress) + Send,
 ) -> Result<PreparedVersion, InstallError> {
+    if let Some(prepared) = prepare_installed(id, dirs).await {
+        return Ok(prepared);
+    }
+
     let client = new_client()?;
     let manifest = fetch_manifest(&client).await?;
     let entry = manifest
@@ -103,7 +109,40 @@ pub async fn prepare_version(
             path: marker,
             source,
         })?;
+    // 記號不存在時刪除會失敗，這是正常情況。
+    let _ = tokio::fs::remove_file(recheck_marker(dirs, id)).await;
     Ok(PreparedVersion { details, java })
+}
+
+/// 用本機資料確認版本完整。任何一步不符合都回傳 `None`，交給完整校驗處理。
+async fn prepare_installed(id: &str, dirs: &DataDirs) -> Option<PreparedVersion> {
+    if !is_installed(dirs, id) || recheck_marker(dirs, id).exists() {
+        return None;
+    }
+    let details_text = tokio::fs::read_to_string(details_path(dirs, id))
+        .await
+        .ok()?;
+    let details = VersionDetails::parse(&details_text).ok()?;
+    let index_path = index_path(dirs, &details.asset_index.id);
+    let index_text = tokio::fs::read_to_string(index_path).await.ok()?;
+    let asset_index: AssetIndexFile = serde_json::from_str(&index_text).ok()?;
+    let (java, runtime_tasks) = local_runtime(&details.java_version.component, dirs).await?;
+
+    let mut tasks = game_file_tasks(&details, &asset_index, dirs);
+    tasks.extend(runtime_tasks);
+    let complete = tokio::task::spawn_blocking(move || tasks.iter().all(has_expected_size))
+        .await
+        .ok()?;
+    complete.then_some(PreparedVersion { details, java })
+}
+
+fn has_expected_size(task: &DownloadTask) -> bool {
+    std::fs::metadata(&task.path).is_ok_and(|file| file.len() == task.size)
+}
+
+/// 下次啟動前完整校驗這個版本。遊戲異常結束時使用，檔案損壞可能是原因。
+pub async fn request_full_check(dirs: &DataDirs, id: &str) -> io::Result<()> {
+    tokio::fs::write(recheck_marker(dirs, id), b"").await
 }
 
 /// 這個版本是否已經完整下載。下載中斷的版本不算。
@@ -115,6 +154,20 @@ fn installed_marker(dirs: &DataDirs, id: &str) -> PathBuf {
     dirs.versions().join(id).join(".installed")
 }
 
+fn recheck_marker(dirs: &DataDirs, id: &str) -> PathBuf {
+    dirs.versions().join(id).join(".recheck")
+}
+
+fn details_path(dirs: &DataDirs, id: &str) -> PathBuf {
+    dirs.versions().join(id).join(format!("{id}.json"))
+}
+
+fn index_path(dirs: &DataDirs, index_id: &str) -> PathBuf {
+    dirs.assets()
+        .join("indexes")
+        .join(format!("{index_id}.json"))
+}
+
 /// 下載一個版本需要的全部檔案。已存在且 SHA1 正確的檔案會跳過。
 pub async fn install_version(
     client: &reqwest::Client,
@@ -123,10 +176,7 @@ pub async fn install_version(
     concurrency: usize,
     on_progress: impl FnMut(DownloadProgress),
 ) -> Result<VersionDetails, InstallError> {
-    let details_path = dirs
-        .versions()
-        .join(&entry.id)
-        .join(format!("{}.json", entry.id));
+    let details_path = details_path(dirs, &entry.id);
     let details_task = DownloadTask {
         url: entry.url.clone(),
         path: details_path.clone(),
@@ -137,10 +187,7 @@ pub async fn install_version(
     let details = VersionDetails::parse(&read_text(&details_path).await?)?;
 
     let index = &details.asset_index;
-    let index_path = dirs
-        .assets()
-        .join("indexes")
-        .join(format!("{}.json", index.id));
+    let index_path = index_path(dirs, &index.id);
     let index_task = DownloadTask {
         url: index.url.clone(),
         path: index_path.clone(),
@@ -219,9 +266,7 @@ fn game_file_tasks(
 mod tests {
     use super::*;
 
-    fn details() -> VersionDetails {
-        VersionDetails::parse(
-            r#"{
+    const DETAILS_JSON: &str = r#"{
                 "id": "26.3",
                 "mainClass": "m",
                 "assetIndex": { "id": "34", "sha1": "a", "size": 2, "totalSize": 3, "url": "u" },
@@ -238,19 +283,80 @@ mod tests {
                         "rules": [{ "action": "allow", "os": { "name": "linux" } }]
                     }
                 ]
-            }"#,
-        )
-        .unwrap()
+            }"#;
+    const ASSETS_JSON: &str = r#"{ "objects": {
+                "first.png": { "hash": "abcdef", "size": 7 },
+                "same-content.png": { "hash": "abcdef", "size": 7 }
+            } }"#;
+    const RUNTIME_JSON: &str = r#"{ "files": {
+                "bin/java.exe": { "type": "file", "downloads": { "raw": { "sha1": "j", "size": 3, "url": "u" } } }
+            } }"#;
+
+    fn details() -> VersionDetails {
+        VersionDetails::parse(DETAILS_JSON).unwrap()
     }
 
     fn assets() -> AssetIndexFile {
-        serde_json::from_str(
-            r#"{ "objects": {
-                "first.png": { "hash": "abcdef", "size": 7 },
-                "same-content.png": { "hash": "abcdef", "size": 7 }
-            } }"#,
-        )
-        .unwrap()
+        serde_json::from_str(ASSETS_JSON).unwrap()
+    }
+
+    fn write(path: PathBuf, content: &[u8]) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
+    }
+
+    /// 一個所有檔案都齊全的已安裝版本。
+    fn installed_version(name: &str) -> DataDirs {
+        let root =
+            std::env::temp_dir().join(format!("sapling-installed-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let dirs = DataDirs::at(root);
+        let version = dirs.versions().join("26.3");
+        write(version.join("26.3.json"), DETAILS_JSON.as_bytes());
+        write(version.join("26.3.jar"), b"1234");
+        write(version.join(".installed"), b"");
+        write(
+            dirs.assets().join("indexes/34.json"),
+            ASSETS_JSON.as_bytes(),
+        );
+        write(dirs.assets().join("objects/ab/abcdef"), b"1234567");
+        write(dirs.libraries().join("a/b/1/b-1.jar"), b"12345");
+        write(dirs.runtimes().join("j.json"), RUNTIME_JSON.as_bytes());
+        write(dirs.runtimes().join("j/bin/java.exe"), b"123");
+        dirs
+    }
+
+    #[tokio::test]
+    async fn trusts_an_installed_version_with_all_files_present() {
+        let dirs = installed_version("complete");
+
+        let prepared = prepare_installed("26.3", &dirs).await.unwrap();
+
+        assert_eq!(prepared.details.id, "26.3");
+        assert!(prepared.java.starts_with(dirs.runtimes().join("j")));
+        std::fs::remove_dir_all(dirs.root()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn needs_a_full_check_when_a_file_is_missing_or_changed() {
+        let dirs = installed_version("broken");
+
+        std::fs::write(dirs.libraries().join("a/b/1/b-1.jar"), b"1").unwrap();
+        assert!(prepare_installed("26.3", &dirs).await.is_none());
+
+        std::fs::remove_file(dirs.libraries().join("a/b/1/b-1.jar")).unwrap();
+        assert!(prepare_installed("26.3", &dirs).await.is_none());
+        std::fs::remove_dir_all(dirs.root()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn needs_a_full_check_after_the_game_crashed() {
+        let dirs = installed_version("crashed");
+
+        request_full_check(&dirs, "26.3").await.unwrap();
+
+        assert!(prepare_installed("26.3", &dirs).await.is_none());
+        std::fs::remove_dir_all(dirs.root()).unwrap();
     }
 
     #[test]

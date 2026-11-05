@@ -106,6 +106,19 @@ pub async fn install_runtime(
     Ok(runtime_dir.join(JAVA_EXE_PATH))
 }
 
+/// 本機已有的 Java：`java.exe` 的位置和它需要的全部檔案。只讀本機資料，不用網絡。
+pub async fn local_runtime(
+    component: &str,
+    dirs: &DataDirs,
+) -> Option<(PathBuf, Vec<DownloadTask>)> {
+    let manifest_path = dirs.runtimes().join(format!("{component}.json"));
+    let text = tokio::fs::read_to_string(manifest_path).await.ok()?;
+    let manifest: RuntimeManifest = serde_json::from_str(&text).ok()?;
+    let runtime_dir = dirs.runtimes().join(component);
+    let tasks = runtime_file_tasks(&manifest, &runtime_dir);
+    Some((runtime_dir.join(JAVA_EXE_PATH), tasks))
+}
+
 fn find_manifest<'a>(
     index: &'a RuntimeIndex,
     component: &str,

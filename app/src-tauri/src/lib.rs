@@ -9,7 +9,7 @@ use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
 use sapling_core::instance::mods::{self, ModFile};
-use sapling_core::launch::{LaunchEvent, play};
+use sapling_core::launch::{LaunchCancel, LaunchEvent, play};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
@@ -31,6 +31,7 @@ struct AppState {
     device_login: Mutex<Option<DeviceLogin>>,
     /// 同一時間只做一次恢復登入，避免短時間重複請求被 Minecraft 伺服器限流。
     restoring: AsyncMutex<()>,
+    launch_cancel: LaunchCancel,
 }
 
 impl AppState {
@@ -276,6 +277,7 @@ async fn play_game(
     state: State<'_, AppState>,
     instance_id: String,
 ) -> Result<(), String> {
+    state.launch_cancel.reset();
     let session = current_session(&state)
         .await?
         .ok_or_else(|| "請先登入微軟帳號".to_string())?;
@@ -290,6 +292,7 @@ async fn play_game(
         &dirs,
         config.download_concurrency,
         config.is_feature_enabled(CRASH_FEATURE),
+        &state.launch_cancel,
         move |event| {
             if let LaunchEvent::Progress { progress, .. } = &event {
                 let is_last = progress.finished_files == progress.total_files;
@@ -304,6 +307,11 @@ async fn play_game(
     )
     .await
     .map_err(text)
+}
+
+#[tauri::command]
+fn cancel_launch(state: State<'_, AppState>) {
+    state.launch_cancel.cancel();
 }
 
 /// 目前有效的登入狀態；沒有或已過期時用保存的 refresh token 恢復。
@@ -345,7 +353,8 @@ pub fn run() {
             open_link,
             check_update,
             apply_update,
-            play_game
+            play_game,
+            cancel_launch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

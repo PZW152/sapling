@@ -11,14 +11,16 @@ use serde::Serialize;
 use thiserror::Error;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::Command;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use crate::auth::Session;
 use crate::download::DownloadProgress;
 use crate::instance::Instance;
 use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
-use crate::versions::install::{InstallError, PrepareStage, PreparedVersion, prepare_version};
+use crate::versions::install::{
+    InstallError, PrepareStage, PreparedVersion, prepare_version, request_full_check,
+};
 
 const LAUNCHER_NAME: &str = "Sapling Launcher";
 const LAUNCHER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -63,19 +65,48 @@ pub enum LaunchEvent {
     },
 }
 
-/// 準備檔案並啟動遊戲，一直等到遊戲結束。
+/// 取消「準備遊戲檔案」這一步。遊戲開始後不受影響。
+pub struct LaunchCancel(watch::Sender<bool>);
+
+impl Default for LaunchCancel {
+    fn default() -> Self {
+        Self(watch::Sender::new(false))
+    }
+}
+
+impl LaunchCancel {
+    /// 開始新的一次啟動前清除上一次的取消。
+    pub fn reset(&self) {
+        self.0.send_replace(false);
+    }
+
+    pub fn cancel(&self) {
+        self.0.send_replace(true);
+    }
+
+    async fn cancelled(&self) {
+        // 發送端就在 `self` 裡，等待不會因為它消失而失敗。
+        let _ = self.0.subscribe().wait_for(|cancelled| *cancelled).await;
+    }
+}
+
+/// 準備檔案並啟動遊戲，一直等到遊戲結束。準備途中被取消時直接結束。
 pub async fn play(
     session: &Session,
     instance: &Instance,
     dirs: &DataDirs,
     concurrency: usize,
     analyze_crash: bool,
+    cancel: &LaunchCancel,
     mut on_event: impl FnMut(LaunchEvent) + Send,
 ) -> Result<(), LaunchError> {
-    let prepared = prepare_version(&instance.version, dirs, concurrency, |stage, progress| {
+    let prepare = prepare_version(&instance.version, dirs, concurrency, |stage, progress| {
         on_event(LaunchEvent::Progress { stage, progress })
-    })
-    .await?;
+    });
+    let prepared = tokio::select! {
+        prepared = prepare => prepared?,
+        () = cancel.cancelled() => return Ok(()),
+    };
     let details = instance.loader.loader().apply(prepared.details.clone());
     let prepared = PreparedVersion {
         details,
@@ -122,8 +153,11 @@ pub async fn play(
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
     if status.success() {
-        Ok(())
-    } else if !analyze_crash {
+        return Ok(());
+    }
+    // 只影響下次啟動的速度和檢查範圍，寫不進去也不該蓋過崩潰原因。
+    let _ = request_full_check(dirs, &instance.version).await;
+    if !analyze_crash {
         Err(LaunchError::CrashedWithoutAnalysis)
     } else {
         let reports = crash::read_reports(&game_dir).await;
@@ -254,6 +288,19 @@ fn path_text(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn cancel_is_remembered_until_the_next_launch_resets_it() {
+        let cancel = LaunchCancel::default();
+
+        cancel.cancel();
+        cancel.cancelled().await;
+
+        cancel.reset();
+        let waiting =
+            tokio::time::timeout(std::time::Duration::from_millis(10), cancel.cancelled());
+        assert!(waiting.await.is_err());
+    }
 
     #[test]
     fn fills_known_placeholders_and_keeps_surrounding_text() {
