@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Settings } from "./types";
 
@@ -6,13 +7,18 @@ const MEMORY_STEP_MB = 512;
 const MIN_MEMORY_MB = 1024;
 const MAX_MEMORY_MB = 16384;
 const MB_PER_GB = 1024;
+const MIN_CONCURRENCY = 1;
+const MAX_CONCURRENCY = 64;
+/** 停止調整多久後自動保存。 */
+const SAVE_DELAY_MS = 400;
 
-type SaveState = "idle" | "saved" | "failed";
+type SaveState = "idle" | "saving" | "saved" | "failed";
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
+  const changed = useRef(false);
 
   useEffect(() => {
     invoke<Settings>("load_settings")
@@ -20,27 +26,29 @@ export function SettingsPage() {
       .catch((reason) => setError(String(reason)));
   }, []);
 
-  function updateInstance(change: Partial<Settings["instance"]>) {
-    setSaveState("idle");
-    setSettings((current) =>
-      current && { ...current, instance: { ...current.instance, ...change } },
-    );
-  }
-
-  function updateConcurrency(downloadConcurrency: number) {
-    setSaveState("idle");
-    setSettings((current) => current && { ...current, config: { downloadConcurrency } });
-  }
-
-  async function save() {
-    setError("");
-    try {
-      await invoke("save_settings", { settings });
-      setSaveState("saved");
-    } catch (reason) {
-      setError(String(reason));
-      setSaveState("failed");
+  useEffect(() => {
+    if (!changed.current) {
+      return;
     }
+    const timer = setTimeout(() => {
+      invoke("save_settings", { settings })
+        .then(() => setSaveState("saved"))
+        .catch((reason) => {
+          setError(String(reason));
+          setSaveState("failed");
+        });
+    }, SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [settings]);
+
+  function update(change: (current: Settings) => Settings) {
+    changed.current = true;
+    setSaveState("saving");
+    setSettings((current) => current && change(current));
+  }
+
+  function updateInstance(change: Partial<Settings["instance"]>) {
+    update((current) => ({ ...current, instance: { ...current.instance, ...change } }));
   }
 
   if (!settings) {
@@ -52,6 +60,7 @@ export function SettingsPage() {
   }
 
   const memoryMb = settings.instance.memoryMb;
+  const concurrency = settings.config.downloadConcurrency;
 
   return (
     <div className="settings">
@@ -67,12 +76,35 @@ export function SettingsPage() {
           max={MAX_MEMORY_MB}
           step={MEMORY_STEP_MB}
           value={memoryMb}
+          style={sliderFill(memoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)}
           onChange={(event) => updateInstance({ memoryMb: Number(event.target.value) })}
         />
         <p>一般遊玩 4 GB 就夠。不要超過電腦實體記憶體的一半。</p>
       </section>
 
       <section className="panel setting">
+        <div className="setting-head">
+          <label htmlFor="concurrency">同時下載的檔案數</label>
+          <output htmlFor="concurrency">{concurrency}</output>
+        </div>
+        <input
+          id="concurrency"
+          type="range"
+          min={MIN_CONCURRENCY}
+          max={MAX_CONCURRENCY}
+          value={concurrency}
+          style={sliderFill(concurrency, MIN_CONCURRENCY, MAX_CONCURRENCY)}
+          onChange={(event) =>
+            update((current) => ({
+              ...current,
+              config: { downloadConcurrency: Number(event.target.value) },
+            }))
+          }
+        />
+        <p>網絡不穩定時可以調低。</p>
+      </section>
+
+      <section className="panel setting setting-wide">
         <div className="setting-head">
           <label htmlFor="java-args">額外 Java 參數</label>
         </div>
@@ -86,29 +118,23 @@ export function SettingsPage() {
         />
       </section>
 
-      <section className="panel setting">
-        <div className="setting-head">
-          <label htmlFor="concurrency">同時下載的檔案數</label>
-          <output htmlFor="concurrency">{settings.config.downloadConcurrency}</output>
-        </div>
-        <input
-          id="concurrency"
-          type="range"
-          min={1}
-          max={64}
-          value={settings.config.downloadConcurrency}
-          onChange={(event) => updateConcurrency(Number(event.target.value))}
-        />
-        <p>網絡不穩定時可以調低。</p>
-      </section>
-
-      <div className="settings-actions">
-        <button className="save-button" onClick={save}>
-          保存設定
-        </button>
-        {saveState === "saved" && <p className="status">已保存，下次啟動遊戲時生效。</p>}
-        {saveState === "failed" && <p className="error">{error}</p>}
-      </div>
+      <p className={saveState === "failed" ? "error setting-wide" : "status setting-wide"}>
+        {saveMessage(saveState, error)}
+      </p>
     </div>
   );
+}
+
+function sliderFill(value: number, min: number, max: number) {
+  return { "--fill": `${((value - min) / (max - min)) * 100}%` } as CSSProperties;
+}
+
+function saveMessage(state: SaveState, error: string) {
+  if (state === "failed") {
+    return error;
+  }
+  if (state === "saving") {
+    return "正在保存";
+  }
+  return state === "saved" ? "已保存，下次啟動遊戲時生效。" : "設定會自動保存。";
 }

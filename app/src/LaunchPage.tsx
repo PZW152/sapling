@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { AccountPanel } from "./AccountPanel";
+import { LogPanel } from "./LogPanel";
 import { Sapling } from "./Sapling";
-import type { LaunchEvent, LoginCode, Profile, Progress, Settings, VersionList } from "./types";
+import { VersionPicker } from "./VersionPicker";
+import type { LaunchEvent, Profile, Progress, Settings, VersionList } from "./types";
 
 /** 遊戲檔案佔整體進度的比例，其餘是 Java。 */
 const GAME_SHARE = 0.85;
@@ -105,6 +108,12 @@ export function LaunchPage() {
       </aside>
 
       <section className="stage">
+        {logs.length > 0 && (
+          <button className="stage-log text-button" onClick={() => setLogOpen(true)}>
+            查看遊戲日誌
+          </button>
+        )}
+
         <div className="stage-text">
           <p className="game-name">Minecraft</p>
           <h1 key={selected}>{selected || "…"}</h1>
@@ -139,17 +148,12 @@ export function LaunchPage() {
             </div>
           )}
           <button
-            className="primary"
+            className={phase === "running" ? "primary running" : "primary"}
             disabled={!selected || !profile || busy}
             onClick={startGame}
           >
             {launchLabel(phase)}
           </button>
-          {logs.length > 0 && (
-            <button className="text-button" onClick={() => setLogOpen(true)}>
-              查看遊戲日誌
-            </button>
-          )}
         </div>
 
         {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
@@ -163,204 +167,6 @@ function launchLabel(phase: Phase) {
     return "準備中";
   }
   return phase === "running" ? "遊戲運行中" : "啟動遊戲";
-}
-
-function AccountPanel({
-  profile,
-  onProfileChange,
-  disabled,
-}: {
-  profile: Profile | null;
-  onProfileChange: (profile: Profile | null) => void;
-  disabled: boolean;
-}) {
-  const [restoring, setRestoring] = useState(true);
-  const [code, setCode] = useState<LoginCode | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    invoke<Profile | null>("restore_account")
-      .then(onProfileChange)
-      .catch((reason) => setError(String(reason)))
-      .finally(() => setRestoring(false));
-  }, [onProfileChange]);
-
-  async function signIn() {
-    setError("");
-    setStarting(true);
-    try {
-      const loginCode = await invoke<LoginCode>("login_start");
-      setCode(loginCode);
-      setCopied(await copyText(loginCode.userCode));
-      setStarting(false);
-      onProfileChange(await invoke<Profile>("login_finish"));
-    } catch (reason) {
-      setError(String(reason));
-    } finally {
-      setStarting(false);
-      setCode(null);
-    }
-  }
-
-  async function signOut() {
-    setError("");
-    try {
-      await invoke("sign_out");
-      onProfileChange(null);
-    } catch (reason) {
-      setError(String(reason));
-    }
-  }
-
-  if (profile) {
-    return (
-      <section className="panel account">
-        <Avatar skinUrl={profile.skinUrl} />
-        <div>
-          <h2>{profile.name}</h2>
-          <p>正版帳號</p>
-        </div>
-        <button className="secondary" disabled={disabled} onClick={signOut}>
-          登出
-        </button>
-        {error && <p className="error">{error}</p>}
-      </section>
-    );
-  }
-
-  if (code) {
-    return (
-      <section className="panel account">
-        <h2>在瀏覽器輸入代碼</h2>
-        <button className="login-code" onClick={() => copyText(code.userCode).then(setCopied)}>
-          {code.userCode}
-        </button>
-        <p>
-          {copied ? "代碼已複製。" : "按上面的代碼可以複製。"}
-          登入頁面已在瀏覽器打開，沒看到的話請前往 {code.verificationUri}
-        </p>
-        <p className="status">正在等待你完成登入</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="panel account">
-      <Avatar skinUrl={null} />
-      <div>
-        <h2>{restoring ? "正在恢復登入" : "尚未登入"}</h2>
-        <p>需要正版微軟帳號才能進入遊戲</p>
-      </div>
-      <button className="secondary" disabled={restoring || starting} onClick={signIn}>
-        {starting ? "正在取得代碼" : "用微軟帳號登入"}
-      </button>
-      {error && <p className="error">{error}</p>}
-    </section>
-  );
-}
-
-async function copyText(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function Avatar({ skinUrl }: { skinUrl: string | null }) {
-  if (skinUrl) {
-    return (
-      <div className="skin-head" aria-hidden="true">
-        <span className="skin-face" style={{ backgroundImage: `url(${skinUrl})` }} />
-        <span className="skin-hat" style={{ backgroundImage: `url(${skinUrl})` }} />
-      </div>
-    );
-  }
-  return (
-    <svg className="avatar" viewBox="0 0 56 56" aria-hidden="true">
-      <circle cx="28" cy="22" r="10" />
-      <path d="M10 56c0-13 8-20 18-20s18 7 18 20z" />
-    </svg>
-  );
-}
-
-function VersionPicker({
-  list,
-  selected,
-  disabled,
-  onSelect,
-}: {
-  list: VersionList | null;
-  selected: string;
-  disabled: boolean;
-  onSelect: (id: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    function closeOnOutsideClick(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    }
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [open]);
-
-  return (
-    <div className="picker" ref={root}>
-      {open && list && (
-        <ul className="picker-list" aria-label="選擇遊戲版本">
-          {list.versions.map((id) => (
-            <li key={id}>
-              <button
-                className="picker-option"
-                aria-current={id === selected ? "true" : undefined}
-                onClick={() => {
-                  onSelect(id);
-                  setOpen(false);
-                  trigger.current?.focus();
-                }}
-              >
-                <span>{id}</span>
-                {id === list.latest && <small>最新</small>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button
-        ref={trigger}
-        className="picker-trigger"
-        aria-expanded={open}
-        disabled={!list || disabled}
-        onClick={() => setOpen(!open)}
-      >
-        <span>{list ? selected : "正在取得版本"}</span>
-        <svg viewBox="0 0 12 12" aria-hidden="true">
-          <path d="M2.5 7.5 6 4l3.5 3.5" />
-        </svg>
-      </button>
-    </div>
-  );
 }
 
 function StatusLine({
@@ -377,7 +183,7 @@ function StatusLine({
   signedIn: boolean;
 }) {
   if (phase === "failed") {
-    return <p className="status error">{error}</p>;
+    return <p className="status-error">{error}</p>;
   }
   if (phase === "running") {
     return <p className="status">遊戲已啟動，關閉遊戲後可以再次啟動。</p>;
@@ -401,31 +207,6 @@ function StatusLine({
     <p className="status">
       {signedIn ? "第一次啟動會自動下載遊戲檔案和 Java。" : "登入微軟帳號後就能啟動遊戲。"}
     </p>
-  );
-}
-
-function LogPanel({ lines, onClose }: { lines: string[]; onClose: () => void }) {
-  const end = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    end.current?.scrollIntoView();
-  }, [lines]);
-
-  return (
-    <div className="log-panel" role="dialog" aria-label="遊戲日誌">
-      <header>
-        <h2>遊戲日誌</h2>
-        <button className="text-button" onClick={onClose}>
-          關閉
-        </button>
-      </header>
-      <div className="log-lines">
-        {lines.map((line, index) => (
-          <p key={index}>{line}</p>
-        ))}
-        <div ref={end} />
-      </div>
-    </div>
   );
 }
 

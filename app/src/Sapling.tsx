@@ -1,14 +1,24 @@
+import { useState } from "react";
+
 /** 首頁的樹苗：下載進度就是它長高的過程。`growth` 由 0 到 1，完成時用 `celebrate` 抖一下葉子。 */
 export function Sapling({ growth, celebrate }: { growth: number; celebrate: boolean }) {
+  // 開場動畫只在打開啟動器時播放一次，之後由 growth 控制。
+  const [intro, setIntro] = useState(true);
   // 葉子要等莖長到它的位置才開始長，否則會浮在半空。
   const leftLeaf = stageOf(growth, 0.36, 0.72);
   const rightLeaf = stageOf(growth, 0.6, 1);
 
   return (
     <svg
-      className={celebrate ? "sapling celebrate" : "sapling"}
+      className={`sapling${intro ? " intro" : ""}${celebrate ? " celebrate" : ""}`}
       viewBox="0 0 200 240"
       aria-hidden="true"
+      onAnimationEnd={(event) => {
+        // 右葉最後長完，它結束才算開場動畫完成。
+        if ((event.target as Element).classList.contains("sapling-leaf-right")) {
+          setIntro(false);
+        }
+      }}
     >
       <path
         className="sapling-stem"

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LaunchPage } from "./LaunchPage";
 import { SettingsPage } from "./SettingsPage";
@@ -13,6 +15,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "more", label: "更多" },
 ];
 
+const REPOSITORY_URL = "https://github.com/PZW152/sapling";
+const USAGE_URL = `${REPOSITORY_URL}/blob/main/USAGE.md`;
+
 function App() {
   const [tab, setTab] = useState<Tab>("launch");
 
@@ -25,7 +30,13 @@ function App() {
       </main>
       {tab === "download" && (
         <main className="page">
-          <Notice text="在啟動頁選好版本並按「啟動遊戲」，就會自動下載。模組下載之後加入。" />
+          <div className="notice">
+            <div className="notice-card">
+              <h2>自動下載</h2>
+              <p>在啟動頁選好版本並按「啟動遊戲」，需要的檔案和 Java 會自動下載。</p>
+              <p>模組下載之後加入。</p>
+            </div>
+          </div>
         </main>
       )}
       {tab === "settings" && (
@@ -88,22 +99,28 @@ function TitleBar({ tab, onTabChange }: { tab: Tab; onTabChange: (tab: Tab) => v
   );
 }
 
-function Notice({ text }: { text: string }) {
-  return (
-    <div className="notice">
-      <p>{text}</p>
-    </div>
-  );
-}
-
 function About() {
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    getVersion().then(setVersion);
+  }, []);
+
   return (
     <div className="notice">
-      <div className="about">
-        <img src="/logo.svg" alt="" width={56} height={56} />
+      <div className="notice-card about">
+        <img src="/logo.svg" alt="" width={64} height={64} />
         <h2>Sapling Launcher</h2>
-        <p>版本 0.1.0</p>
-        <p>非 Minecraft 官方產品，與 Mojang 和 Microsoft 無關。</p>
+        <p>版本 {version}</p>
+        <div className="about-links">
+          <button className="secondary" onClick={() => invoke("open_link", { url: REPOSITORY_URL })}>
+            GitHub 主頁
+          </button>
+          <button className="secondary" onClick={() => invoke("open_link", { url: USAGE_URL })}>
+            使用指南
+          </button>
+        </div>
+        <p className="about-note">非 Minecraft 官方產品，與 Mojang 和 Microsoft 無關。</p>
       </div>
     </div>
   );
