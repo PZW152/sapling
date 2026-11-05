@@ -1,6 +1,6 @@
 [package]
 name = "sapling"
-version = "0.1.0"
+version = "0.2.0"
 description = "Sapling Launcher (SPL), a Minecraft Java launcher"
 authors = ["PZW152"]
 edition = "2024"
