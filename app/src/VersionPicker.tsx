@@ -58,7 +58,7 @@ export function VersionPicker({
     <div className="picker" ref={root}>
       {open && list && (
         <ul className="picker-list" ref={options} aria-label="選擇遊戲版本" onKeyDown={moveFocus}>
-          {list.versions.map((id) => (
+          {list.installed.map((id) => (
             <li key={id}>
               <button
                 className="picker-option"
@@ -80,14 +80,21 @@ export function VersionPicker({
         ref={trigger}
         className="picker-trigger"
         aria-expanded={open}
-        disabled={!list || disabled}
+        disabled={!list || list.installed.length === 0 || disabled}
         onClick={() => setOpen(!open)}
       >
-        <span>{list ? selected : "正在取得版本"}</span>
+        <span>{pickerLabel(list, selected)}</span>
         <svg viewBox="0 0 12 12" aria-hidden="true">
           <path d="M2.5 7.5 6 4l3.5 3.5" />
         </svg>
       </button>
     </div>
   );
+}
+
+function pickerLabel(list: VersionList | null, selected: string) {
+  if (!list) {
+    return "正在取得版本";
+  }
+  return selected || "還沒有下載版本";
 }

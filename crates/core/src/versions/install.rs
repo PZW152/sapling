@@ -33,6 +33,12 @@ pub enum InstallError {
         #[source]
         source: io::Error,
     },
+    #[error("無法記錄下載結果：{}", path.display())]
+    Mark {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 /// 資源索引：遊戲資源名稱對應到 hash。
@@ -89,7 +95,24 @@ pub async fn prepare_version(
         |progress| on_progress(PrepareStage::Java, progress),
     )
     .await?;
+
+    let marker = installed_marker(dirs, id);
+    tokio::fs::write(&marker, b"")
+        .await
+        .map_err(|source| InstallError::Mark {
+            path: marker,
+            source,
+        })?;
     Ok(PreparedVersion { details, java })
+}
+
+/// 這個版本是否已經完整下載。下載中斷的版本不算。
+pub fn is_installed(dirs: &DataDirs, id: &str) -> bool {
+    installed_marker(dirs, id).exists()
+}
+
+fn installed_marker(dirs: &DataDirs, id: &str) -> PathBuf {
+    dirs.versions().join(id).join(".installed")
 }
 
 /// 下載一個版本需要的全部檔案。已存在且 SHA1 正確的檔案會跳過。

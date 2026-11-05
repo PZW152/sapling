@@ -1,4 +1,4 @@
-export type VersionList = { latest: string; versions: string[] };
+export type VersionList = { latest: string; versions: string[]; installed: string[] };
 
 export type Profile = { id: string; name: string; skinUrl: string | null };
 

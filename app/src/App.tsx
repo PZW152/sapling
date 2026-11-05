@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { DownloadPage } from "./DownloadPage";
 import { LaunchPage } from "./LaunchPage";
 import { SettingsPage } from "./SettingsPage";
+import { overallProgress } from "./progress";
+import type { LaunchEvent, Progress, Settings, VersionList } from "./types";
 import "./App.css";
 
 type Tab = "launch" | "download" | "settings" | "more";
@@ -18,25 +22,104 @@ const TABS: { id: Tab; label: string }[] = [
 const REPOSITORY_URL = "https://github.com/PZW152/sapling";
 const USAGE_URL = `${REPOSITORY_URL}/blob/main/USAGE.md`;
 
+/** 目前的下載。失敗時保留 `error`，讓對應版本顯示原因。 */
+export type InstallState = {
+  id: string;
+  progress: Progress | null;
+  percent: number;
+  error: string;
+};
+
 function App() {
   const [tab, setTab] = useState<Tab>("launch");
+  const [list, setList] = useState<VersionList | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+  const [selected, setSelected] = useState("");
+  const [install, setInstall] = useState<InstallState | null>(null);
+
+  const loadVersions = useCallback(async () => {
+    setListError(null);
+    try {
+      const [versions, settings] = await Promise.all([
+        invoke<VersionList>("list_versions"),
+        invoke<Settings>("load_settings"),
+      ]);
+      setList(versions);
+      setSelected((current) => {
+        const wanted = current || settings.instance.version;
+        return versions.installed.includes(wanted) ? wanted : (versions.installed[0] ?? "");
+      });
+    } catch (reason) {
+      setListError(String(reason));
+    }
+  }, []);
+
+  useEffect(() => {
+    loadVersions();
+  }, [loadVersions]);
+
+  useEffect(() => {
+    const stopListening = listen<LaunchEvent>("install-event", ({ payload }) => {
+      if (payload.kind === "progress") {
+        setInstall(
+          (current) =>
+            current && {
+              ...current,
+              progress: payload,
+              percent: overallProgress(payload),
+            },
+        );
+      }
+    });
+    return () => {
+      stopListening.then((stop) => stop());
+    };
+  }, []);
+
+  async function installGame(id: string) {
+    setInstall({ id, progress: null, percent: 0, error: "" });
+    try {
+      await invoke("install_game", { version: id });
+      setInstall(null);
+      await loadVersions();
+    } catch (reason) {
+      setInstall({ id, progress: null, percent: 0, error: String(reason) });
+    }
+  }
+
+  function playVersion(id: string) {
+    setSelected(id);
+    setTab("launch");
+  }
 
   return (
     <div className="app">
+      <svg className="hills" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
+        <path className="hill-back" d="M0 170C190 130 430 190 800 40V220H0Z" />
+        <path className="hill-front" d="M0 196C260 180 520 200 800 110V220H0Z" />
+      </svg>
       <TitleBar tab={tab} onTabChange={setTab} />
-      {/* 啟動頁一直保留，切換分頁時下載和遊戲狀態不會消失。 */}
+      {/* 啟動頁一直保留，切換分頁時遊戲狀態不會消失。 */}
       <main className="page" hidden={tab !== "launch"}>
-        <LaunchPage />
+        <LaunchPage
+          list={list}
+          listError={listError}
+          selected={selected}
+          onSelect={setSelected}
+          onGoToDownload={() => setTab("download")}
+          onRetry={loadVersions}
+        />
       </main>
       {tab === "download" && (
         <main className="page">
-          <div className="notice">
-            <div className="notice-card">
-              <h2>自動下載</h2>
-              <p>在啟動頁選好版本並按「啟動遊戲」，需要的檔案和 Java 會自動下載。</p>
-              <p>模組下載之後加入。</p>
-            </div>
-          </div>
+          <DownloadPage
+            list={list}
+            listError={listError}
+            install={install}
+            onRetry={loadVersions}
+            onInstall={installGame}
+            onPlay={playVersion}
+          />
         </main>
       )}
       {tab === "settings" && (

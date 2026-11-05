@@ -3,8 +3,8 @@
   --color-canvas: #edf2ee;
   --color-surface: #ffffff;
   --color-sunken: #e2eae4;
-  --color-stage-top: #e8f3ec;
-  --color-stage-bottom: #d6e9dc;
+  --color-sky-top: #f1f7f2;
+  --color-sky-bottom: #dcecdf;
   --color-stage-deep: #c9e1d1;
   --color-hill-back: #c3dfcc;
   --color-hill-front: #a9d0b6;
@@ -24,7 +24,9 @@
   /* 圓角 */
   --radius-small: 8px;
   --radius-medium: 12px;
-  --radius-large: 20px;
+  /* Sapling 的招牌：對角葉形圓角。 */
+  --radius-leaf: 4px 22px 4px 22px;
+  --radius-leaf-small: 3px 12px 3px 12px;
 
   /* 間距 */
   --space-1: 4px;
@@ -36,7 +38,9 @@
 
   /* 尺寸 */
   --titlebar-height: 52px;
-  --side-width: 272px;
+  --side-width: 264px;
+  --vine-width: 2px;
+  --node-size: 18px;
   --control-height: 40px;
   --primary-height: 64px;
   --tab-width: 72px;
@@ -111,13 +115,36 @@ button:disabled {
 }
 
 .app {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
+  background: linear-gradient(170deg, var(--color-sky-top), var(--color-sky-bottom));
+}
+
+/* 所有分頁共用的山丘。 */
+.hills {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 36%;
+}
+
+.hill-back {
+  fill: var(--color-hill-back);
+}
+
+.hill-front {
+  fill: var(--color-hill-front);
 }
 
 /* 標題列 */
 .titlebar {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -140,7 +167,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(4, var(--tab-width));
   padding: var(--space-1);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-leaf-small);
   background: var(--color-sunken);
 }
 
@@ -150,7 +177,7 @@ button:disabled {
   bottom: var(--space-1);
   left: var(--space-1);
   width: var(--tab-width);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
   transition: transform var(--duration-grow) var(--ease);
@@ -209,6 +236,8 @@ button:disabled {
 
 /* 頁面 */
 .page {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
   padding: 0 var(--space-4) var(--space-4);
@@ -244,7 +273,7 @@ button:disabled {
 
 .panel {
   padding: var(--space-4);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-leaf);
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
 }
@@ -361,7 +390,7 @@ button:disabled {
   width: 100%;
   height: 44px;
   padding: 0 var(--space-3);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   font-size: 16px;
   font-weight: 600;
   background: var(--color-sunken);
@@ -401,7 +430,7 @@ button:disabled {
   list-style: none;
   scrollbar-color: var(--color-line) transparent;
   scrollbar-width: thin;
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-leaf);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
   transform-origin: bottom;
@@ -448,7 +477,7 @@ button:disabled {
 .secondary {
   height: var(--control-height);
   padding: 0 var(--space-3);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-leaf-small);
   color: var(--color-accent-deep);
   font-weight: 600;
   background: var(--color-accent-soft);
@@ -481,17 +510,14 @@ button:disabled {
   text-decoration: underline;
 }
 
-/* 主舞台：樹苗和啟動按鈕 */
+/* 主舞台：沒有卡片，直接站在山丘上。 */
 .stage {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-height: 0;
-  padding: var(--space-6);
-  overflow: hidden;
-  border-radius: var(--radius-large);
-  background: linear-gradient(165deg, var(--color-stage-top), var(--color-stage-bottom));
+  padding: var(--space-4) var(--space-4) 0;
 }
 
 .stage-log {
@@ -533,28 +559,22 @@ button:disabled {
   color: var(--color-muted);
 }
 
-.hills {
+.sapling {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 38%;
+  right: 5%;
+  bottom: 3%;
+  height: 74%;
 }
 
-.hill-back {
-  fill: var(--color-hill-back);
-}
-
-.hill-front {
+.sapling-mound {
   fill: var(--color-hill-front);
 }
 
-.sapling {
-  position: absolute;
-  right: 7%;
-  bottom: 11%;
-  height: 72%;
+.sapling-extra {
+  fill: var(--color-accent-leaf);
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: leaf-intro var(--duration-grow) var(--ease) backwards;
 }
 
 .sapling-stem {
@@ -658,7 +678,7 @@ button:disabled {
   height: 8px;
   overflow: hidden;
   border-radius: var(--radius-small);
-  background: var(--color-stage-deep);
+  background: var(--color-sunken);
 }
 
 .progress div {
@@ -675,7 +695,7 @@ button:disabled {
   justify-content: center;
   gap: var(--space-2);
   height: var(--primary-height);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-leaf);
   color: var(--color-on-accent);
   font-family: var(--font-display);
   font-size: 21px;
@@ -717,12 +737,12 @@ button:disabled {
 /* 日誌 */
 .log-panel {
   position: absolute;
-  inset: var(--space-3);
+  inset: 0 0 var(--space-1);
   z-index: 2;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-leaf);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
   animation: popover-in var(--duration-quick) var(--ease);
@@ -854,7 +874,7 @@ button:disabled {
   gap: var(--space-2);
   width: min(var(--notice-width), 100%);
   padding: var(--space-6);
-  border-radius: var(--radius-large);
+  border-radius: var(--radius-leaf);
   background: var(--color-surface);
   box-shadow: var(--shadow-panel);
 }
@@ -882,6 +902,139 @@ button:disabled {
   margin-top: var(--space-2);
   color: var(--color-faint);
   font-size: 13px;
+}
+
+/* 下載頁：版本長在一條藤蔓上。 */
+.download {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-3);
+  height: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-leaf);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.download-head h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.download-head p {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.vine {
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--space-2) 0 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}
+
+.vine-series {
+  position: relative;
+  padding-left: var(--space-6);
+}
+
+.vine-series::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--node-size) / 2 - var(--vine-width) / 2);
+  width: var(--vine-width);
+  background: var(--color-accent-soft);
+  content: "";
+}
+
+.vine-title {
+  padding: var(--space-3) 0 var(--space-1);
+  color: var(--color-faint);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vine-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-leaf-small);
+  transition: background var(--duration-quick) var(--ease);
+}
+
+.vine-row:hover {
+  background: var(--color-canvas);
+}
+
+.vine-leaf {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--space-6) * -1);
+  width: var(--node-size);
+  height: var(--node-size);
+  border-radius: 2px 10px 2px 10px;
+  background: var(--color-sunken);
+  transform: translateY(-50%);
+  transition: background var(--duration-grow) var(--ease);
+}
+
+.vine-row.installed .vine-leaf {
+  background: var(--color-accent);
+}
+
+.vine-row.active .vine-leaf {
+  background: var(--color-accent-leaf);
+  animation: waiting 1.2s ease-in-out infinite;
+}
+
+.vine-id {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.vine-id small {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-leaf-small);
+  color: var(--color-accent-deep);
+  font-size: 12px;
+  background: var(--color-accent-soft);
+}
+
+.vine-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.vine-actions .secondary {
+  height: 32px;
+  min-width: 72px;
+}
+
+.vine-progress {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+
+.vine-progress .progress {
+  height: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {

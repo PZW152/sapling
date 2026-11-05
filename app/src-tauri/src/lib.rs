@@ -10,11 +10,13 @@ use sapling_core::instance::{DEFAULT_INSTANCE_ID, Instance};
 use sapling_core::launch::{LaunchEvent, play};
 use sapling_core::platform::{DataDirs, open_in_browser};
 use sapling_core::versions::fetch_manifest;
+use sapling_core::versions::install::{is_installed, prepare_version};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::{AppHandle, Emitter, State};
 
 const LAUNCH_EVENT: &str = "launch-event";
+const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Default)]
@@ -43,6 +45,7 @@ const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 struct VersionList {
     latest: String,
     versions: Vec<String>,
+    installed: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -67,15 +70,22 @@ fn text<E: ToString>(error: E) -> String {
 async fn list_versions() -> Result<VersionList, String> {
     let client = new_client().map_err(text)?;
     let manifest = fetch_manifest(&client).await.map_err(text)?;
-    let versions = manifest
+    let dirs = DataDirs::for_this_user().map_err(text)?;
+    let versions: Vec<String> = manifest
         .supported_releases()
         .map_err(text)?
         .iter()
         .map(|entry| entry.id.clone())
         .collect();
+    let installed = versions
+        .iter()
+        .filter(|id| is_installed(&dirs, id))
+        .cloned()
+        .collect();
     Ok(VersionList {
         latest: manifest.latest.release.clone(),
         versions,
+        installed,
     })
 }
 
@@ -137,6 +147,29 @@ async fn login_finish(state: State<'_, AppState>) -> Result<Profile, String> {
 fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
     auth::sign_out().map_err(text)?;
     state.set_session(None)
+}
+
+#[tauri::command]
+async fn install_game(app: AppHandle, version: String) -> Result<(), String> {
+    let dirs = DataDirs::for_this_user().map_err(text)?;
+    let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let mut last_progress = Instant::now();
+    prepare_version(
+        &version,
+        &dirs,
+        config.download_concurrency,
+        move |stage, progress| {
+            let is_last = progress.finished_files == progress.total_files;
+            if is_last || last_progress.elapsed() >= PROGRESS_INTERVAL {
+                last_progress = Instant::now();
+                // 進度只用於顯示，送不出去不影響下載本身。
+                let _ = app.emit(INSTALL_EVENT, LaunchEvent::Progress { stage, progress });
+            }
+        },
+    )
+    .await
+    .map(|_| ())
+    .map_err(text)
 }
 
 #[tauri::command]
@@ -213,6 +246,7 @@ pub fn run() {
             login_finish,
             sign_out,
             open_link,
+            install_game,
             play_game
         ])
         .run(tauri::generate_context!())

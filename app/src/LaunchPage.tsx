@@ -1,23 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AccountPanel } from "./AccountPanel";
+import { overallProgress, toMegabytes } from "./progress";
 import { LogPanel } from "./LogPanel";
 import { Sapling } from "./Sapling";
 import { VersionPicker } from "./VersionPicker";
-import type { LaunchEvent, Profile, Progress, Settings, VersionList } from "./types";
+import type { LaunchEvent, Profile, Progress, VersionList } from "./types";
 
-/** 遊戲檔案佔整體進度的比例，其餘是 Java。 */
-const GAME_SHARE = 0.85;
 /** 日誌最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
 
 type Phase = "idle" | "preparing" | "running" | "failed";
 
-export function LaunchPage() {
-  const [list, setList] = useState<VersionList | null>(null);
-  const [listError, setListError] = useState<string | null>(null);
-  const [selected, setSelected] = useState("");
+export function LaunchPage({
+  list,
+  listError,
+  selected,
+  onSelect,
+  onGoToDownload,
+  onRetry,
+}: {
+  list: VersionList | null;
+  listError: string | null;
+  selected: string;
+  onSelect: (id: string) => void;
+  onGoToDownload: () => void;
+  onRetry: () => void;
+}) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -25,19 +35,6 @@ export function LaunchPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [logOpen, setLogOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
-
-  const loadVersions = useCallback(() => {
-    setListError(null);
-    Promise.all([invoke<VersionList>("list_versions"), invoke<Settings>("load_settings")])
-      .then(([versions, settings]) => {
-        setList(versions);
-        const saved = settings.instance.version;
-        setSelected(versions.versions.includes(saved) ? saved : versions.latest);
-      })
-      .catch((reason) => setListError(String(reason)));
-  }, []);
-
-  useEffect(loadVersions, [loadVersions]);
 
   useEffect(() => {
     const stopListening = listen<LaunchEvent>("launch-event", ({ payload }) => {
@@ -73,7 +70,7 @@ export function LaunchPage() {
   }
 
   function selectVersion(id: string) {
-    setSelected(id);
+    onSelect(id);
     setPhase("idle");
     setProgress(null);
   }
@@ -81,6 +78,7 @@ export function LaunchPage() {
   const overall = overallProgress(progress);
   const preparing = phase === "preparing";
   const busy = preparing || phase === "running";
+  const noVersion = list !== null && list.installed.length === 0;
 
   return (
     <div className="launch">
@@ -92,7 +90,7 @@ export function LaunchPage() {
           {listError ? (
             <>
               <p className="error">{listError}</p>
-              <button className="secondary" onClick={loadVersions}>
+              <button className="secondary" onClick={onRetry}>
                 重新取得版本
               </button>
             </>
@@ -116,17 +114,16 @@ export function LaunchPage() {
 
         <div className="stage-text">
           <p className="game-name">Minecraft</p>
-          <h1 key={selected}>{selected || "…"}</h1>
+          <h1 key={selected}>{selected || (noVersion ? "待播種" : "…")}</h1>
           <p className="edition">原版</p>
         </div>
 
         {/* 檔案都已存在時只是快速檢查，樹苗保持長大的樣子，不用重新長一次。 */}
-        <Sapling growth={preparing && downloading ? overall : 1} celebrate={phase === "running"} />
-
-        <svg className="hills" viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
-          <path className="hill-back" d="M0 170C190 130 430 190 800 40V220H0Z" />
-          <path className="hill-front" d="M0 196C260 180 520 200 800 110V220H0Z" />
-        </svg>
+        <Sapling
+          growth={preparing && downloading ? overall : 1}
+          leaves={list?.installed.length ?? 0}
+          celebrate={phase === "running"}
+        />
 
         <div className="stage-action">
           <StatusLine
@@ -135,6 +132,7 @@ export function LaunchPage() {
             error={error}
             percent={overall}
             signedIn={profile !== null}
+            noVersion={noVersion}
           />
           {preparing && (
             <div
@@ -147,13 +145,19 @@ export function LaunchPage() {
               <div style={{ transform: `scaleX(${overall})` }} />
             </div>
           )}
-          <button
-            className={phase === "running" ? "primary running" : "primary"}
-            disabled={!selected || !profile || busy}
-            onClick={startGame}
-          >
-            {launchLabel(phase)}
-          </button>
+          {noVersion ? (
+            <button className="primary" onClick={onGoToDownload}>
+              前往下載
+            </button>
+          ) : (
+            <button
+              className={phase === "running" ? "primary running" : "primary"}
+              disabled={!selected || !profile || busy}
+              onClick={startGame}
+            >
+              {launchLabel(phase)}
+            </button>
+          )}
         </div>
 
         {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
@@ -175,12 +179,14 @@ function StatusLine({
   error,
   percent,
   signedIn,
+  noVersion,
 }: {
   phase: Phase;
   progress: Progress | null;
   error: string;
   percent: number;
   signedIn: boolean;
+  noVersion: boolean;
 }) {
   if (phase === "failed") {
     return <p className="status-error">{error}</p>;
@@ -196,28 +202,15 @@ function StatusLine({
     return (
       <p className="status status-row">
         <span>
-          正在檢查和下載{what}：{toMegabytes(progress.finishedBytes)} /{" "}
+          正在檢查{what}：{toMegabytes(progress.finishedBytes)} /{" "}
           {toMegabytes(progress.totalBytes)} MB
         </span>
         <span>{Math.round(percent * 100)}%</span>
       </p>
     );
   }
-  return (
-    <p className="status">
-      {signedIn ? "第一次啟動會自動下載遊戲檔案和 Java。" : "登入微軟帳號後就能啟動遊戲。"}
-    </p>
-  );
-}
-
-function toMegabytes(bytes: number) {
-  return Math.round(bytes / 1024 / 1024);
-}
-
-function overallProgress(progress: Progress | null) {
-  if (!progress) {
-    return 0;
+  if (noVersion) {
+    return <p className="status">先下載一個遊戲版本。</p>;
   }
-  const part = progress.finishedBytes / Math.max(progress.totalBytes, 1);
-  return progress.stage === "game" ? part * GAME_SHARE : GAME_SHARE + part * (1 - GAME_SHARE);
+  return <p className="status">{signedIn ? "準備好就開始吧。" : "登入微軟帳號後就能啟動遊戲。"}</p>;
 }
