@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ModHit } from "../../shell/types";
+import type { ModHit } from "../types";
 import { displayTitle, searchTerm } from "./names";
 
 describe("displayTitle", () => {

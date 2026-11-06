@@ -12,7 +12,11 @@
 
   --color-hero: color-mix(in srgb, var(--color-accent) 68%, black);
   --color-hero-soft: color-mix(in srgb, var(--color-hero) 78%, white);
+  /* 主區塊裡的卡片。要深到白字清楚。 */
+  --color-hero-tile: color-mix(in srgb, var(--color-hero) 90%, white);
   --color-strong: color-mix(in srgb, var(--color-accent) 52%, black);
+  /* 可以按的文字。比一般文字鮮豔，一眼分得出來。 */
+  --color-link: color-mix(in srgb, var(--color-accent) 68%, black);
   --color-rail: color-mix(in srgb, var(--color-accent) 22%, #101b17);
   --color-rail-text: color-mix(in srgb, var(--color-soft) 82%, var(--color-rail));
   --color-tint: color-mix(in srgb, var(--color-accent) 9%, transparent);
@@ -180,11 +184,6 @@ button:disabled {
   cursor: default;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 1px;
-}
-
 .app {
   position: relative;
   display: flex;
@@ -261,10 +260,6 @@ button:disabled {
 
 .nav:hover:not([aria-current]) {
   color: var(--color-on-dark);
-}
-
-.nav:hover svg {
-  transform: translateY(-2px) scale(1.12);
 }
 
 .nav[aria-current="page"] {
@@ -412,11 +407,16 @@ button:disabled {
 .secondary:hover:enabled {
   border-color: var(--color-accent);
   background: var(--color-soft);
-  transform: translateY(-1px);
 }
 
 .secondary:disabled {
   color: var(--color-faint);
+}
+
+.secondary.strong:disabled {
+  border-color: var(--color-line);
+  color: var(--color-faint);
+  background: var(--color-surface);
 }
 
 .secondary.strong {
@@ -438,19 +438,26 @@ button:disabled {
 
 .text-button {
   padding: 2px 0;
-  color: var(--color-strong);
+  color: var(--color-link);
   font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 3px;
 }
 
 .text-button:hover:enabled {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-color: currentColor;
 }
 
 .text-button:disabled {
   color: var(--color-faint);
+  text-decoration: none;
+}
+
+.text-button.danger {
+  color: var(--color-danger);
 }
 
 .switch {

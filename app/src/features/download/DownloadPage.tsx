@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
-import { LOADERS } from "../../shell/loaders";
+import { LOADERS, LOADER_HINT } from "../../shell/loaders";
+import { Segments } from "../../shell/Segments";
 import { DownloadQueue } from "./DownloadQueue";
 import type { LoaderKind } from "../../shell/types";
 import { groupBySeries } from "./series";
@@ -14,36 +15,23 @@ const GAME_SECTION = "game";
 
 /** 頂部分頁切換內容。全部保持掛載，切走時下載進度不會消失。 */
 export function DownloadPage() {
-  const { isEnabled } = useApp();
+  const { features } = useApp();
   const [current, setCurrent] = useState(GAME_SECTION);
-  const sections = FEATURES.filter(
-    (feature) => !feature.optional || isEnabled(feature.id),
-  ).flatMap((feature) =>
+  const sections = features.flatMap((feature) =>
     (feature.downloadSections ?? []).map((section) => ({ ...section, feature: feature.name })),
   );
   const active = sections.some(({ id }) => id === current) ? current : GAME_SECTION;
-
-  function tab(id: string, label: string) {
-    return (
-      <button
-        key={id}
-        className="segment"
-        aria-current={id === active ? "page" : undefined}
-        onClick={() => setCurrent(id)}
-      >
-        {label}
-      </button>
-    );
-  }
 
   return (
     <div className="download-page">
       <div className="download-bar">
         {sections.length > 0 && (
-          <nav className="segments" aria-label="下載內容">
-            {tab(GAME_SECTION, "遊戲")}
-            {sections.map(({ id, label }) => tab(id, label))}
-          </nav>
+          <Segments
+            label="下載內容"
+            items={[{ id: GAME_SECTION, label: "遊戲" }, ...sections]}
+            current={active}
+            onChoose={setCurrent}
+          />
         )}
         <DownloadQueue />
       </div>
@@ -100,24 +88,32 @@ function GameDownloads() {
       <div className="download-head">
         <h2>下載遊戲</h2>
         <p>下載好的版本會自動建立實例，需要的 Java 會一起下載。</p>
-        <div className="chips" role="group" aria-label="載入器">
-          {LOADERS.map(({ kind, name }) => (
-            <button
-              key={kind}
-              className="chip"
-              aria-pressed={kind === loader}
-              onClick={() => setLoader(kind)}
-            >
-              {name}
-            </button>
-          ))}
-          <button
-            className="chip"
-            aria-pressed={snapshots}
-            onClick={() => setSnapshots(!snapshots)}
-          >
-            快照版
-          </button>
+        <div className="field">
+          <span>{LOADER_HINT}</span>
+          <div className="download-options">
+            <div className="chips" role="group" aria-label="載入器">
+              {LOADERS.map(({ kind, name }) => (
+                <button
+                  key={kind}
+                  className="chip"
+                  aria-pressed={kind === loader}
+                  onClick={() => setLoader(kind)}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <div className="toggle-row">
+              <button
+                className="switch"
+                role="switch"
+                aria-checked={snapshots}
+                aria-label="顯示快照版"
+                onClick={() => setSnapshots(!snapshots)}
+              />
+              <span>顯示快照版</span>
+            </div>
+          </div>
         </div>
       </div>
       <ul className="vine">
@@ -172,13 +168,14 @@ function VersionRow({
       </span>
       <div className="vine-actions">
         {isInstalled ? (
-          <button className="secondary" onClick={() => onPlay(id)}>
+          <button className="secondary" aria-label={`去啟動 ${id}`} onClick={() => onPlay(id)}>
             去啟動
           </button>
         ) : (
           <button
             className="secondary"
             disabled={install !== null && !install.error}
+            aria-label={`下載 ${id}`}
             onClick={() => onInstall(id)}
           >
             {active && !failed ? "下載中" : "下載"}
@@ -194,6 +191,7 @@ function VersionRow({
           <div
             className="progress"
             role="progressbar"
+            aria-label={`下載 ${id} 的進度`}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(install.percent * 100)}
@@ -202,7 +200,7 @@ function VersionRow({
           </div>
         </div>
       )}
-      {failed && <p className="error vine-progress">{install.error}</p>}
+      {failed && <ErrorText className="vine-progress" message={install.error ?? ""} />}
     </div>
   );
 }

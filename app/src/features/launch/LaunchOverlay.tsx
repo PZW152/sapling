@@ -65,6 +65,7 @@ export function LaunchOverlay({
           <div
             className={ProgressView ? undefined : "overlay-bar"}
             role="progressbar"
+            aria-label="啟動進度"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(share * 100)}
@@ -75,6 +76,9 @@ export function LaunchOverlay({
               <div style={{ transform: `scaleX(${share})` }} />
             )}
           </div>
+          <p className="sr-only" role="status">
+            {running ? "遊戲已啟動" : "正在準備遊戲"}
+          </p>
           <p key={running ? "running" : "preparing"} className="overlay-note">
             {running && "遊戲已啟動"}
             {!running && !progress && "正在確認需要哪些檔案"}

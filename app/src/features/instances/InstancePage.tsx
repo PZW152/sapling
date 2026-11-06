@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { FEATURES } from "..";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
+import { ConfirmButton } from "../../shell/ConfirmButton";
+import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
-import { LOADERS, loaderName } from "../../shell/loaders";
+import { useEscape } from "../../shell/keyboard";
+import { LOADERS, LOADER_HINT, loaderName } from "../../shell/loaders";
+import { Segments } from "../../shell/Segments";
 import type { Instance, LoaderKind } from "../../shell/types";
 
 export function InstancePage() {
   const { instances, list, selected, selectInstance, loadInstances } = useApp();
   const [creating, setCreating] = useState(false);
+  // 放在這裡，換實例時才會停在同一個分頁。
+  const [panel, setPanel] = useState("");
 
   return (
     <div className="instances">
@@ -20,6 +25,7 @@ export function InstancePage() {
               <button
                 className="instance-item"
                 aria-current={instance.id === selected?.id ? "true" : undefined}
+                title={`${instance.name}，${instance.version}`}
                 onClick={() => {
                   setCreating(false);
                   selectInstance(instance.id);
@@ -50,6 +56,8 @@ export function InstancePage() {
         <InstanceDetail
           key={selected.id}
           instance={selected}
+          panel={panel}
+          onPanel={setPanel}
           onChanged={loadInstances}
           onDuplicated={async (id) => {
             await loadInstances();
@@ -79,6 +87,9 @@ function CreateInstance({
   const [loader, setLoader] = useState<LoaderKind>("vanilla");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const form = useRef<HTMLElement>(null);
+
+  useEscape(onCancel, form);
 
   async function create() {
     setError("");
@@ -102,7 +113,7 @@ function CreateInstance({
   }
 
   return (
-    <section className="panel instance-detail">
+    <section className="panel instance-detail" ref={form}>
       <h2>新增實例</h2>
       <label className="field">
         <span>名稱</span>
@@ -111,11 +122,12 @@ function CreateInstance({
           value={name}
           placeholder="例如：生存世界"
           onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && !creating && create()}
         />
       </label>
       <div className="field">
         <span>遊戲版本</span>
-        <div className="chips">
+        <div className="chips" role="group" aria-label="遊戲版本">
           {versions.map((id) => (
             <button
               key={id}
@@ -129,8 +141,8 @@ function CreateInstance({
         </div>
       </div>
       <div className="field">
-        <span>載入器</span>
-        <div className="chips">
+        <span>{LOADER_HINT}</span>
+        <div className="chips" role="group" aria-label="載入器">
           {LOADERS.map(({ kind, name: label }) => (
             <button
               key={kind}
@@ -143,7 +155,7 @@ function CreateInstance({
           ))}
         </div>
       </div>
-      {error && <p className="error">{error}</p>}
+      <ErrorText message={error} />
       <div className="detail-actions">
         <button className="secondary strong" disabled={creating} onClick={create}>
           {creating ? "正在建立" : "建立"}
@@ -158,17 +170,27 @@ function CreateInstance({
 
 function InstanceDetail({
   instance,
+  panel,
+  onPanel,
   onChanged,
   onDuplicated,
 }: {
   instance: Instance;
+  panel: string;
+  onPanel: (id: string) => void;
   onChanged: () => Promise<void>;
   onDuplicated: (id: string) => Promise<void>;
 }) {
-  const { isEnabled } = useApp();
-  const panels = FEATURES.filter((feature) => feature.InstancePanel && isEnabled(feature.id));
+  const { features, goTo } = useApp();
+  const panels = features
+    .flatMap(({ id, name, instancePanel }) =>
+      instancePanel && (instancePanel.available?.(instance) ?? true)
+        ? [{ ...instancePanel, id, feature: name }]
+        : [],
+    )
+    .sort((first, second) => first.order - second.order);
+  const active = panels.find(({ id }) => id === panel) ?? panels[0];
   const [name, setName] = useState(instance.name);
-  const [confirming, setConfirming] = useState(false);
   const [copying, setCopying] = useState(false);
   const [error, setError] = useState("");
 
@@ -200,10 +222,6 @@ function InstanceDetail({
   }
 
   function deleteInstance() {
-    if (!confirming) {
-      setConfirming(true);
-      return;
-    }
     run(async () => {
       await api.deleteInstance(instance.id);
       await onChanged();
@@ -225,22 +243,28 @@ function InstanceDetail({
         Minecraft {instance.version}，{loaderName(instance.loader)}
       </p>
 
-      {panels.length > 0 ? (
-        panels.map(
-          ({ id, name, InstancePanel }) =>
-            InstancePanel && (
-              <FeatureBoundary key={id} name={name}>
-                <InstancePanel instanceId={instance.id} />
-              </FeatureBoundary>
-            ),
-        )
-      ) : (
-        <div className="detail-spacer" />
+      {panels.length > 1 && (
+        <Segments
+          label="實例內容"
+          items={panels}
+          current={active.id}
+          onChoose={onPanel}
+        />
       )}
+      <div className="detail-panel">
+        {active && (
+          <FeatureBoundary key={active.id} name={active.feature}>
+            <active.Panel instanceId={instance.id} />
+          </FeatureBoundary>
+        )}
+      </div>
 
-      {error && <p className="error">{error}</p>}
+      <ErrorText message={error} />
       <div className="detail-actions">
         <div className="detail-group">
+          <button className="secondary strong" onClick={() => goTo("launch")}>
+            去啟動
+          </button>
           <button
             className="secondary"
             onClick={() => run(() => api.openInstanceFolder(instance.id))}
@@ -251,13 +275,12 @@ function InstanceDetail({
             {copying ? "正在複製" : "複製實例"}
           </button>
         </div>
-        <button
-          className={confirming ? "secondary danger" : "secondary"}
-          onClick={deleteInstance}
-          onBlur={() => setConfirming(false)}
-        >
-          {confirming ? "再按一次刪除（存檔也會刪除）" : "刪除實例"}
-        </button>
+        <ConfirmButton
+          className="secondary"
+          label="刪除實例"
+          warning="再按一次刪除（存檔也會刪除）"
+          onConfirm={deleteInstance}
+        />
       </div>
     </section>
   );

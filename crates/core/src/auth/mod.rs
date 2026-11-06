@@ -6,6 +6,7 @@ mod token_store;
 
 use md5::{Digest, Md5};
 use std::fmt;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,8 @@ const SLOW_DOWN_STEP_SECS: u64 = 5;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
+    #[error("已取消登入")]
+    Cancelled,
     #[error(transparent)]
     Storage(#[from] crate::storage::StorageError),
     #[error("無法連線到登入伺服器，請檢查網路連線後再試一次")]
@@ -243,11 +246,15 @@ pub async fn begin_login(client: &reqwest::Client) -> Result<DeviceLogin, AuthEr
 pub async fn finish_login(
     client: &reqwest::Client,
     login: &DeviceLogin,
+    cancelled: &AtomicBool,
 ) -> Result<Session, AuthError> {
     let deadline = Instant::now() + Duration::from_secs(login.expires_in);
     let mut interval = login.interval.max(1);
     loop {
         tokio::time::sleep(Duration::from_secs(interval)).await;
+        if cancelled.load(Ordering::Relaxed) {
+            return Err(AuthError::Cancelled);
+        }
         if Instant::now() >= deadline {
             return Err(AuthError::CodeExpired);
         }

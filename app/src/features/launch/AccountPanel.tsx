@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../shell/api";
 import type { LoginCode, Profile } from "../../shell/types";
+import { ErrorText } from "../../shell/ErrorText";
+import { useEscape } from "../../shell/keyboard";
 
 export function AccountPanel({
   profile,
@@ -21,6 +23,10 @@ export function AccountPanel({
   const [error, setError] = useState("");
   const [accounts, setAccounts] = useState<Profile[]>([]);
   const [choosing, setChoosing] = useState(false);
+  const attempt = useRef(0);
+  const panel = useRef<HTMLElement>(null);
+
+  useEscape(choosing ? () => setChoosing(false) : undefined, panel);
 
   // 登入、登出或切換後，其他帳號的清單都會變。
   useEffect(() => {
@@ -35,6 +41,7 @@ export function AccountPanel({
   }, [onProfileChange]);
 
   async function signIn() {
+    const mine = ++attempt.current;
     setError("");
     setChoosing(false);
     setStarting(true);
@@ -43,13 +50,27 @@ export function AccountPanel({
       setCode(loginCode);
       setCopied(await copyText(loginCode.userCode));
       setStarting(false);
-      onProfileChange(await api.loginFinish());
+      const signedIn = await api.loginFinish();
+      if (signedIn) {
+        onProfileChange(signedIn);
+      }
     } catch (reason) {
-      setError(String(reason));
-    } finally {
+      if (mine === attempt.current) {
+        setError(String(reason));
+      }
+    }
+    // 取消後又重新登入時，舊的等待結束不能蓋掉新的代碼。
+    if (mine === attempt.current) {
       setStarting(false);
       setCode(null);
     }
+  }
+
+  function cancelSignIn() {
+    attempt.current += 1;
+    setStarting(false);
+    setCode(null);
+    api.loginCancel().catch((reason) => setError(String(reason)));
   }
 
   async function switchTo(id: string) {
@@ -98,14 +119,24 @@ export function AccountPanel({
         </button>
         <p className="hint">{copied ? "代碼已複製，貼到登入頁面。" : "按上面的代碼可以複製。"}</p>
         <p className="hint">沒看到頁面的話，請前往 {code.verificationUri}</p>
-        <p className="hint waiting">正在等待你完成登入</p>
+        <p className="hint waiting" role="status">
+          正在等待你完成登入
+        </p>
+        <div className="account-actions">
+          <button className="text-button" onClick={() => api.openLink(code.verificationUri)}>
+            打開登入頁面
+          </button>
+          <button className="text-button" onClick={cancelSignIn}>
+            取消
+          </button>
+        </div>
       </section>
     );
   }
 
   if (profile) {
     return (
-      <section className="panel account">
+      <section className="panel account" ref={panel}>
         <div className="me">
           <Avatar skinUrl={profile.skinUrl} />
           <div className="me-text">
@@ -134,7 +165,7 @@ export function AccountPanel({
             </div>
           </>
         )}
-        {error && <p className="error">{error}</p>}
+        <ErrorText message={error} />
       </section>
     );
   }
@@ -147,7 +178,7 @@ export function AccountPanel({
       <button className="secondary strong" disabled={restoring || starting} onClick={signIn}>
         {starting ? "正在取得代碼" : "用微軟帳號登入"}
       </button>
-      {error && <p className="error">{error}</p>}
+      <ErrorText message={error} />
     </section>
   );
 }

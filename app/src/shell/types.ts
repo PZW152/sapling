@@ -33,6 +33,8 @@ export type LauncherConfig = {
   offlineEnabled: boolean;
   offlineName: string;
   favorites: Favorite[];
+  /** 介面大小的百分比。 */
+  uiScale: number;
 };
 
 export type World = {

@@ -7,6 +7,8 @@ use crate::platform::DataDirs;
 use crate::storage::{StorageError, read_json, write_json};
 
 const DEFAULT_THEME: &str = "sapling";
+const DEFAULT_UI_SCALE: u32 = 100;
+const MAX_UI_SCALE: u32 = 130;
 const RETIRED_THEME: &str = "zhongshan";
 const MIN_CONCURRENCY: usize = 1;
 const MAX_CONCURRENCY: usize = 64;
@@ -30,6 +32,8 @@ pub struct LauncherConfig {
     pub offline_name: String,
     /// 收藏的資源，內容由介面決定。
     pub favorites: Vec<serde_json::Value>,
+    /// 介面大小的百分比。
+    pub ui_scale: u32,
 }
 
 impl Default for LauncherConfig {
@@ -44,6 +48,7 @@ impl Default for LauncherConfig {
             offline_enabled: false,
             offline_name: String::new(),
             favorites: Vec::new(),
+            ui_scale: DEFAULT_UI_SCALE,
         }
     }
 }
@@ -74,6 +79,7 @@ impl LauncherConfig {
         self.download_concurrency = self
             .download_concurrency
             .clamp(MIN_CONCURRENCY, MAX_CONCURRENCY);
+        self.ui_scale = self.ui_scale.clamp(DEFAULT_UI_SCALE, MAX_UI_SCALE);
         // 中山主題改成植樹節限定後，舊設定裡的值要換回預設主題。
         if self.theme == RETIRED_THEME {
             self.theme = DEFAULT_THEME.to_string();
@@ -105,6 +111,17 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(dirs.config_file().with_extension("json.bad")).unwrap(),
             "{ not json"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_interface_size_stays_within_the_supported_range() {
+        let dirs = temp_dirs("scale");
+        std::fs::write(dirs.config_file(), r#"{ "uiScale": 400 }"#).unwrap();
+
+        assert_eq!(
+            LauncherConfig::load(&dirs).await.unwrap().ui_scale,
+            MAX_UI_SCALE
         );
     }
 

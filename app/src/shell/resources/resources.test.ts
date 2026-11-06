@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Instance, ModHit, ProjectVersion } from "../../shell/types";
+import type { Instance, ModHit, ProjectVersion } from "../types";
 import { appendHits, compatibleVersions, formatSize, hitTags, versionSummary } from "./resources";
 
 function version(gameVersions: string[], loaders: string[]): ProjectVersion {

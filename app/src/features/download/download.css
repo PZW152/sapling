@@ -121,35 +121,6 @@
   min-height: 0;
 }
 
-.segments {
-  display: flex;
-  flex: none;
-  align-self: flex-start;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border-radius: var(--radius-control);
-  background: var(--color-tint);
-}
-
-.segment {
-  height: 34px;
-  padding: 0 var(--space-5);
-  border-radius: 7px;
-  color: var(--color-muted);
-  font-weight: 500;
-}
-
-.segment:hover {
-  color: var(--color-strong);
-}
-
-.segment[aria-current="page"] {
-  color: var(--color-strong);
-  font-weight: 700;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-tile);
-}
-
 .download-section {
   flex: 1;
   min-height: 0;
@@ -214,4 +185,12 @@
 
 .queue-panel .error {
   grid-column: 1 / -1;
+}
+
+.download-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
 }

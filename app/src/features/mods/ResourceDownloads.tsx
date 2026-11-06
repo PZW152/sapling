@@ -3,7 +3,7 @@ import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import { loaderName } from "../../shell/loaders";
 import type { ProjectKind, World } from "../../shell/types";
-import { ResourceBrowser } from "./ResourceBrowser";
+import { ResourceBrowser } from "../../shell/resources/ResourceBrowser";
 
 /** 下載頁的分頁：先選實例，只列出和它相容的內容，不會裝錯版本。 */
 function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string }) {

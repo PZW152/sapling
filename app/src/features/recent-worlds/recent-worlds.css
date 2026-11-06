@@ -19,6 +19,24 @@
   gap: var(--space-2);
 }
 
+/* 主區塊變窄時只留兩個，卡片才放得下名字。 */
+@container (max-width: 400px) {
+  .worlds ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .worlds li:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+/* 太矮時收起來，啟動按鈕和版本號優先。 */
+@container (max-height: 300px) {
+  .worlds {
+    display: none;
+  }
+}
+
 .worlds li {
   min-width: 0;
 }
@@ -32,12 +50,12 @@
   border-radius: var(--radius-control);
   color: var(--color-on-dark);
   text-align: left;
-  background: var(--color-hero-soft);
+  background: var(--color-hero-tile);
   transition: background-color var(--fast) var(--ease);
 }
 
 .world:hover:enabled {
-  background: color-mix(in srgb, var(--color-hero-soft) 82%, white);
+  background: var(--color-hero-soft);
 }
 
 .world:disabled {
@@ -71,7 +89,6 @@
 
 .world-text small {
   font-size: var(--text-xs);
-  opacity: 0.8;
 }
 
 /* 實例頁 */

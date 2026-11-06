@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { api } from "../../shell/api";
-import { useApp } from "../../shell/AppContext";
-import { trackDownload } from "../../shell/downloads";
-import { timeAgo } from "../../shell/time";
-import type { Instance, ModHit, ProjectKind, ProjectVersion } from "../../shell/types";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { api } from "../api";
+import { useApp } from "../AppContext";
+import { trackDownload } from "../downloads";
+import { ErrorText } from "../ErrorText";
+import { useEscape, useFocusHandoff } from "../keyboard";
+import { timeAgo } from "../time";
+import type { Instance, ModHit, ProjectKind, ProjectVersion } from "../types";
 import { formatDownloads } from "./downloads";
+import "./resources.css";
 import { displayTitle, searchTerm } from "./names";
 import {
   CATEGORY_NAMES,
@@ -57,6 +60,25 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
   const [installed, setInstalled] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [detail, setDetail] = useState<ModHit | null>(null);
+  const browser = useRef<HTMLDivElement>(null);
+  const listScroll = useRef(0);
+
+  useEscape(onClose, browser);
+
+  const scroller = () => browser.current?.closest<HTMLElement>(".mod-section, .detail-panel");
+
+  function openDetail(hit: ModHit) {
+    listScroll.current = scroller()?.scrollTop ?? 0;
+    setDetail(hit);
+  }
+
+  // 詳情頁從最上面開始，回到清單時停在原本的位置。
+  useLayoutEffect(() => {
+    const element = scroller();
+    if (element) {
+      element.scrollTop = detail ? 0 : listScroll.current;
+    }
+  }, [detail]);
 
   const targetVersion = instance?.version ?? gameVersion;
   const favorites = config.favorites.filter((favorite) => favorite.kind === kind);
@@ -142,29 +164,28 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
 
   const shownHits = favoritesOnly ? favorites : hits;
 
-  if (detail) {
-    return (
-      <ProjectDetail
-        hit={detail}
-        kind={kind}
-        instance={instance}
-        installing={installing}
-        installed={installed}
-        busyLabel={busyLabel}
-        error={error}
-        favorite={isFavorite(detail)}
-        onToggleFavorite={() => toggleFavorite(detail)}
-        onInstall={(versionId) => run(detail, versionId)}
-        onBack={() => setDetail(null)}
-      />
-    );
-  }
-
+  // 詳情頁打開時清單留著，回來時才會停在原本的位置。
   return (
-    <div className="mod-browser">
+    <>
+      {detail && (
+        <ProjectDetail
+          hit={detail}
+          kind={kind}
+          instance={instance}
+          installing={installing}
+          installed={installed}
+          busyLabel={busyLabel}
+          error={error}
+          favorite={isFavorite(detail)}
+          onToggleFavorite={() => toggleFavorite(detail)}
+          onInstall={(versionId) => run(detail, versionId)}
+          onBack={() => setDetail(null)}
+        />
+      )}
+    <div className="mod-browser" ref={browser} hidden={detail !== null}>
       {onClose && (
         <div className="mods-head">
-          <h3>下載模組</h3>
+          <h2>下載模組</h2>
           <button className="text-button" onClick={onClose}>
             返回模組清單
           </button>
@@ -172,6 +193,7 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
       )}
       <div className="resource-filters">
         <input
+          type="search"
           className="resource-search"
           aria-label={PLACEHOLDERS[kind]}
           value={query}
@@ -222,9 +244,11 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
           收藏 {favorites.length}
         </button>
       </div>
-      {error && <p className="error">{error}</p>}
+      <ErrorText message={error} />
       {!error && searching && !favoritesOnly && hits.length === 0 && (
-        <p className="hint">正在搜尋</p>
+        <p className="hint" role="status">
+          正在搜尋
+        </p>
       )}
       {!error && (favoritesOnly || !searching) && shownHits.length === 0 && (
         <p className="mods-empty">
@@ -238,13 +262,14 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
           const done = installed.includes(hit.projectId);
           return (
             <li key={hit.projectId}>
-              <button className="hit-main" onClick={() => setDetail(hit)}>
+              <button className="hit-main" onClick={() => openDetail(hit)}>
                 <HitIcon hit={hit} />
                 <HitText hit={hit} />
               </button>
               <button
                 className="secondary"
                 disabled={done || installing.includes(hit.projectId)}
+                aria-label={`${done ? "已安裝" : "安裝"} ${displayTitle(hit)}`}
                 onClick={() => run(hit, null)}
               >
                 {done
@@ -263,6 +288,7 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
         </button>
       )}
     </div>
+    </>
   );
 }
 
@@ -321,6 +347,10 @@ function ProjectDetail({
 }) {
   const [versions, setVersions] = useState<ProjectVersion[] | null>(null);
   const [loadError, setLoadError] = useState("");
+  const root = useRef<HTMLDivElement>(null);
+  const heading = useFocusHandoff<HTMLHeadingElement>();
+
+  useEscape(onBack, root);
 
   useEffect(() => {
     api.projectVersions(hit.projectId).then(setVersions).catch((reason) => setLoadError(String(reason)));
@@ -329,14 +359,16 @@ function ProjectDetail({
   const shown = versions && compatibleVersions(versions, instance, kind);
 
   return (
-    <div className="mod-browser resource-detail">
+    <div className="mod-browser resource-detail" ref={root}>
       <button className="text-button detail-back" onClick={onBack}>
         返回列表
       </button>
       <header className="detail-head">
         <HitIcon hit={hit} />
         <div>
-          <h3>{displayTitle(hit)}</h3>
+          <h2 ref={heading} tabIndex={-1}>
+            {displayTitle(hit)}
+          </h2>
           {hit.author && <small>作者 {hit.author}</small>}
           <p>{hit.description}</p>
           <div className="detail-links">
@@ -352,7 +384,7 @@ function ProjectDetail({
           </div>
         </div>
       </header>
-      {(error || loadError) && <p className="error">{error || loadError}</p>}
+      <ErrorText message={error || loadError} />
       {!shown && !loadError && <p className="hint">正在取得版本</p>}
       {shown?.length === 0 && (
         <p className="mods-empty">
@@ -361,7 +393,7 @@ function ProjectDetail({
       )}
       {shown && shown.length > 0 && (
         <>
-          <h4>{instance ? `適合「${instance.name}」的版本` : "全部版本"}</h4>
+          <h3>{instance ? `適合「${instance.name}」的版本` : "全部版本"}</h3>
           <ul className="version-list">
             {shown.map((version) => {
               const done = installed.includes(version.id);
@@ -383,6 +415,7 @@ function ProjectDetail({
                   <button
                     className="secondary"
                     disabled={done || installing.includes(version.id)}
+                    aria-label={`${done ? "已安裝" : "安裝"} ${version.name}`}
                     onClick={() => onInstall(version.id)}
                   >
                     {done

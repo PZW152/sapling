@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import type { Feature } from "../../shell/feature";
 import "./settings.css";
 
 function SettingsPage() {
-  const { config, isEnabled, saveError } = useApp();
+  const { config, features: active, saveError } = useApp();
   const [advanced, setAdvanced] = useState(false);
-  const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
 
   return (
     <div className="settings">
@@ -43,15 +42,17 @@ function SettingsPage() {
           {config.featureSwitchesUnlocked && <FeatureSwitches />}
         </div>
       </div>
-      <p className={saveError ? "error setting-wide" : "status setting-wide"}>
-        {saveError || "設定會自動保存。"}
-      </p>
+      {saveError ? (
+        <ErrorText className="setting-wide" message={saveError} />
+      ) : (
+        <p className="status setting-wide">設定會自動保存。</p>
+      )}
     </div>
   );
 }
 
 function FeatureSwitches() {
-  const { config, isEnabled, updateConfig } = useApp();
+  const { allFeatures, config, isEnabled, updateConfig } = useApp();
 
   function toggle(id: string) {
     const disabled = config.disabledFeatures;
@@ -68,7 +69,7 @@ function FeatureSwitches() {
         <span>功能模塊</span>
       </div>
       <ul className="feature-switches">
-        {FEATURES.filter((feature) => feature.optional).map(({ id, name, description }) => (
+        {allFeatures.filter((feature) => feature.optional).map(({ id, name, description }) => (
           <li key={id}>
             <button
               className="switch"

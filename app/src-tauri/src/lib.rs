@@ -1,10 +1,11 @@
 //! Tauri 命令：只做轉接，業務邏輯都在 sapling-core。
 
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use sapling_core::auth::{self, DeviceLogin, Profile, Session, accounts};
+use sapling_core::auth::{self, AuthError, DeviceLogin, Profile, Session, accounts};
 use sapling_core::cleanup::{self, CleanupSummary};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
@@ -45,6 +46,8 @@ const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 struct AppState {
     session: Mutex<Option<Session>>,
     device_login: Mutex<Option<DeviceLogin>>,
+    /// 正在等待的登入。設成 true 就會停止等待。
+    login_cancelled: Mutex<Option<Arc<AtomicBool>>>,
     /// 同一時間只做一次恢復登入，避免短時間重複請求被 Minecraft 伺服器限流。
     restoring: AsyncMutex<()>,
     launch_cancel: LaunchCancel,
@@ -345,19 +348,38 @@ async fn login_start(state: State<'_, AppState>) -> Result<LoginCode, String> {
 }
 
 #[tauri::command]
-async fn login_finish(state: State<'_, AppState>) -> Result<Profile, String> {
+async fn login_finish(state: State<'_, AppState>) -> Result<Option<Profile>, String> {
     let login = state
         .device_login
         .lock()
         .map_err(|_| STATE_ERROR)?
         .take()
         .ok_or("請重新開始登入")?;
+    let cancelled = Arc::new(AtomicBool::new(false));
+    *state.login_cancelled.lock().map_err(|_| STATE_ERROR)? = Some(cancelled.clone());
     let client = new_client().map_err(text)?;
-    let session = auth::finish_login(&client, &login).await.map_err(text)?;
+    let session = match auth::finish_login(&client, &login, &cancelled).await {
+        Ok(session) => session,
+        Err(AuthError::Cancelled) => return Ok(None),
+        Err(error) => return Err(text(error)),
+    };
     let profile = session.profile.clone();
     state.set_session(Some(session))?;
     remember_account(&profile).await;
-    Ok(profile)
+    Ok(Some(profile))
+}
+
+#[tauri::command]
+fn cancel_login(state: State<'_, AppState>) -> Result<(), String> {
+    if let Some(cancelled) = state
+        .login_cancelled
+        .lock()
+        .map_err(|_| STATE_ERROR)?
+        .take()
+    {
+        cancelled.store(true, Ordering::Relaxed);
+    }
+    Ok(())
 }
 
 /// 帳號清單只是方便切換，記不下來也不影響這次登入。
@@ -581,6 +603,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            cancel_login,
             list_versions,
             system_memory_mb,
             load_config,

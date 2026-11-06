@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { api } from "./api";
 import { applyTheme } from "./applyTheme";
+import { applyScale } from "./applyScale";
+import type { Feature } from "./feature";
 import { createSaveQueue } from "./saveQueue";
 import type { Instance, LauncherConfig, VersionList } from "./types";
 
@@ -17,6 +19,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   offlineEnabled: false,
   offlineName: "",
   favorites: [],
+  uiScale: 100,
 };
 
 type AppState = {
@@ -28,6 +31,10 @@ type AppState = {
   selected: Instance | null;
   config: LauncherConfig;
   saveError: string;
+  /** 目前開著的功能模塊。 */
+  features: Feature[];
+  /** 全部功能模塊，包含關閉的。 */
+  allFeatures: Feature[];
   isEnabled: (featureId: string) => boolean;
   goTo: (featureId: string) => void;
   activeTab: string;
@@ -53,10 +60,12 @@ export function useApp() {
 
 export function AppProvider({
   children,
+  allFeatures,
   activeTab,
   goTo,
 }: {
   children: ReactNode;
+  allFeatures: Feature[];
   activeTab: string;
   goTo: (featureId: string) => void;
 }) {
@@ -92,6 +101,7 @@ export function AppProvider({
         latestConfig.current = saved;
         setConfig(saved);
         applyTheme(saved.theme);
+        applyScale(saved.uiScale);
       })
       .finally(() => setLoaded(true));
     loadVersions();
@@ -126,6 +136,14 @@ export function AppProvider({
     [updateConfig],
   );
 
+  const features = useMemo(
+    () =>
+      allFeatures.filter(
+        (feature) => !feature.optional || !config.disabledFeatures.includes(feature.id),
+      ),
+    [allFeatures, config.disabledFeatures],
+  );
+
   const value = useMemo(
     () => ({
       loaded,
@@ -135,6 +153,8 @@ export function AppProvider({
       selected,
       config,
       saveError,
+      features,
+      allFeatures,
       activeTab,
       isEnabled: (featureId: string) => !config.disabledFeatures.includes(featureId),
       goTo,
@@ -153,6 +173,8 @@ export function AppProvider({
       selected,
       config,
       saveError,
+      features,
+      allFeatures,
       activeTab,
       goTo,
       loadVersions,

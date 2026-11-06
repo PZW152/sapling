@@ -66,7 +66,9 @@ export const api = {
 
   restoreAccount: () => invoke<Profile | null>("restore_account"),
   loginStart: () => invoke<LoginCode>("login_start"),
-  loginFinish: () => invoke<Profile>("login_finish"),
+  /** 用戶取消時回傳 `null`。 */
+  loginFinish: () => invoke<Profile | null>("login_finish"),
+  loginCancel: () => invoke<void>("cancel_login"),
   signOut: () => invoke<void>("sign_out"),
   listAccounts: () => invoke<Profile[]>("list_accounts"),
   switchAccount: (id: string) => invoke<Profile | null>("switch_account", { id }),

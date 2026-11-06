@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { clearFinished, isDone, isRunning, useDownloadTasks } from "../../shell/downloads";
+import { ErrorText } from "../../shell/ErrorText";
 
 /** 下載頁右上角的清單：不用待在原來的分頁，也能看到每項下載的狀況。 */
 export function DownloadQueue() {
@@ -15,7 +16,7 @@ export function DownloadQueue() {
   return (
     <div className="queue">
       <button className="secondary" aria-expanded={open} onClick={() => setOpen(!open)}>
-        {running > 0 ? `下載中 ${running}` : "下載完成"}
+        <span role="status">{running > 0 ? `下載中 ${running}` : "下載完成"}</span>
       </button>
       {open && (
         <div className="queue-panel">
@@ -25,7 +26,7 @@ export function DownloadQueue() {
                 <span>{task.name}</span>
                 {isRunning(task) && <small>進行中</small>}
                 {isDone(task) && <small>完成</small>}
-                {!isRunning(task) && !isDone(task) && <p className="error">{task.result}</p>}
+                {!isRunning(task) && !isDone(task) && <ErrorText message={task.result ?? ""} />}
               </li>
             ))}
           </ul>

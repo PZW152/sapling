@@ -117,7 +117,7 @@ function WorldList({ instanceId }: { instanceId: string }) {
   return (
     <>
       <div className="mods-head">
-        <h3>世界</h3>
+        <h2 className="sr-only">世界</h2>
         <button className="text-button" aria-expanded={importing} onClick={openImport}>
           匯入世界
         </button>
@@ -137,6 +137,7 @@ function WorldList({ instanceId }: { instanceId: string }) {
                   <button
                     className="text-button"
                     disabled={working !== ""}
+                    aria-label={`匯入 ${world.folder}`}
                     onClick={() => importFrom(source, world.folder)}
                   >
                     {working === world.folder ? "正在匯入" : "匯入"}
@@ -154,6 +155,7 @@ function WorldList({ instanceId }: { instanceId: string }) {
             <button
               className="text-button"
               disabled={working !== ""}
+              aria-label={`備份 ${world.folder}`}
               onClick={() => backup(world.folder)}
             >
               {working === world.folder ? "正在備份" : "備份"}
@@ -161,7 +163,11 @@ function WorldList({ instanceId }: { instanceId: string }) {
           </li>
         ))}
       </ul>
-      {message && <p className="hint">{message}</p>}
+      {message && (
+        <p className="hint" role="status">
+          {message}
+        </p>
+      )}
     </>
   );
 }
@@ -172,5 +178,5 @@ export const recentWorlds: Feature = {
   description: "在首頁顯示最近玩過的世界，按一下直接進入，並可以備份世界",
   optional: true,
   HeroPanel: RecentWorlds,
-  InstancePanel: WorldList,
+  instancePanel: { label: "世界", order: 2, Panel: WorldList },
 };

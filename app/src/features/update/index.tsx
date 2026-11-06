@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../shell/api";
+import { ErrorText } from "../../shell/ErrorText";
 import type { Feature } from "../../shell/feature";
 import type { UpdateInfo } from "../../shell/types";
 
@@ -55,7 +56,7 @@ function UpdateSettings() {
         </button>
       )}
       {state.kind === "latest" && <p>已經是最新版本。</p>}
-      {state.kind === "failed" && <p className="error">{state.message}</p>}
+      {state.kind === "failed" && <ErrorText message={state.message} />}
     </section>
   );
 }

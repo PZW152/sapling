@@ -1,4 +1,4 @@
-import type { Instance, LoaderKind, ModHit, ProjectKind, ProjectVersion } from "../../shell/types";
+import type { Instance, LoaderKind, ModHit, ProjectKind, ProjectVersion } from "../types";
 
 const BYTES_PER_MB = 1024 * 1024;
 const MAX_TAGS = 3;

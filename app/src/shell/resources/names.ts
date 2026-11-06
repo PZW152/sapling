@@ -1,4 +1,4 @@
-import type { ModHit } from "../../shell/types";
+import type { ModHit } from "../types";
 
 /** 熱門模組的中文名稱，按 Modrinth 的 slug 對應。這份清單由本專案自行整理。 */
 const CHINESE_NAMES: Record<string, string> = {

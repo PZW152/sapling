@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, onPackEvent } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
-import { ResourceBrowser } from "../mods/ResourceBrowser";
+import { ResourceBrowser } from "../../shell/resources/ResourceBrowser";
 
 function ModpackPage() {
   const { goTo, loadInstances, selectInstance } = useApp();

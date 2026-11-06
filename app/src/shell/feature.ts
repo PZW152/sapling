@@ -33,8 +33,15 @@ export type Feature = {
   Settings?: ComponentType;
   /** 放進設定頁「進階設定」的區塊，平時收起。 */
   AdvancedSettings?: ComponentType;
-  /** 放進實例頁的區塊。 */
-  InstancePanel?: ComponentType<{ instanceId: string }>;
+  /** 實例頁的一個分頁。 */
+  instancePanel?: {
+    label: string;
+    /** 數字小的排前面。 */
+    order: number;
+    Panel: ComponentType<{ instanceId: string }>;
+    /** 回傳 false 時這個實例不顯示這個分頁。 */
+    available?: (instance: Instance) => boolean;
+  };
   /** 放在啟動頁帳號區塊下面的內容。 */
   AccountPanel?: ComponentType<{ profile: Profile | null; disabled: boolean }>;
   /** 放在啟動頁主區塊、啟動按鈕上方的內容。 */

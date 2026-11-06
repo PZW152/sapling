@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { loaderName } from "../../shell/loaders";
 import { useChangeFade, useSlideMark } from "../../shell/motion";
@@ -23,6 +23,7 @@ export function LaunchPage() {
     selectInstance,
     goTo,
     loadVersions,
+    features: active,
     isEnabled,
   } = useApp();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -30,7 +31,6 @@ export function LaunchPage() {
   const [logOpen, setLogOpen] = useState(false);
   const hero = useRef<HTMLElement>(null);
 
-  const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
   const offlineName =
     active.map((feature) => feature.offlineName?.(config)).find((name) => name) ?? null;
   const progressView = active.map((feature) => feature.launchProgress?.(config)).find(Boolean);
@@ -228,7 +228,7 @@ function InstanceList({
       </div>
       {error && (
         <>
-          <p className="error">{error}</p>
+          <ErrorText message={error} />
           <button className="text-button" onClick={onRetry}>
             重試
           </button>
@@ -239,13 +239,14 @@ function InstanceList({
         <p className="hint">下載好的版本會出現在這裡。</p>
       )}
       <ul className="row-list" ref={list}>
-        <span className="slide-mark row-mark" />
+        <li className="slide-mark row-mark" aria-hidden="true" />
         {instances.map((instance) => (
           <li key={instance.id}>
             <button
               className="row"
               disabled={disabled}
               aria-current={instance.id === selected?.id ? "true" : undefined}
+              title={`${instance.name}，${instance.version}`}
               onClick={() => onChoose(instance.id)}
             >
               <span>{instance.name}</span>
@@ -301,7 +302,7 @@ function HeroStatus({
 }) {
   if (phase === "failed") {
     return (
-      <div className="hero-error">
+      <div className="hero-error" role="alert">
         <p>{error}</p>
         {hasLogs && (
           <button className="text-button" onClick={onShowLogs}>
@@ -315,7 +316,11 @@ function HeroStatus({
     return null;
   }
   if (phase === "running") {
-    return <p className="hero-note">遊戲已啟動，關閉遊戲後可以再次啟動。</p>;
+    return (
+      <p className="hero-note" role="status">
+        遊戲已啟動，關閉遊戲後可以再次啟動。
+      </p>
+    );
   }
   if (noInstance) {
     return <p className="hero-note">下載一個遊戲版本，再登入微軟帳號。</p>;

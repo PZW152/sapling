@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FEATURES } from "../features";
 import { AppProvider, useApp } from "./AppContext";
@@ -15,18 +15,14 @@ export function Shell() {
   const goTo = useCallback((featureId: string) => setActiveTab(featureId), []);
 
   return (
-    <AppProvider activeTab={activeTab} goTo={goTo}>
+    <AppProvider allFeatures={FEATURES} activeTab={activeTab} goTo={goTo}>
       <Frame />
     </AppProvider>
   );
 }
 
 function Frame() {
-  const { activeTab, isEnabled } = useApp();
-  const features = useMemo(
-    () => FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id)),
-    [isEnabled],
-  );
+  const { activeTab, features } = useApp();
   const tabs = features.filter((feature) => feature.tab);
   const index = Math.max(
     tabs.findIndex((feature) => feature.id === activeTab),
