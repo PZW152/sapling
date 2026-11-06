@@ -69,7 +69,7 @@ export function ModList({ instanceId }: { instanceId: string }) {
         {mods.length === 0 && (
           <li className="mods-empty">
             {vanilla
-              ? "原版不會載入模組。想用模組，請新增一個 Fabric 實例。"
+              ? "原版不會載入模組。想用模組，請新增一個使用載入器的實例。"
               : "按「下載模組」搜尋，或把 .jar 放進模組資料夾。"}
           </li>
         )}

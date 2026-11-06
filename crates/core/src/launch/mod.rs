@@ -134,6 +134,7 @@ pub async fn play(
         instance.loader,
         &instance.loader_version,
         prepared.details.clone(),
+        &prepared.java,
         dirs,
         concurrency,
     );
@@ -314,6 +315,8 @@ fn placeholder_values(
         ("launcher_name", LAUNCHER_NAME.to_string()),
         ("launcher_version", LAUNCHER_VERSION.to_string()),
         ("classpath", classpath(details, dirs)),
+        ("library_directory", path_text(&dirs.libraries())),
+        ("classpath_separator", CLASSPATH_SEPARATOR.to_string()),
     ])
 }
 

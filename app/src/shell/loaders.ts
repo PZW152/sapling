@@ -4,6 +4,8 @@ import type { LoaderKind } from "./types";
 export const LOADERS: { kind: LoaderKind; name: string }[] = [
   { kind: "vanilla", name: "原版" },
   { kind: "fabric", name: "Fabric" },
+  { kind: "neoForge", name: "NeoForge" },
+  { kind: "forge", name: "Forge" },
 ];
 
 export function loaderName(kind: LoaderKind) {

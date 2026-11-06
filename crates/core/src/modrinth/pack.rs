@@ -28,10 +28,12 @@ const SECURE_SCHEME: &str = "https://";
 /// 依序解開，後面的覆蓋前面的。
 const OVERRIDE_FOLDERS: [&str; 2] = ["overrides/", "client-overrides/"];
 /// 還不支援的載入器。規格說之後可能新增，其他未知項目一律忽略。
-const UNSUPPORTED_LOADERS: [(&str, &str); 3] = [
-    ("forge", "Forge"),
-    ("neoforge", "NeoForge"),
-    ("quilt-loader", "Quilt"),
+const UNSUPPORTED_LOADERS: [(&str, &str); 1] = [("quilt-loader", "Quilt")];
+/// 整合包裡的載入器名稱。
+const LOADERS: [(&str, LoaderKind); 3] = [
+    ("fabric-loader", LoaderKind::Fabric),
+    ("forge", LoaderKind::Forge),
+    ("neoforge", LoaderKind::NeoForge),
 ];
 
 #[derive(Debug, Deserialize)]
@@ -71,7 +73,15 @@ pub async fn search_packs(
     client: &reqwest::Client,
     query: &str,
 ) -> Result<Vec<ModHit>, ModrinthError> {
-    let facets = serde_json::json!([["project_type:modpack"], ["categories:fabric"]]).to_string();
+    let facets = serde_json::json!([
+        ["project_type:modpack"],
+        [
+            "categories:fabric",
+            "categories:forge",
+            "categories:neoforge"
+        ],
+    ])
+    .to_string();
     search_hits(client, query, &facets).await
 }
 
@@ -113,7 +123,7 @@ async fn latest_pack_version(
     client: &reqwest::Client,
     project_id: &str,
 ) -> Result<ModVersion, ModrinthError> {
-    let loaders = serde_json::json!(["fabric"]).to_string();
+    let loaders = serde_json::json!(["fabric", "forge", "neoforge"]).to_string();
     let url = Url::parse_with_params(
         &format!("{API_URL}/project/{project_id}/version"),
         [("loaders", loaders.as_str())],
@@ -209,10 +219,10 @@ fn pack_target(index: &PackIndex) -> Result<PackTarget, ModrinthError> {
         .get("minecraft")
         .ok_or(ModrinthError::BadPack)?
         .clone();
-    let (loader, loader_version) = match index.dependencies.get("fabric-loader") {
-        Some(version) => (LoaderKind::Fabric, version.clone()),
-        None => (LoaderKind::Vanilla, String::new()),
-    };
+    let (loader, loader_version) = LOADERS
+        .iter()
+        .find_map(|(id, kind)| Some((*kind, index.dependencies.get(*id)?.clone())))
+        .unwrap_or((LoaderKind::Vanilla, String::new()));
     Ok(PackTarget {
         game_version,
         loader,
@@ -361,12 +371,25 @@ mod tests {
 
     #[test]
     fn explains_when_the_loader_is_not_supported_yet() {
-        let result = pack_target(&index(r#"{ "minecraft": "1.20.1", "forge": "47.0" }"#));
+        let result = pack_target(&index(
+            r#"{ "minecraft": "1.20.1", "quilt-loader": "0.2" }"#,
+        ));
 
         assert!(matches!(
             result,
-            Err(ModrinthError::UnsupportedLoader { loader: "Forge" })
+            Err(ModrinthError::UnsupportedLoader { loader: "Quilt" })
         ));
+    }
+
+    #[test]
+    fn reads_forge_and_neoforge_packs() {
+        let forge = pack_target(&index(r#"{ "minecraft": "1.20.1", "forge": "47.4.0" }"#)).unwrap();
+        let neo =
+            pack_target(&index(r#"{ "minecraft": "26.3", "neoforge": "26.3.0.1" }"#)).unwrap();
+
+        assert_eq!(forge.loader, LoaderKind::Forge);
+        assert_eq!(forge.loader_version, "47.4.0");
+        assert_eq!(neo.loader, LoaderKind::NeoForge);
     }
 
     #[test]

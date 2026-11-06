@@ -4,7 +4,7 @@ export type Profile = { id: string; name: string; skinUrl: string | null };
 
 export type LoginCode = { userCode: string; verificationUri: string };
 
-export type LoaderKind = "vanilla" | "fabric";
+export type LoaderKind = "vanilla" | "fabric" | "forge" | "neoForge";
 
 export type Instance = {
   id: string;

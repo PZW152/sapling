@@ -26,6 +26,8 @@ pub struct ProfileLibrary {
     url: Option<String>,
     sha1: Option<String>,
     size: Option<u64>,
+    /// Forge 系列用和 Mojang 相同的寫法。沒有網址的檔案由安裝工具產生。
+    downloads: Option<LibraryDownloads>,
 }
 
 impl LoaderProfile {
@@ -57,7 +59,14 @@ impl LoaderProfile {
 }
 
 impl ProfileLibrary {
-    fn to_library(&self) -> Result<Library, LoaderError> {
+    pub fn to_library(&self) -> Result<Library, LoaderError> {
+        if let Some(downloads) = &self.downloads {
+            return Ok(Library {
+                name: self.name.clone(),
+                downloads: downloads.clone(),
+                rules: Vec::new(),
+            });
+        }
         let bad = || LoaderError::BadLibrary {
             name: self.name.clone(),
         };
@@ -80,9 +89,10 @@ impl ProfileLibrary {
     }
 }
 
-/// `group:artifact:version[:classifier]` 對應的相對路徑。
+/// `group:artifact:version[:classifier][@副檔名]` 對應的相對路徑。
 /// 這段文字來自網路，含有 `..` 或路徑符號的一律拒絕。
 pub fn maven_path(name: &str) -> Option<String> {
+    let (name, extension) = name.split_once('@').unwrap_or((name, "jar"));
     let parts: Vec<&str> = name.split(':').collect();
     let safe = parts
         .iter()
@@ -97,7 +107,7 @@ pub fn maven_path(name: &str) -> Option<String> {
     };
     let suffix = classifier.map_or(String::new(), |classifier| format!("-{classifier}"));
     Some(format!(
-        "{}/{artifact}/{version}/{artifact}-{version}{suffix}.jar",
+        "{}/{artifact}/{version}/{artifact}-{version}{suffix}.{extension}",
         group.replace('.', "/")
     ))
 }
@@ -207,6 +217,27 @@ mod tests {
             maven_path("org.lwjgl:lwjgl:3.3.3:natives-windows").unwrap(),
             "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar"
         );
+    }
+
+    #[test]
+    fn extension_can_be_something_other_than_jar() {
+        assert_eq!(
+            maven_path("de.oceanlabs.mcp:mcp_config:1.20.1:mappings@txt").unwrap(),
+            "de/oceanlabs/mcp/mcp_config/1.20.1/mcp_config-1.20.1-mappings.txt"
+        );
+    }
+
+    #[test]
+    fn forge_style_libraries_keep_their_own_download_details() {
+        let profile = profile(
+            r#"[{ "name": "net.minecraftforge:forge:26.3-66.1.5:client",
+                  "downloads": { "artifact": { "path": "p.jar", "sha1": "s", "size": 0, "url": "" } } }]"#,
+        );
+
+        let libraries = profile.libraries().unwrap();
+
+        assert_eq!(libraries[0].downloads.artifact.url, "");
+        assert_eq!(libraries[0].downloads.artifact.path, "p.jar");
     }
 
     #[test]

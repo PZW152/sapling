@@ -30,7 +30,7 @@ pub enum ModrinthError {
     BadUrl,
     #[error("{project} 沒有適合這個遊戲版本和載入器的檔案")]
     NoCompatibleVersion { project: String },
-    #[error("原版不能安裝模組，請新增一個 Fabric 實例")]
+    #[error("原版不能安裝模組，請新增一個使用載入器的實例")]
     NoLoader,
     #[error("這個整合包的內容看不懂，可能已損壞")]
     BadPack,
@@ -105,6 +105,8 @@ fn loader_name(loader: LoaderKind) -> Result<&'static str, ModrinthError> {
     match loader {
         LoaderKind::Vanilla => Err(ModrinthError::NoLoader),
         LoaderKind::Fabric => Ok("fabric"),
+        LoaderKind::Forge => Ok("forge"),
+        LoaderKind::NeoForge => Ok("neoforge"),
     }
 }
 
