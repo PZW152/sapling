@@ -2,7 +2,7 @@
 
 版本號規則見 [VERSIONING.md](VERSIONING.md)。
 
-## 未發佈
+## 0.5.0
 
 ### 介面
 

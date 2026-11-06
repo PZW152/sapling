@@ -1,6 +1,6 @@
 [package]
 name = "sapling-core"
-version = "0.4.0"
+version = "0.5.0"
 description = "Sapling launcher core logic (no UI code)"
 authors = ["PZW152"]
 edition = "2024"
