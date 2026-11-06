@@ -37,6 +37,8 @@ export type World = {
   icon: number[] | null;
 };
 
+export type CleanupSummary = { bytes: number; items: number };
+
 export type ImportSource = {
   label: string;
   path: string;

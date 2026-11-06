@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  CleanupSummary,
   ImportSource,
   Instance,
   LaunchEvent,
@@ -34,6 +35,8 @@ export const api = {
   openInstanceFolder: (id: string) => invoke<void>("open_instance_folder", { id }),
 
   recentWorlds: (id: string) => invoke<World[]>("recent_worlds", { id }),
+  cleanupPreview: () => invoke<CleanupSummary>("cleanup_preview"),
+  cleanupRun: () => invoke<number>("cleanup_run"),
   listImportSources: () => invoke<ImportSource[]>("list_import_sources"),
   importWorld: (id: string, source: string, folder: string) =>
     invoke<string>("import_world", { id, source, folder }),

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use sapling_core::auth::{self, DeviceLogin, Profile, Session, accounts};
+use sapling_core::cleanup::{self, CleanupSummary};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
@@ -361,6 +362,16 @@ async fn switch_account(state: State<'_, AppState>, id: String) -> Result<Option
 }
 
 #[tauri::command]
+async fn cleanup_preview() -> Result<CleanupSummary, String> {
+    cleanup::preview(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn cleanup_run() -> Result<u64, String> {
+    cleanup::run(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
 async fn list_import_sources() -> Result<Vec<ImportSource>, String> {
     Ok(import::find_sources(&data_dirs()?).await)
 }
@@ -565,6 +576,8 @@ pub fn run() {
             sign_out,
             list_accounts,
             switch_account,
+            cleanup_preview,
+            cleanup_run,
             list_import_sources,
             import_world,
             has_saved_account,

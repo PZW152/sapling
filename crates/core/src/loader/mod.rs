@@ -15,6 +15,7 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::download::{DownloadError, download_all, new_client};
+use crate::instance::Instance;
 use crate::platform::DataDirs;
 use crate::storage::{StorageError, read_json, write_json};
 use crate::versions::details::VersionDetails;
@@ -57,6 +58,42 @@ pub enum LoaderKind {
     Fabric,
     Forge,
     NeoForge,
+}
+
+/// 載入器在 `versions` 裡的資料夾名稱。原版沒有。
+pub fn folder_id(kind: LoaderKind, loader_version: &str, game_version: &str) -> Option<String> {
+    match kind {
+        LoaderKind::Vanilla => None,
+        LoaderKind::Fabric => Some(fabric::profile_id(loader_version, game_version)),
+        LoaderKind::Forge => Some(forge::forge_request(loader_version, game_version).id),
+        LoaderKind::NeoForge => Some(forge::neoforge_request(loader_version, game_version).id),
+    }
+}
+
+/// 這個實例的載入器用到的函式庫路徑。
+/// 回傳 `None` 代表無法列全：Forge 系列有安裝時才產生、清單裡沒有的檔案。
+pub async fn known_libraries(instance: &Instance, dirs: &DataDirs) -> Option<Vec<PathBuf>> {
+    match instance.loader {
+        LoaderKind::Vanilla => Some(Vec::new()),
+        LoaderKind::Forge | LoaderKind::NeoForge => None,
+        LoaderKind::Fabric => {
+            let id = fabric::profile_id(&instance.loader_version, &instance.version);
+            let path = dirs.versions().join(&id).join(format!("{id}.json"));
+            let raw: Option<Value> = read_json(&path).await.ok()?;
+            let Some(raw) = raw else {
+                return Some(Vec::new());
+            };
+            let profile: LoaderProfile = serde_json::from_value(raw).ok()?;
+            let libraries = profile.libraries().ok()?;
+            Some(
+                libraries
+                    .iter()
+                    .filter_map(|library| library.downloads.artifact.as_ref())
+                    .map(|artifact| PathBuf::from(&artifact.path))
+                    .collect(),
+            )
+        }
+    }
 }
 
 /// 這個遊戲版本可以用的最新穩定載入器版本。原版沒有載入器版本。

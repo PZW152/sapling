@@ -11,6 +11,7 @@ import { mods } from "./mods";
 import { offlineAccount } from "./offline-account";
 import { recentWorlds } from "./recent-worlds";
 import { settings } from "./settings";
+import { storageCleanup } from "./storage-cleanup";
 import { update } from "./update";
 
 /** 所有內建功能模塊。分頁和設定區塊按這裡的順序排列。 */
@@ -25,6 +26,7 @@ export const FEATURES: Feature[] = [
   modpacks,
   crash,
   update,
+  storageCleanup,
   settings,
   about,
   arborDay,

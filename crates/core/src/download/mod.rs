@@ -2,9 +2,11 @@
 
 mod segmented;
 
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -156,11 +158,26 @@ pub async fn download_all(
     }
 }
 
+/// 正在處理的檔案。兩批下載共用同一個檔案時要排隊，否則會同時寫同一個暫存檔。
+static FILE_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>> =
+    LazyLock::new(Mutex::default);
+
+fn file_lock(path: &Path) -> Arc<tokio::sync::Mutex<()>> {
+    FILE_LOCKS
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .entry(path.to_path_buf())
+        .or_default()
+        .clone()
+}
+
 /// 確保 `task.path` 是一個 SHA1 正確的檔案。
 pub async fn download_file(
     client: &reqwest::Client,
     task: &DownloadTask,
 ) -> Result<DownloadOutcome, DownloadError> {
+    let lock = file_lock(&task.path);
+    let _turn = lock.lock().await;
     if has_expected_sha1(&task.path, &task.sha1).await? {
         return Ok(DownloadOutcome::AlreadyValid);
     }
@@ -364,6 +381,22 @@ mod tests {
                 total_bytes: 25,
             })
         );
+    }
+
+    #[tokio::test]
+    async fn two_downloads_of_one_file_take_turns() {
+        let dir = empty_test_dir("same-file");
+        let (url, requests) = serve(vec![("200 OK", "hello"); 2]).await;
+        let task = task(&url, &dir);
+        let client = new_client().unwrap();
+
+        let (first, second) =
+            tokio::join!(download_file(&client, &task), download_file(&client, &task));
+
+        let outcomes = [first.unwrap(), second.unwrap()];
+        assert!(outcomes.contains(&DownloadOutcome::Downloaded));
+        assert!(outcomes.contains(&DownloadOutcome::AlreadyValid));
+        assert_eq!(requests.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
