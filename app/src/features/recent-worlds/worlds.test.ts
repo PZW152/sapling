@@ -8,9 +8,10 @@ describe("canEnterWorld", () => {
     expect(canEnterWorld("26.3")).toBe(true);
   });
 
-  it("1.19 系列不行", () => {
+  it("更舊的版本不行", () => {
     expect(canEnterWorld("1.19")).toBe(false);
     expect(canEnterWorld("1.19.4")).toBe(false);
+    expect(canEnterWorld("1.8.9")).toBe(false);
   });
 });
 

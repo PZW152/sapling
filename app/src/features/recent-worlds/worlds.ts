@@ -3,9 +3,13 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const MONTH_MS = 30 * DAY_MS;
 
-/** 直接進入世界從 1.20 開始才有，啟動器支援的版本裡只有 1.19 不行。 */
+/** 第一個支援直接進入世界的 `1.x` 版本。 */
+const FIRST_QUICK_PLAY_MINOR = 20;
+
+/** 直接進入世界從 1.20 開始才有。 */
 export function canEnterWorld(version: string) {
-  return version !== "1.19" && !version.startsWith("1.19.");
+  const minor = /^1\.(\d+)/.exec(version)?.[1];
+  return minor === undefined || Number(minor) >= FIRST_QUICK_PLAY_MINOR;
 }
 
 /** 用口語說多久以前玩過。 */

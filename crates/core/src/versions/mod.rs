@@ -16,7 +16,7 @@ const MANIFEST_URL: &str = "https://piston-meta.mojang.com/mc/game/version_manif
 ///
 /// Mojang 在 2026 年改用 `26.1` 這類版本號，所以不比較版本號數字，
 /// 而是靠清單順序（最新的排最前）判斷新舊。
-const OLDEST_SUPPORTED_RELEASE: &str = "1.19";
+const OLDEST_SUPPORTED_RELEASE: &str = "1.7.10";
 
 #[derive(Debug, Error)]
 pub enum VersionsError {
@@ -104,14 +104,14 @@ mod tests {
             { "id": "26.4-snapshot-7", "type": "snapshot", "url": "u", "sha1": "s", "complianceLevel": 1 },
             { "id": "26.3", "type": "release", "url": "u", "sha1": "s", "complianceLevel": 1 },
             { "id": "1.21.11", "type": "release", "url": "u", "sha1": "s", "complianceLevel": 1 },
-            { "id": "1.19", "type": "release", "url": "u", "sha1": "s", "complianceLevel": 1 },
+            { "id": "1.7.10", "type": "release", "url": "u", "sha1": "s", "complianceLevel": 1 },
             { "id": "1.18.2", "type": "release", "url": "u", "sha1": "s", "complianceLevel": 1 },
             { "id": "b1.7.3", "type": "old_beta", "url": "u", "sha1": "s", "complianceLevel": 0 }
         ]
     }"#;
 
     #[test]
-    fn keeps_only_releases_from_newest_down_to_1_19() {
+    fn keeps_only_releases_down_to_the_oldest_supported() {
         let manifest = VersionManifest::parse(SAMPLE).unwrap();
         let ids: Vec<&str> = manifest
             .supported_releases()
@@ -119,7 +119,7 @@ mod tests {
             .iter()
             .map(|entry| entry.id.as_str())
             .collect();
-        assert_eq!(ids, ["26.3", "1.21.11", "1.19"]);
+        assert_eq!(ids, ["26.3", "1.21.11", "1.7.10"]);
     }
 
     #[test]

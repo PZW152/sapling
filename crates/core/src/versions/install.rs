@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::details::VersionDetails;
+use super::details::{LoggingFile, VersionDetails};
 use super::{VersionEntry, VersionsError, fetch_manifest};
 use crate::download::{
     DownloadError, DownloadProgress, DownloadTask, download_all, download_file, new_client,
@@ -158,6 +158,27 @@ fn recheck_marker(dirs: &DataDirs, id: &str) -> PathBuf {
     dirs.versions().join(id).join(".recheck")
 }
 
+/// 有 Log4Shell 漏洞的版本才需要 Mojang 的修補設定。
+fn log_config(details: &VersionDetails) -> Option<&LoggingFile> {
+    if !details.needs_log4j_fix() {
+        return None;
+    }
+    let client = details.logging.as_ref()?.client.as_ref()?;
+    Some(&client.file)
+}
+
+/// 啟動這個版本要加上的修補參數。
+pub fn log_config_argument(details: &VersionDetails, dirs: &DataDirs) -> Option<String> {
+    let file = log_config(details)?;
+    let client = details.logging.as_ref()?.client.as_ref()?;
+    let path = log_config_path(dirs, &file.id);
+    Some(client.argument.replace("${path}", &path.to_string_lossy()))
+}
+
+fn log_config_path(dirs: &DataDirs, id: &str) -> PathBuf {
+    dirs.assets().join("log_configs").join(id)
+}
+
 fn details_path(dirs: &DataDirs, id: &str) -> PathBuf {
     dirs.versions().join(id).join(format!("{id}.json"))
 }
@@ -233,15 +254,25 @@ fn game_file_tasks(
     let library_tasks = details
         .libraries_for_this_machine()
         .into_iter()
-        .map(|library| {
-            let artifact = &library.downloads.artifact;
-            DownloadTask {
-                url: artifact.url.clone(),
-                path: libraries_dir.join(&artifact.path),
-                sha1: artifact.sha1.clone(),
-                size: artifact.size,
-            }
+        .flat_map(|library| {
+            library
+                .downloads
+                .artifact
+                .iter()
+                .chain(library.native_artifact())
+        })
+        .map(|artifact| DownloadTask {
+            url: artifact.url.clone(),
+            path: libraries_dir.join(&artifact.path),
+            sha1: artifact.sha1.clone(),
+            size: artifact.size,
         });
+    let log_config_task = log_config(details).map(|file| DownloadTask {
+        url: file.url.clone(),
+        path: log_config_path(dirs, &file.id),
+        sha1: file.sha1.clone(),
+        size: file.size,
+    });
 
     let objects_dir = dirs.assets().join("objects");
     let asset_tasks = asset_index.objects.values().map(|object| {
@@ -257,6 +288,7 @@ fn game_file_tasks(
     let mut seen_paths = HashSet::new();
     std::iter::once(client_task)
         .chain(library_tasks)
+        .chain(log_config_task)
         .chain(asset_tasks)
         .filter(|task| seen_paths.insert(task.path.clone()))
         .collect()

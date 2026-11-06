@@ -1,6 +1,7 @@
 //! 啟動遊戲：組裝命令行、啟動進程、轉發問題記錄。
 
 pub mod crash;
+mod natives;
 
 use std::collections::HashMap;
 use std::io;
@@ -20,7 +21,8 @@ use crate::loader::{self, LoaderError};
 use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{
-    InstallError, PrepareStage, PreparedVersion, prepare_version, request_full_check,
+    InstallError, PrepareStage, PreparedVersion, log_config_argument, prepare_version,
+    request_full_check,
 };
 
 const LAUNCHER_NAME: &str = "Sapling Launcher";
@@ -29,6 +31,9 @@ const CLASSPATH_SEPARATOR: &str = ";";
 /// 遊戲需要這兩個值，但 Sapling 不使用遙測，也不需要真實的 Xbox ID。
 const UNUSED_ID: &str = "0";
 const HIDDEN_TOKEN: &str = "***";
+const LATEST_LOG: &str = "logs/latest.log";
+/// 舊版遊戲要求這個參數，內容可以是空的。
+const EMPTY_PROPERTIES: &str = "{}";
 const LOG_CHANNEL_SIZE: usize = 256;
 /// 版本 JSON 用這個功能開關標記支援直接進入世界，1.20 起才有。
 const QUICK_PLAY_FEATURE: &str = "is_quick_play_singleplayer";
@@ -98,6 +103,35 @@ impl LaunchCancel {
     }
 }
 
+/// 舊版遊戲會把 token 寫進日誌，玩家常把這個檔案貼到網上求助，所以遊戲結束後抹掉。
+/// 日誌可能不是 UTF-8，要用位元組處理。清理失敗不影響遊戲本身。
+async fn scrub_token(log: &Path, token: &str) {
+    if let Ok(content) = tokio::fs::read(log).await
+        && let Some(cleaned) = without_token(&content, token.as_bytes())
+    {
+        let _ = tokio::fs::write(log, cleaned).await;
+    }
+}
+
+/// 把內容裡的 token 換掉。沒有出現時回傳 `None`。
+fn without_token(content: &[u8], token: &[u8]) -> Option<Vec<u8>> {
+    if token.is_empty() || !content.windows(token.len()).any(|part| part == token) {
+        return None;
+    }
+    let mut cleaned = Vec::with_capacity(content.len());
+    let mut rest = content;
+    while !rest.is_empty() {
+        if rest.starts_with(token) {
+            cleaned.extend_from_slice(HIDDEN_TOKEN.as_bytes());
+            rest = &rest[token.len()..];
+        } else {
+            cleaned.push(rest[0]);
+            rest = &rest[1..];
+        }
+    }
+    Some(cleaned)
+}
+
 /// 這次啟動的選項。
 pub struct PlayOptions<'a> {
     pub concurrency: usize,
@@ -158,6 +192,13 @@ pub async fn play(
             })?;
     }
 
+    natives::extract_all(&prepared.details, dirs, &natives_dir)
+        .await
+        .map_err(|source| LaunchError::GameDir {
+            path: natives_dir.clone(),
+            source,
+        })?;
+
     let mut arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
     arguments.extend(world_arguments(&prepared.details, world));
     let mut child = Command::new(&prepared.java)
@@ -192,6 +233,9 @@ pub async fn play(
     }
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
+    if !session.is_offline() {
+        scrub_token(&game_dir.join(LATEST_LOG), session.access_token()).await;
+    }
     if status.success() {
         return Ok(());
     }
@@ -257,6 +301,7 @@ fn build_arguments(
     let mut arguments = vec![format!("-Xmx{memory_mb}M")];
     arguments.extend(OUTPUT_ENCODING_ARGUMENTS.map(str::to_string));
     arguments.extend(instance.java_args.split_whitespace().map(str::to_string));
+    arguments.extend(log_config_argument(details, dirs));
     arguments.extend(expand(&details.arguments.jvm, &values));
     arguments.push(details.main_class.clone());
     arguments.extend(expand(&details.arguments.game, &values));
@@ -316,6 +361,8 @@ fn placeholder_values(
         ("launcher_version", LAUNCHER_VERSION.to_string()),
         ("classpath", classpath(details, dirs)),
         ("library_directory", path_text(&dirs.libraries())),
+        ("user_properties", EMPTY_PROPERTIES.to_string()),
+        ("auth_session", session.access_token().to_string()),
         ("classpath_separator", CLASSPATH_SEPARATOR.to_string()),
     ])
 }
@@ -329,7 +376,8 @@ fn classpath(details: &VersionDetails, dirs: &DataDirs) -> String {
     details
         .libraries_for_this_machine()
         .into_iter()
-        .map(|library| libraries_dir.join(&library.downloads.artifact.path))
+        .filter_map(|library| library.downloads.artifact.as_ref())
+        .map(|artifact| libraries_dir.join(&artifact.path))
         .chain(std::iter::once(client_jar))
         .map(|path| path_text(&path))
         .collect::<Vec<_>>()
@@ -461,6 +509,21 @@ mod tests {
             "\tat net.minecraft.client.Main.main(Main.java:1)"
         ));
         assert!(!is_problem_line("[12:00:00] [Render thread/INFO]: Loaded"));
+    }
+
+    #[test]
+    fn removes_the_token_from_a_log_file_even_when_it_is_not_utf8() {
+        let log = b"\xB4\xFA Session ID is token:secret:uuid\nsecret again\n";
+
+        let cleaned = without_token(log, b"secret").unwrap();
+
+        let expected = b"\xB4\xFA Session ID is token:***:uuid\n*** again\n";
+        assert_eq!(cleaned, expected);
+    }
+
+    #[test]
+    fn leaves_a_clean_log_alone() {
+        assert_eq!(without_token(b"nothing here", b"secret"), None);
     }
 
     #[test]

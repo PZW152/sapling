@@ -1,6 +1,6 @@
 //! 載入器設定檔：和 Mojang 版本 JSON 同樣的格式，只列出要補充的內容。
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde::Deserialize;
 
@@ -65,6 +65,8 @@ impl ProfileLibrary {
                 name: self.name.clone(),
                 downloads: downloads.clone(),
                 rules: Vec::new(),
+                natives: HashMap::new(),
+                extract: None,
             });
         }
         let bad = || LoaderError::BadLibrary {
@@ -76,15 +78,18 @@ impl ProfileLibrary {
         Ok(Library {
             name: self.name.clone(),
             downloads: LibraryDownloads {
-                artifact: LibraryArtifact {
+                artifact: Some(LibraryArtifact {
                     url: format!("{}/{path}", base.trim_end_matches('/')),
                     path,
                     sha1,
                     // 來源不一定提供大小，它只用於進度，校驗靠 SHA1。
                     size: self.size.unwrap_or(0),
-                },
+                }),
+                classifiers: HashMap::new(),
             },
             rules: Vec::new(),
+            natives: HashMap::new(),
+            extract: None,
         })
     }
 }
@@ -164,7 +169,7 @@ mod tests {
     #[test]
     fn builds_the_download_address_from_the_maven_name() {
         let libraries = profile(FABRIC_LIBRARIES).libraries().unwrap();
-        let artifact = &libraries[1].downloads.artifact;
+        let artifact = libraries[1].downloads.artifact.as_ref().unwrap();
 
         assert_eq!(
             artifact.path,
@@ -236,8 +241,9 @@ mod tests {
 
         let libraries = profile.libraries().unwrap();
 
-        assert_eq!(libraries[0].downloads.artifact.url, "");
-        assert_eq!(libraries[0].downloads.artifact.path, "p.jar");
+        let artifact = libraries[0].downloads.artifact.as_ref().unwrap();
+        assert_eq!(artifact.url, "");
+        assert_eq!(artifact.path, "p.jar");
     }
 
     #[test]

@@ -144,7 +144,7 @@ pub fn library_tasks(libraries: &[Library], dirs: &DataDirs) -> Vec<DownloadTask
     let mut seen = HashSet::new();
     libraries
         .iter()
-        .map(|library| &library.downloads.artifact)
+        .filter_map(|library| library.downloads.artifact.as_ref())
         .filter(|artifact| !artifact.url.is_empty() && seen.insert(artifact.path.clone()))
         .map(|artifact| DownloadTask {
             url: artifact.url.clone(),

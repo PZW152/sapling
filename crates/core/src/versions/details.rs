@@ -1,10 +1,24 @@
 //! 單個版本的版本 JSON：遊戲本體、依賴庫、資源索引、Java 需求、啟動參數。
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 use super::VersionsError;
+use crate::platform::MOJANG_OS_NAME;
+
 use super::rules::{Rule, rules_allow};
 use crate::platform::OTHER_ARCH_NATIVE_SUFFIXES;
+
+/// 舊格式沒有 JVM 參數，這些是新格式裡的基本項目。
+const LEGACY_JVM_ARGUMENTS: [&str; 3] = [
+    "-Djava.library.path=${natives_directory}",
+    "-cp",
+    "${classpath}",
+];
+const LOG4J_CORE: &str = "org.apache.logging.log4j:log4j-core:";
+/// 2.15 起修補了 Log4Shell。
+const FIRST_SAFE_LOG4J: (u32, u32) = (2, 15);
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +34,31 @@ pub struct VersionDetails {
     /// 例如 `release`，啟動時傳給遊戲。
     #[serde(default, rename = "type")]
     pub release_type: String,
+    /// 1.13 以前的版本用一整串文字寫遊戲參數。
+    #[serde(default, rename = "minecraftArguments")]
+    legacy_arguments: Option<String>,
+    #[serde(default)]
+    pub logging: Option<Logging>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Logging {
+    pub client: Option<ClientLogging>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClientLogging {
+    /// 含有 `${path}` 的 JVM 參數。
+    pub argument: String,
+    pub file: LoggingFile,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoggingFile {
+    pub id: String,
+    pub sha1: String,
+    pub size: u64,
+    pub url: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -107,11 +146,24 @@ pub struct Library {
     pub downloads: LibraryDownloads,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// 各系統的原生庫分類，例如 `windows` 對應 `natives-windows`。
+    #[serde(default)]
+    pub natives: HashMap<String, String>,
+    pub extract: Option<ExtractRules>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExtractRules {
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LibraryDownloads {
-    pub artifact: LibraryArtifact,
+    /// 舊版的純原生庫沒有這一項，只有 `classifiers`。
+    pub artifact: Option<LibraryArtifact>,
+    #[serde(default)]
+    pub classifiers: HashMap<String, LibraryArtifact>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -124,6 +176,12 @@ pub struct LibraryArtifact {
 }
 
 impl Library {
+    /// 這台電腦要解開的原生庫。
+    pub fn native_artifact(&self) -> Option<&LibraryArtifact> {
+        let classifier = self.natives.get(MOJANG_OS_NAME)?.replace("${arch}", "64");
+        self.downloads.classifiers.get(&classifier)
+    }
+
     fn is_needed_on_this_machine(&self) -> bool {
         let for_other_arch = OTHER_ARCH_NATIVE_SUFFIXES
             .iter()
@@ -134,7 +192,34 @@ impl Library {
 
 impl VersionDetails {
     pub fn parse(json: &str) -> Result<Self, VersionsError> {
-        Ok(serde_json::from_str(json)?)
+        let mut details: Self = serde_json::from_str(json)?;
+        details.convert_legacy_arguments();
+        Ok(details)
+    }
+
+    /// 把舊格式轉成新格式，啟動流程就不用分兩種寫法。
+    fn convert_legacy_arguments(&mut self) {
+        let Some(text) = self.legacy_arguments.take() else {
+            return;
+        };
+        self.arguments.game = text
+            .split_whitespace()
+            .map(|argument| Argument::Plain(argument.to_string()))
+            .collect();
+        self.arguments.jvm = LEGACY_JVM_ARGUMENTS
+            .map(|argument| Argument::Plain(argument.to_string()))
+            .to_vec();
+    }
+
+    /// 這個版本的 log4j 有 Log4Shell 漏洞，必須套用 Mojang 提供的修補設定。
+    /// 看函式庫實際的版本，不用遊戲版本號判斷。
+    pub fn needs_log4j_fix(&self) -> bool {
+        self.libraries.iter().any(|library| {
+            library
+                .name
+                .strip_prefix(LOG4J_CORE)
+                .is_some_and(is_vulnerable_log4j)
+        })
     }
 
     /// 本機（Windows x64）實際需要的依賴庫。
@@ -144,6 +229,15 @@ impl VersionDetails {
             .filter(|library| library.is_needed_on_this_machine())
             .collect()
     }
+}
+
+fn is_vulnerable_log4j(version: &str) -> bool {
+    let mut parts = version
+        .split('.')
+        .filter_map(|part| part.parse::<u32>().ok());
+    let major = parts.next().unwrap_or(0);
+    let minor = parts.next().unwrap_or(0);
+    (major, minor) < FIRST_SAFE_LOG4J
 }
 
 #[cfg(test)]
@@ -209,6 +303,44 @@ mod tests {
             .flat_map(Argument::values_for_this_machine)
             .collect();
         assert_eq!(values, ["--username", "-A", "-B"]);
+    }
+
+    #[test]
+    fn treats_only_old_log4j_as_vulnerable() {
+        assert!(is_vulnerable_log4j("2.8.1"));
+        assert!(is_vulnerable_log4j("2.0-beta9"));
+        assert!(!is_vulnerable_log4j("2.17.0"));
+        assert!(!is_vulnerable_log4j("2.24.1"));
+    }
+
+    #[test]
+    fn converts_the_old_argument_format() {
+        let details = VersionDetails::parse(
+            r#"{
+                "id": "1.8.9", "mainClass": "m",
+                "minecraftArguments": "--username ${auth_player_name} --version ${version_name}",
+                "assetIndex": { "id": "1.8", "sha1": "a", "size": 2, "totalSize": 3, "url": "u" },
+                "downloads": { "client": { "sha1": "c", "size": 4, "url": "u" } },
+                "javaVersion": { "component": "jre-legacy", "majorVersion": 8 },
+                "libraries": [{
+                    "name": "org.lwjgl.lwjgl:lwjgl-platform:2.9.4",
+                    "natives": { "linux": "natives-linux", "windows": "natives-windows-${arch}" },
+                    "extract": { "exclude": ["META-INF/"] },
+                    "downloads": { "classifiers": {
+                        "natives-windows-64": { "path": "n.jar", "sha1": "n", "size": 1, "url": "u" }
+                    } }
+                }]
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(details.arguments.game.len(), 4);
+        assert_eq!(details.arguments.jvm.len(), 3);
+        assert_eq!(
+            details.libraries[0].native_artifact().unwrap().path,
+            "n.jar"
+        );
+        assert!(details.libraries[0].downloads.artifact.is_none());
     }
 
     #[test]
