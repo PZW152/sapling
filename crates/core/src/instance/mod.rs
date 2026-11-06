@@ -236,7 +236,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_corrupted_instance_does_not_hide_the_others() {
-        let dirs = temp_dirs("corrupted");
+        let dirs = temp_dirs("corrupted-instance");
         let good = Instance::create(&dirs, "生存", "26.3").await.unwrap();
         let bad = Instance::create(&dirs, "創造", "26.3").await.unwrap();
         std::fs::write(bad.game_dir(&dirs).join("instance.json"), "{ not json").unwrap();
