@@ -1,5 +1,7 @@
 //! 統一下載器：已存在且 SHA1 正確就跳過，否則下載、校驗，失敗則重試。
 
+mod segmented;
+
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -15,7 +17,8 @@ use tokio::task::{JoinError, JoinSet};
 /// 同時下載的檔案數量上限的預設值。
 pub const DEFAULT_CONCURRENCY: usize = 16;
 
-const MAX_ATTEMPTS: u32 = 3;
+/// 網路不穩時一個檔案失敗就會中斷整批下載，所以多試幾次。
+const MAX_ATTEMPTS: u32 = 5;
 /// Modrinth 要求每個程式帶上可以識別的名稱。
 const USER_AGENT: &str = concat!(
     "sapling-launcher/",
@@ -23,8 +26,8 @@ const USER_AGENT: &str = concat!(
     " (github.com/PZW152/sapling)"
 );
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-/// 連線後超過這個時間收不到新資料就算失敗。不設總時限，大檔案在慢網絡下也能下完。
-const READ_TIMEOUT: Duration = Duration::from_secs(30);
+/// 連線後超過這個時間收不到新資料就換一條連線。不設總時限，大檔案在慢網絡下也能下完。
+const READ_TIMEOUT: Duration = Duration::from_secs(15);
 const RETRY_DELAY: Duration = if cfg!(test) {
     Duration::from_millis(1)
 } else {
@@ -36,6 +39,8 @@ const HASH_BUFFER_SIZE: usize = 64 * 1024;
 pub enum DownloadError {
     #[error("無法準備下載功能")]
     ClientSetup(#[source] reqwest::Error),
+    #[error("下載中斷，請檢查網絡連線後再試一次：{url}")]
+    Incomplete { url: String },
     #[error("下載失敗，請檢查網絡連線後再試一次：{url}")]
     Network {
         url: String,
@@ -202,6 +207,18 @@ async fn download_to_part_file(
     task: &DownloadTask,
     part_path: &Path,
 ) -> Result<(), DownloadError> {
+    if task.size >= segmented::MIN_SIZE
+        && segmented::download(client, task, part_path).await? == segmented::Outcome::Finished
+    {
+        return if has_expected_sha1(part_path, &task.sha1).await? {
+            Ok(())
+        } else {
+            Err(DownloadError::ChecksumMismatch {
+                url: task.url.clone(),
+            })
+        };
+    }
+
     let network_error = |source| DownloadError::Network {
         url: task.url.clone(),
         source,
@@ -352,7 +369,7 @@ mod tests {
     #[tokio::test]
     async fn batch_stops_with_the_error_of_a_failed_file() {
         let dir = empty_test_dir("batch-fail");
-        let (url, _) = serve(vec![("200 OK", "wrong"); 3]).await;
+        let (url, _) = serve(vec![("200 OK", "wrong"); MAX_ATTEMPTS as usize]).await;
 
         let result = download_all(
             &new_client().unwrap(),
@@ -433,14 +450,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gives_up_after_three_bad_downloads_and_leaves_no_file() {
+    async fn gives_up_after_repeated_bad_downloads_and_leaves_no_file() {
         let dir = empty_test_dir("give-up");
-        let (url, requests) = serve(vec![
-            ("200 OK", "wrong"),
-            ("200 OK", "wrong"),
-            ("200 OK", "wrong"),
-        ])
-        .await;
+        let (url, requests) = serve(vec![("200 OK", "wrong"); MAX_ATTEMPTS as usize]).await;
         let task = task(&url, &dir);
 
         let result = download_file(&new_client().unwrap(), &task).await;
@@ -449,7 +461,7 @@ mod tests {
             result,
             Err(DownloadError::ChecksumMismatch { .. })
         ));
-        assert_eq!(requests.load(Ordering::SeqCst), 3);
+        assert_eq!(requests.load(Ordering::SeqCst), MAX_ATTEMPTS as usize);
         assert!(!task.path.exists());
         assert!(!part_path(&task.path).exists());
     }
