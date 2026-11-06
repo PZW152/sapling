@@ -70,7 +70,7 @@ pub struct PreparedVersion {
 
 /// 準備好某個版本需要的一切：遊戲檔案和對應的 Java。
 ///
-/// 已安裝的版本只確認檔案還在，不用網絡也不計算 SHA1；有問題才走完整校驗。
+/// 已安裝的版本只確認檔案還在，不用網路也不計算 SHA1；有問題才走完整校驗。
 pub async fn prepare_version(
     id: &str,
     dirs: &DataDirs,

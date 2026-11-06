@@ -76,7 +76,6 @@ pub enum PlatformError {
     NoDataFolder,
 }
 
-/// 資料資料夾下各資料夾的位置。
 /// 官方啟動器的遊戲資料夾。
 pub fn official_game_dir() -> Option<PathBuf> {
     Some(dirs::config_dir()?.join(".minecraft"))
@@ -87,6 +86,7 @@ pub fn legacy_data_dir() -> Option<PathBuf> {
     Some(dirs::config_dir()?.join("Sapling"))
 }
 
+/// 資料資料夾下各資料夾的位置。
 #[derive(Debug, Clone)]
 pub struct DataDirs {
     root: PathBuf,

@@ -63,12 +63,6 @@
   background: var(--color-hero);
 }
 
-@keyframes pop {
-  from {
-    transform: scale(0.3);
-  }
-}
-
 .vine-row.active .vine-leaf {
   background: var(--color-accent);
   animation: breathe 1.2s ease-in-out infinite;

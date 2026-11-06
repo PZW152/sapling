@@ -36,6 +36,7 @@ export function AccountPanel({
 
   async function signIn() {
     setError("");
+    setChoosing(false);
     setStarting(true);
     try {
       const loginCode = await api.loginStart();

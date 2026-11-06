@@ -75,7 +75,7 @@ impl Instance {
     ) -> Result<Self, InstanceError> {
         let name = clean_name(name)?;
         let instance = Self {
-            id: next_id(&Self::list(dirs).await?),
+            id: next_id(dirs).await?,
             name,
             version: version.to_string(),
             loader,
@@ -101,8 +101,9 @@ impl Instance {
         };
         let mut instances = Vec::new();
         while let Some(entry) = entries.next_entry().await.map_err(io_error)? {
-            let saved: Option<Self> = read_json(&entry.path().join("instance.json")).await?;
-            instances.extend(saved);
+            // 一個實例的設定損壞，不能讓其他實例都消失。
+            let saved = read_json::<Self>(&entry.path().join("instance.json")).await;
+            instances.extend(saved.ok().flatten());
         }
         instances.sort_by_key(|instance| creation_order(&instance.id));
         Ok(instances)
@@ -129,7 +130,7 @@ impl Instance {
     /// 複製出一個新實例，包括存檔、模組和設定。不複製日誌和崩潰報告。
     pub async fn duplicate(&self, dirs: &DataDirs) -> Result<Self, InstanceError> {
         let mut copy = self.clone();
-        copy.id = next_id(&Self::list(dirs).await?);
+        copy.id = next_id(dirs).await?;
         copy.name = format!("{} 副本", self.name);
 
         let from = self.game_dir(dirs);
@@ -188,14 +189,26 @@ fn clean_name(name: &str) -> Result<String, InstanceError> {
     Ok(name.to_string())
 }
 
-/// 第一個沒被用過的 `instance-N`。名稱不用於資料夾，所以可以隨時改名。
-fn next_id(instances: &[Instance]) -> String {
-    let next = instances
-        .iter()
-        .map(|instance| creation_order(&instance.id))
-        .max()
-        .map_or(1, |highest| highest + 1);
-    format!("instance-{next}")
+/// 第一個沒被用過的 `instance-N`。看資料夾而不是實例清單：
+/// 設定損壞的實例不在清單裡，但它的資料夾不能被新實例佔用。
+async fn next_id(dirs: &DataDirs) -> Result<String, InstanceError> {
+    let root = dirs.instances();
+    let io_error = |source| InstanceError::Io {
+        path: root.clone(),
+        source,
+    };
+    let mut highest = 0;
+    let mut entries = match tokio::fs::read_dir(&root).await {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok("instance-1".to_string());
+        }
+        Err(error) => return Err(io_error(error)),
+    };
+    while let Some(entry) = entries.next_entry().await.map_err(io_error)? {
+        highest = highest.max(creation_order(&entry.file_name().to_string_lossy()));
+    }
+    Ok(format!("instance-{}", highest + 1))
 }
 
 fn creation_order(id: &str) -> u32 {
@@ -219,6 +232,20 @@ mod tests {
         let root = std::env::temp_dir().join(format!("sapling-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         DataDirs::at(root)
+    }
+
+    #[tokio::test]
+    async fn a_corrupted_instance_does_not_hide_the_others() {
+        let dirs = temp_dirs("corrupted");
+        let good = Instance::create(&dirs, "生存", "26.3").await.unwrap();
+        let bad = Instance::create(&dirs, "創造", "26.3").await.unwrap();
+        std::fs::write(bad.game_dir(&dirs).join("instance.json"), "{ not json").unwrap();
+
+        let listed = Instance::list(&dirs).await.unwrap();
+        assert_eq!(listed, [good]);
+
+        let next = Instance::create(&dirs, "新的", "26.3").await.unwrap();
+        assert_ne!(next.id, bad.id);
     }
 
     #[tokio::test]

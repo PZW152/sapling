@@ -96,3 +96,7 @@ export const onLaunchEvent = (handler: (payload: LaunchEvent) => void) =>
 /** 訂閱下載過程的事件，回傳取消訂閱的函數。 */
 export const onInstallEvent = (handler: (payload: LaunchEvent) => void) =>
   subscribe("install-event", handler);
+
+/** 訂閱整合包的安裝進度。遊戲下載也在跑時，兩邊的進度不能混在一起。 */
+export const onPackEvent = (handler: (payload: LaunchEvent) => void) =>
+  subscribe("pack-event", handler);

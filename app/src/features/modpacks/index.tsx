@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, onInstallEvent } from "../../shell/api";
+import { api, onPackEvent } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
 import { ResourceBrowser } from "../mods/ResourceBrowser";
@@ -10,7 +10,7 @@ function ModpackPage() {
 
   useEffect(
     () =>
-      onInstallEvent((payload) => {
+      onPackEvent((payload) => {
         if (payload.kind === "progress") {
           setFiles(`${payload.finishedFiles} / ${payload.totalFiles}`);
         }

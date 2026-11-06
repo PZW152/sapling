@@ -106,7 +106,7 @@ pub async fn install_runtime(
     Ok(runtime_dir.join(JAVA_EXE_PATH))
 }
 
-/// 本機已有的 Java：`java.exe` 的位置和它需要的全部檔案。只讀本機資料，不用網絡。
+/// 本機已有的 Java：`java.exe` 的位置和它需要的全部檔案。只讀本機資料，不用網路。
 pub async fn local_runtime(
     component: &str,
     dirs: &DataDirs,

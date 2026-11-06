@@ -23,8 +23,11 @@
 }
 
 .hero-name {
+  overflow: hidden;
   font-size: var(--text-lg);
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hero-welcome {
@@ -38,10 +41,11 @@
   margin-top: var(--space-2);
   font-family: var(--font-number);
   /* 版本號就是主視覺：寬度撐滿主區塊，高度最多佔六成。--units 是字數，小數點算半個。 */
-  font-size: clamp(96px, min(100cqw / (var(--units) * 0.54), 58cqh), 640px);
+  font-size: clamp(34px, min(100cqw / (var(--units) * 0.54), 58cqh), 640px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.035em;
+  white-space: nowrap;
 }
 
 .hero-bottom {
@@ -59,25 +63,6 @@
   justify-content: space-between;
   gap: var(--space-3);
   font-variant-numeric: tabular-nums;
-}
-
-.hero-progress {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.hero-bar {
-  height: 6px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--color-hero-soft);
-}
-
-.hero-bar div {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--color-on-dark);
-  transform-origin: left;
 }
 
 .hero-error {
@@ -336,16 +321,22 @@
 }
 
 .overlay-name {
+  max-width: 100%;
+  overflow: hidden;
   font-size: var(--text-lg);
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .overlay-version {
   font-family: var(--font-number);
-  font-size: clamp(110px, 22vw, 220px);
+  /* 寬度不超過 .overlay-content，否則長版本號會把進度條一起撐歪。 */
+  font-size: clamp(30px, min(22vw, min(420px, 70vw) / (var(--units) * 0.54)), 220px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.035em;
+  white-space: nowrap;
 }
 
 .overlay-status {

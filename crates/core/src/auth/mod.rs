@@ -36,7 +36,7 @@ const SLOW_DOWN_STEP_SECS: u64 = 5;
 pub enum AuthError {
     #[error(transparent)]
     Storage(#[from] crate::storage::StorageError),
-    #[error("無法連線到登入伺服器，請檢查網絡連線後再試一次")]
+    #[error("無法連線到登入伺服器，請檢查網路連線後再試一次")]
     Network(#[from] reqwest::Error),
     #[error("微軟拒絕了登入請求，應用程式設定可能有問題（{code}）")]
     ClientRejected { code: String },

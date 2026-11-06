@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
 use crate::platform::DataDirs;
+use crate::storage::safe_relative_path;
 use crate::versions::details::VersionDetails;
 
 /// 把這個版本需要的原生庫解到 `natives_dir`。已經解過的檔案不重複處理。
@@ -45,10 +46,14 @@ fn extract_jar(jar: &Path, target: &Path, excluded: &[String]) -> io::Result<()>
         let mut entry = archive.by_index(index).map_err(io::Error::other)?;
         let name = entry.name().map_err(io::Error::other)?.to_string();
         let skipped = excluded.iter().any(|prefix| name.starts_with(prefix));
-        if skipped || entry.is_dir() || name.contains("..") {
+        if skipped || entry.is_dir() {
             continue;
         }
-        let path = target.join(&name);
+        // 不接受跳出資料夾的路徑。
+        let Some(relative) = safe_relative_path(&name) else {
+            continue;
+        };
+        let path = target.join(relative);
         if path.exists() {
             continue;
         }

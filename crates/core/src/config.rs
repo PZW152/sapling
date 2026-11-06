@@ -7,6 +7,7 @@ use crate::platform::DataDirs;
 use crate::storage::{StorageError, read_json, write_json};
 
 const DEFAULT_THEME: &str = "sapling";
+const RETIRED_THEME: &str = "zhongshan";
 const MIN_CONCURRENCY: usize = 1;
 const MAX_CONCURRENCY: usize = 64;
 
@@ -22,7 +23,7 @@ pub struct LauncherConfig {
     pub disabled_features: Vec<String>,
     /// 功能模塊開關平時隱藏，在關於頁連按版本號才顯示。
     pub feature_switches_unlocked: bool,
-    /// 植樹節種過樹的年份，種過就解鎖隱藏主題。
+    /// 植樹節種過樹的年份。
     pub planted_years: Vec<i32>,
     /// 下次啟動是否用離線模式。
     pub offline_enabled: bool,
@@ -49,8 +50,16 @@ impl Default for LauncherConfig {
 
 impl LauncherConfig {
     pub async fn load(dirs: &DataDirs) -> Result<Self, StorageError> {
-        let config: Option<Self> = read_json(&dirs.config_file()).await?;
-        Ok(config.unwrap_or_default().normalized())
+        let path = dirs.config_file();
+        match read_json::<Self>(&path).await {
+            Ok(config) => Ok(config.unwrap_or_default().normalized()),
+            // 損壞的設定不能讓啟動器和遊戲都打不開。留一份副本，用預設值繼續。
+            Err(StorageError::Corrupted { .. }) => {
+                let _ = tokio::fs::rename(&path, path.with_extension("json.bad")).await;
+                Ok(Self::default())
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub async fn save(&self, dirs: &DataDirs) -> Result<(), StorageError> {
@@ -65,6 +74,10 @@ impl LauncherConfig {
         self.download_concurrency = self
             .download_concurrency
             .clamp(MIN_CONCURRENCY, MAX_CONCURRENCY);
+        // 中山主題改成植樹節限定後，舊設定裡的值要換回預設主題。
+        if self.theme == RETIRED_THEME {
+            self.theme = DEFAULT_THEME.to_string();
+        }
         self
     }
 }
@@ -72,6 +85,39 @@ impl LauncherConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn temp_dirs(name: &str) -> DataDirs {
+        let root =
+            std::env::temp_dir().join(format!("sapling-config-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        DataDirs::at(root)
+    }
+
+    #[tokio::test]
+    async fn a_corrupted_config_is_kept_aside_and_defaults_are_used() {
+        let dirs = temp_dirs("corrupted");
+        std::fs::write(dirs.config_file(), "{ not json").unwrap();
+
+        let config = LauncherConfig::load(&dirs).await.unwrap();
+
+        assert_eq!(config, LauncherConfig::default());
+        assert_eq!(
+            std::fs::read_to_string(dirs.config_file().with_extension("json.bad")).unwrap(),
+            "{ not json"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_retired_theme_falls_back_to_the_default() {
+        let dirs = temp_dirs("theme");
+        std::fs::write(dirs.config_file(), r#"{ "theme": "zhongshan" }"#).unwrap();
+
+        assert_eq!(
+            LauncherConfig::load(&dirs).await.unwrap().theme,
+            DEFAULT_THEME
+        );
+    }
 
     #[test]
     fn missing_fields_use_the_default() {

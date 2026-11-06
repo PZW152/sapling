@@ -20,7 +20,7 @@ const OLDEST_SUPPORTED_RELEASE: &str = "1.7.10";
 
 #[derive(Debug, Error)]
 pub enum VersionsError {
-    #[error("無法取得版本資料，請檢查網絡連線後再試一次")]
+    #[error("無法取得版本資料，請檢查網路連線後再試一次")]
     Network(#[from] DownloadError),
     #[error("版本資料的格式看不懂，可能是 Mojang 改了格式")]
     Parse(#[from] serde_json::Error),

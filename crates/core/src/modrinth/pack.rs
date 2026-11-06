@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use reqwest::Url;
 use serde::Deserialize;
@@ -16,6 +16,7 @@ use crate::instance::Instance;
 use crate::instance::mods::{all_mods_dirs, link_existing};
 use crate::loader::LoaderKind;
 use crate::platform::DataDirs;
+use crate::storage::safe_relative_path;
 use crate::versions::fetch_manifest;
 
 use super::{API_URL, FileHashes, ModVersion, ModrinthError, fetch_version, pick_version};
@@ -262,18 +263,6 @@ fn client_tasks(files: Vec<PackFile>, game_dir: &Path) -> Result<Vec<DownloadTas
         .collect()
 }
 
-/// 整合包的內容來自網路，路徑只能留在實例資料夾裡。
-fn safe_relative_path(path: &str) -> Option<PathBuf> {
-    // 在其他系統上 `\` 不算分隔符，所以另外擋掉。
-    if path.is_empty() || path.contains('\\') {
-        return None;
-    }
-    let path = Path::new(path);
-    path.components()
-        .all(|part| matches!(part, Component::Normal(_)))
-        .then(|| path.to_path_buf())
-}
-
 fn extract_overrides(pack_path: &Path, game_dir: &Path) -> Result<(), ModrinthError> {
     let mut archive = open_archive(pack_path)?;
     for folder in OVERRIDE_FOLDERS {
@@ -409,22 +398,6 @@ mod tests {
         );
 
         assert!(matches!(result, Err(ModrinthError::BadPack)));
-    }
-
-    #[test]
-    fn refuses_paths_that_leave_the_instance() {
-        for path in [
-            "../evil.jar",
-            "mods/../../evil.jar",
-            "/etc/evil",
-            "C:/evil.jar",
-            "C:\\evil.jar",
-            "\\evil.jar",
-            "",
-        ] {
-            assert_eq!(safe_relative_path(path), None, "{path}");
-        }
-        assert!(safe_relative_path("mods/ok.jar").is_some());
     }
 
     fn write_pack(name: &str, entries: &[(&str, &str)]) -> (PathBuf, PathBuf) {

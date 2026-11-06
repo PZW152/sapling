@@ -31,7 +31,8 @@ const CLASSPATH_SEPARATOR: &str = ";";
 /// 遊戲需要這兩個值，但 Sapling 不使用遙測，也不需要真實的 Xbox ID。
 const UNUSED_ID: &str = "0";
 const HIDDEN_TOKEN: &str = "***";
-const LATEST_LOG: &str = "logs/latest.log";
+/// 遊戲可能把 token 寫進這些日誌。
+const GAME_LOGS: [&str; 2] = ["logs/latest.log", "logs/debug.log"];
 /// 舊版遊戲要求這個參數，內容可以是空的。
 const EMPTY_PROPERTIES: &str = "{}";
 const LOG_CHANNEL_SIZE: usize = 256;
@@ -234,7 +235,9 @@ pub async fn play(
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
     if !session.is_offline() {
-        scrub_token(&game_dir.join(LATEST_LOG), session.access_token()).await;
+        for log in GAME_LOGS {
+            scrub_token(&game_dir.join(log), session.access_token()).await;
+        }
     }
     if status.success() {
         return Ok(());

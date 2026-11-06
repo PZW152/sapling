@@ -2,14 +2,14 @@
 
 pub mod pack;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::download::{DownloadError, DownloadTask, download_all, fetch_text};
+use crate::download::{DownloadError, DownloadTask, download_all, fetch_text, file_sha1};
 use crate::instance::InstanceError;
 use crate::instance::mods::link_existing;
 use crate::instance::worlds;
@@ -321,6 +321,7 @@ pub async fn install(
     let mut pending = vec![wanted];
     let mut seen_projects = HashSet::new();
     let mut files = Vec::new();
+    let mut installed = Vec::new();
 
     while let Some(wanted) = pending.pop() {
         let version = match wanted {
@@ -341,7 +342,9 @@ pub async fn install(
         if kind == ProjectKind::Mod {
             pending.extend(required_dependencies(&version));
         }
-        files.push(primary_file(&version)?);
+        let file = primary_file(&version)?;
+        installed.push((version.project_id.clone(), file.filename.clone()));
+        files.push(file);
     }
 
     let names = files.iter().map(|file| file.filename.clone()).collect();
@@ -358,7 +361,82 @@ pub async fn install(
         .collect::<Result<Vec<_>, ModrinthError>>()?;
     let tasks = link_existing(tasks, target.other_mods_dirs).await;
     download_all(client, tasks, target.concurrency, |_| {}).await?;
+    if kind == ProjectKind::Mod {
+        remove_replaced_mods(client, &folder, &installed).await;
+    }
     Ok(names)
+}
+
+/// 同一個模組留著兩個版本時，載入器會拒絕啟動遊戲，所以裝好新版後要移除舊版。
+/// 模組可能是手動放進來的，只能靠檔案的 SHA1 問 Modrinth 它屬於哪個專案。
+/// 查不到就保留：移除失敗頂多要手動處理，誤刪才是問題。
+async fn remove_replaced_mods(
+    client: &reqwest::Client,
+    folder: &Path,
+    installed: &[(String, String)],
+) {
+    let Ok(mut entries) = tokio::fs::read_dir(folder).await else {
+        return;
+    };
+    let mut local = Vec::new();
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if let Ok(Some(hash)) = file_sha1(&entry.path()).await {
+            local.push((name, hash));
+        }
+    }
+    let hashes: Vec<&str> = local.iter().map(|(_, hash)| hash.as_str()).collect();
+    let Ok(projects) = projects_of(client, &hashes).await else {
+        return;
+    };
+    for name in replaced_files(&local, &projects, installed) {
+        // 刪不掉時保留，用戶可以在實例頁手動處理。
+        let _ = tokio::fs::remove_file(folder.join(name)).await;
+    }
+}
+
+/// 用 SHA1 查檔案屬於哪個專案。
+async fn projects_of(
+    client: &reqwest::Client,
+    hashes: &[&str],
+) -> Result<HashMap<String, String>, ModrinthError> {
+    let response = client
+        .post(format!("{API_URL}/version_files"))
+        .json(&serde_json::json!({ "hashes": hashes, "algorithm": "sha1" }))
+        .send()
+        .await
+        .and_then(reqwest::Response::error_for_status)
+        .map_err(|_| ModrinthError::BadUrl)?;
+    let versions: HashMap<String, ProjectOfFile> =
+        response.json().await.map_err(|_| ModrinthError::BadUrl)?;
+    Ok(versions
+        .into_iter()
+        .map(|(hash, version)| (hash, version.project_id))
+        .collect())
+}
+
+#[derive(Debug, Deserialize)]
+struct ProjectOfFile {
+    project_id: String,
+}
+
+/// 屬於剛裝好的專案、但不是剛裝的那個檔案，就是要移除的舊版本。
+fn replaced_files<'a>(
+    local: &'a [(String, String)],
+    projects: &HashMap<String, String>,
+    installed: &[(String, String)],
+) -> Vec<&'a str> {
+    local
+        .iter()
+        .filter(|(name, hash)| {
+            projects.get(hash).is_some_and(|project| {
+                installed
+                    .iter()
+                    .any(|(id, file)| id == project && file != name)
+            })
+        })
+        .map(|(name, _)| name.as_str())
+        .collect()
 }
 
 fn required_dependencies(version: &ModVersion) -> Vec<Wanted> {
@@ -391,9 +469,23 @@ async fn compatible_version(
     let url = Url::parse_with_params(&format!("{API_URL}/project/{project}/version"), params)
         .map_err(|_| ModrinthError::BadUrl)?;
     let versions: Vec<ModVersion> = serde_json::from_str(&fetch_text(client, url.as_str()).await?)?;
-    pick_version(versions).ok_or_else(|| ModrinthError::NoCompatibleVersion {
-        project: project.to_string(),
-    })
+    match pick_version(versions) {
+        Some(version) => Ok(version),
+        None => Err(ModrinthError::NoCompatibleVersion {
+            project: project_title(client, project).await,
+        }),
+    }
+}
+
+/// 前置模組只有 id，錯誤訊息要用看得懂的名稱。查不到才顯示 id。
+async fn project_title(client: &reqwest::Client, project: &str) -> String {
+    #[derive(Deserialize)]
+    struct Project {
+        title: String,
+    }
+    let url = format!("{API_URL}/project/{project}");
+    let text = fetch_text(client, &url).await.unwrap_or_default();
+    serde_json::from_str::<Project>(&text).map_or_else(|_| project.to_string(), |found| found.title)
 }
 
 async fn fetch_version(client: &reqwest::Client, id: &str) -> Result<ModVersion, ModrinthError> {
@@ -606,6 +698,27 @@ mod tests {
         assert_eq!(wanted.len(), 2);
         assert!(matches!(&wanted[0], Wanted::Project(id) if id == "need"));
         assert!(matches!(&wanted[1], Wanted::Version(id) if id == "v9"));
+    }
+
+    #[test]
+    fn finds_older_versions_of_what_was_just_installed() {
+        let local = vec![
+            ("sodium-old.jar".to_string(), "h1".to_string()),
+            ("sodium-new.jar".to_string(), "h2".to_string()),
+            ("iris.jar.disabled".to_string(), "h3".to_string()),
+            ("handmade.jar".to_string(), "h4".to_string()),
+        ];
+        let projects = HashMap::from([
+            ("h1".to_string(), "sodium".to_string()),
+            ("h2".to_string(), "sodium".to_string()),
+            ("h3".to_string(), "iris".to_string()),
+        ]);
+        let installed = [("sodium".to_string(), "sodium-new.jar".to_string())];
+
+        assert_eq!(
+            replaced_files(&local, &projects, &installed),
+            ["sodium-old.jar"]
+        );
     }
 
     #[test]

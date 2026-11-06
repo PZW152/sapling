@@ -7,7 +7,7 @@ import { ResourceBrowser } from "./ResourceBrowser";
 
 /** 下載頁的分頁：先選實例，只列出和它相容的內容，不會裝錯版本。 */
 function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string }) {
-  const { instances, selected, goTo } = useApp();
+  const { instances, selected, goTo, activeTab } = useApp();
   const usable = instances.filter((instance) => kind !== "mod" || instance.loader !== "vanilla");
   const [chosenId, setChosenId] = useState("");
   const chosen =
@@ -19,11 +19,24 @@ function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string })
   const [worldChoice, setWorldChoice] = useState("");
   const world = worlds.find(({ folder }) => folder === worldChoice) ?? worlds[0];
 
+  // 頁面切走後仍然留著，回來時重新讀取，才看得到剛在遊戲裡建立的世界。
   useEffect(() => {
-    if (needsWorld && chosen) {
-      api.listWorlds(chosen.id).then(setWorlds).catch(() => setWorlds([]));
+    if (!needsWorld || !chosen) {
+      return;
     }
-  }, [needsWorld, chosen?.id]);
+    let current = true;
+    api
+      .listWorlds(chosen.id)
+      .catch(() => [])
+      .then((found) => {
+        if (current) {
+          setWorlds(found);
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [needsWorld, chosen?.id, activeTab]);
 
   if (!chosen) {
     return (

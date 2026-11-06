@@ -3,6 +3,7 @@ import type { ComponentType, CSSProperties } from "react";
 import { api } from "../../shell/api";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
+import { versionUnits } from "./versionUnits";
 
 /** 比 theme.css 的 --overlay 稍長，收合動畫播完才移除。 */
 const CLOSE_MS = 780;
@@ -53,6 +54,7 @@ export function LaunchOverlay({
           "--from-right": `${origin.right}px`,
           "--from-bottom": `${origin.bottom}px`,
           "--from-left": `${origin.left}px`,
+          "--units": versionUnits(version),
         } as CSSProperties
       }
     >

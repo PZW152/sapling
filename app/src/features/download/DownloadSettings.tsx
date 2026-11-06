@@ -20,7 +20,7 @@ export function DownloadSettings() {
         value={config.downloadConcurrency}
         onChange={(value) => updateConfig({ downloadConcurrency: value })}
       />
-      <p>網絡不穩定時可以調低。</p>
+      <p>網路不穩定時可以調低。</p>
     </section>
   );
 }

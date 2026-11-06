@@ -31,6 +31,7 @@ const LAUNCH_EVENT: &str = "launch-event";
 const CRASH_FEATURE: &str = "crash";
 const OFFLINE_FEATURE: &str = "offline-account";
 const INSTALL_EVENT: &str = "install-event";
+const PACK_EVENT: &str = "pack-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 /// 下載頁最多列出幾個快照版。
 const SNAPSHOT_LIMIT: usize = 40;
@@ -190,7 +191,7 @@ async fn duplicate_instance(id: String) -> Result<Instance, String> {
 async fn list_worlds(id: String) -> Result<Vec<World>, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
-    worlds::recent(&instance.game_dir(&dirs), WORLD_LIST_LIMIT)
+    worlds::recent(&instance.game_dir(&dirs), WORLD_LIST_LIMIT, false)
         .await
         .map_err(text)
 }
@@ -208,7 +209,7 @@ async fn backup_world(id: String, folder: String) -> Result<String, String> {
 async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
-    worlds::recent(&instance.game_dir(&dirs), RECENT_WORLD_LIMIT)
+    worlds::recent(&instance.game_dir(&dirs), RECENT_WORLD_LIMIT, true)
         .await
         .map_err(text)
 }
@@ -251,7 +252,7 @@ async fn install_pack(
                 last_progress = Instant::now();
                 let stage = PrepareStage::Game;
                 // 進度只用於顯示，送不出去不影響下載本身。
-                let _ = app.emit(INSTALL_EVENT, LaunchEvent::Progress { stage, progress });
+                let _ = app.emit(PACK_EVENT, LaunchEvent::Progress { stage, progress });
             }
         },
     )
@@ -373,11 +374,23 @@ async fn list_accounts() -> Result<Vec<Profile>, String> {
 
 #[tauri::command]
 async fn switch_account(state: State<'_, AppState>, id: String) -> Result<Option<Profile>, String> {
+    let previous = state.session()?.map(|session| session.profile.id);
     accounts::switch(&id).map_err(text)?;
     state.set_session(None)?;
-    Ok(current_session(&state)
-        .await?
-        .map(|session| session.profile))
+    match current_session(&state).await {
+        Ok(Some(session)) => Ok(Some(session.profile)),
+        outcome => {
+            // 切換失敗時換回原本的帳號，否則畫面和實際登入的帳號會對不上。
+            if let Some(previous) = previous {
+                let _ = accounts::switch(&previous);
+                state.set_session(None)?;
+                let _ = current_session(&state).await;
+            }
+            Err(outcome
+                .err()
+                .unwrap_or_else(|| "這個帳號的登入已過期，請重新登入".to_string()))
+        }
+    }
 }
 
 #[tauri::command]

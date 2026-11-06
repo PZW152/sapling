@@ -30,7 +30,12 @@ fn saves_dir(game_dir: &Path) -> PathBuf {
 }
 
 /// 最近遊玩的世界，新的在前。沒有 `saves` 資料夾就是空清單。
-pub async fn recent(game_dir: &Path, limit: usize) -> Result<Vec<World>, InstanceError> {
+/// 縮圖要傳給介面，只有真的會顯示時才讀。
+pub async fn recent(
+    game_dir: &Path,
+    limit: usize,
+    with_icons: bool,
+) -> Result<Vec<World>, InstanceError> {
     let dir = saves_dir(game_dir);
     let io_error = |source| InstanceError::Io {
         path: dir.clone(),
@@ -57,7 +62,11 @@ pub async fn recent(game_dir: &Path, limit: usize) -> Result<Vec<World>, Instanc
         worlds.push(World {
             folder: entry.file_name().to_string_lossy().to_string(),
             last_played_ms: millis_since_epoch(modified),
-            icon: read_icon(&entry.path().join(ICON_FILE)).await,
+            icon: if with_icons {
+                read_icon(&entry.path().join(ICON_FILE)).await
+            } else {
+                None
+            },
         });
     }
     Ok(worlds)
@@ -145,7 +154,7 @@ mod tests {
         add_world(&dir, "new", 300);
         add_world(&dir, "middle", 200);
 
-        let worlds = recent(&dir, 2).await.unwrap();
+        let worlds = recent(&dir, 2, true).await.unwrap();
 
         let names: Vec<_> = worlds.iter().map(|world| world.folder.as_str()).collect();
         assert_eq!(names, ["new", "middle"]);
@@ -158,7 +167,7 @@ mod tests {
         add_world(&dir, "real", 100);
         std::fs::create_dir_all(saves_dir(&dir).join("backup")).unwrap();
 
-        let worlds = recent(&dir, 5).await.unwrap();
+        let worlds = recent(&dir, 5, true).await.unwrap();
 
         assert_eq!(worlds.len(), 1);
         assert_eq!(worlds[0].folder, "real");
@@ -169,7 +178,7 @@ mod tests {
         let dir = game_dir("empty");
         std::fs::remove_dir_all(saves_dir(&dir)).unwrap();
 
-        assert!(recent(&dir, 5).await.unwrap().is_empty());
+        assert!(recent(&dir, 5, true).await.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -181,7 +190,7 @@ mod tests {
         std::fs::write(icon("small"), [1, 2, 3]).unwrap();
         std::fs::write(icon("huge"), vec![0; MAX_ICON_BYTES as usize + 1]).unwrap();
 
-        let worlds = recent(&dir, 5).await.unwrap();
+        let worlds = recent(&dir, 5, true).await.unwrap();
 
         assert_eq!(worlds[0].icon, Some(vec![1, 2, 3]));
         assert_eq!(worlds[1].icon, None);
@@ -196,7 +205,7 @@ mod tests {
         assert_eq!(backup(&dir, "生存").await.unwrap(), "生存 備份 2");
 
         assert!(exists(&dir, "生存 備份 2"));
-        let worlds = recent(&dir, 5).await.unwrap();
+        let worlds = recent(&dir, 5, true).await.unwrap();
         assert_eq!(worlds.len(), 3);
     }
 
@@ -208,6 +217,17 @@ mod tests {
             backup(&dir, "../mods").await,
             Err(InstanceError::NotFound)
         ));
+    }
+
+    #[tokio::test]
+    async fn icons_are_skipped_when_not_needed() {
+        let dir = game_dir("no-icons");
+        add_world(&dir, "world", 100);
+        std::fs::write(saves_dir(&dir).join("world").join(ICON_FILE), [1]).unwrap();
+
+        let worlds = recent(&dir, 5, false).await.unwrap();
+
+        assert_eq!(worlds[0].icon, None);
     }
 
     #[test]

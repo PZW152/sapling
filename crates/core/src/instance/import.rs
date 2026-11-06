@@ -38,7 +38,9 @@ pub async fn find_sources(dirs: &DataDirs) -> Vec<ImportSource> {
 
     let mut sources = Vec::new();
     for (label, path) in candidates {
-        let found = worlds::recent(&path, WORLD_LIMIT).await.unwrap_or_default();
+        let found = worlds::recent(&path, WORLD_LIMIT, false)
+            .await
+            .unwrap_or_default();
         if !found.is_empty() {
             sources.push(ImportSource {
                 label,

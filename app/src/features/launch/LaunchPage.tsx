@@ -11,6 +11,7 @@ import { LaunchOverlay } from "./LaunchOverlay";
 import { LogPanel } from "./LogPanel";
 import { useLaunch } from "./useLaunch";
 import type { Phase } from "./useLaunch";
+import { versionUnits } from "./versionUnits";
 
 export function LaunchPage() {
   const {
@@ -173,12 +174,6 @@ export function LaunchPage() {
       </aside>
     </div>
   );
-}
-
-/** 版本號的視覺字數：小數點很窄，只算半個字。 */
-function versionUnits(version: string) {
-  const dots = version.split(".").length - 1;
-  return Math.max(version.length - dots / 2, 1);
 }
 
 /** 換實例時淡入，切分頁回來時不動。 */

@@ -47,7 +47,9 @@
   font-size: var(--text-xl);
 }
 
+/* 右邊留給題字。 */
 :root[data-festival="zhongshan"] .hero-name {
+  max-width: 76cqw;
   font-size: var(--text-xl);
 }
 
@@ -58,7 +60,7 @@
 
 /* 版本號讓出右邊給題字。 */
 :root[data-festival="zhongshan"] .hero .version-number {
-  font-size: clamp(72px, min(76cqw / (var(--units) * 0.54), 40cqh), 640px);
+  font-size: clamp(34px, min(76cqw / (var(--units) * 0.54), 40cqh), 640px);
 }
 
 .motto {

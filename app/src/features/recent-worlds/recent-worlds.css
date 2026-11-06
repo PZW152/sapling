@@ -1,6 +1,6 @@
 /* 有世界可以顯示時，版本號讓出空間。 */
 .hero:has(.worlds) .version-number {
-  font-size: clamp(72px, min(100cqw / (var(--units) * 0.54), 40cqh), 640px);
+  font-size: clamp(34px, min(100cqw / (var(--units) * 0.54), 40cqh), 640px);
 }
 
 .worlds {

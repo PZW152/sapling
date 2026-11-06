@@ -16,7 +16,7 @@ const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
 pub enum UpdateError {
-    #[error("無法檢查更新，請檢查網絡連線後再試一次")]
+    #[error("無法檢查更新，請檢查網路連線後再試一次")]
     Network(#[from] reqwest::Error),
     #[error("新版本下載後校驗不通過，已取消更新")]
     ChecksumMismatch,

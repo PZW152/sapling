@@ -1,7 +1,7 @@
 //! 讀寫設定用的 JSON 檔案。
 
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -21,6 +21,19 @@ pub enum StorageError {
         #[source]
         source: serde_json::Error,
     },
+}
+
+/// 來自壓縮檔或網路的相對路徑，確認它留在目標資料夾裡。
+/// `..`、磁碟機代號和開頭的斜線都會被拒絕，否則 `join` 會跳到別的地方。
+pub fn safe_relative_path(path: &str) -> Option<PathBuf> {
+    // 在其他系統上 `\` 不算分隔符，所以另外擋掉。
+    if path.is_empty() || path.contains('\\') {
+        return None;
+    }
+    let path = Path::new(path);
+    path.components()
+        .all(|part| matches!(part, Component::Normal(_)))
+        .then(|| path.to_path_buf())
 }
 
 /// 讀取 JSON 檔案。檔案不存在時回傳 `None`。
@@ -77,5 +90,26 @@ mod tests {
         assert_eq!(read_json::<i32>(&path).await.unwrap(), Some(2));
         assert!(!path.with_extension("json.tmp").exists());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn refuses_paths_that_leave_the_folder() {
+        for path in [
+            "../evil.jar",
+            "mods/../../evil.jar",
+            "/etc/evil",
+            "C:/evil.jar",
+            "C:\\evil.jar",
+            "\\evil.jar",
+            "",
+        ] {
+            assert_eq!(safe_relative_path(path), None, "{path}");
+        }
+        assert!(safe_relative_path("mods/ok.jar").is_some());
     }
 }

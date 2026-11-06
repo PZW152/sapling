@@ -21,7 +21,7 @@
   --color-surface: #ffffff;
   --color-ink: #16302a;
   --color-muted: #4f6259;
-  --color-faint: #7c8d83;
+  --color-faint: #5f7066;
   --color-line: #d7dfd8;
   --color-on-dark: #ffffff;
   --color-danger: #8f3f2d;
@@ -64,7 +64,6 @@
 
   /* 陰影 */
   --shadow-tile: 0 1px 2px rgba(22, 48, 42, 0.05);
-  --shadow-lift: 0 10px 24px rgba(22, 48, 42, 0.12);
   --shadow-popover: 0 12px 34px rgba(22, 48, 42, 0.22);
 
   /* 動效 */

@@ -16,7 +16,7 @@ use zip::ZipArchive;
 
 use crate::download::{DownloadTask, download_all, download_file, fetch_text, has_expected_sha1};
 use crate::platform::{CREATE_NO_WINDOW, DataDirs};
-use crate::storage::{read_json, write_json};
+use crate::storage::{read_json, safe_relative_path, write_json};
 use crate::versions::details::Library;
 
 use super::LoaderError;
@@ -211,18 +211,16 @@ fn extract_entries(
             .name()
             .map_err(|_| LoaderError::BadInstaller)?
             .to_string();
-        let target = match name.strip_prefix(MAVEN_FOLDER) {
-            Some(relative) => libraries.join(relative),
-            None if name.starts_with("data/") => folder.join(&name),
+        let (base, relative) = match name.strip_prefix(MAVEN_FOLDER) {
+            Some(relative) => (libraries, relative),
+            None if name.starts_with("data/") => (folder, name.as_str()),
             None => continue,
         };
         if entry.is_dir() {
             continue;
         }
         // 安裝程式來自官方倉庫，但仍然不接受跳出資料夾的路徑。
-        if name.contains("..") {
-            return Err(LoaderError::BadInstaller);
-        }
+        let target = base.join(safe_relative_path(relative).ok_or(LoaderError::BadInstaller)?);
         let write_error = |source| LoaderError::Write {
             path: target.clone(),
             source,

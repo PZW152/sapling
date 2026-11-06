@@ -50,6 +50,12 @@ const LOADER_LABELS: Record<string, string> = {
   optifine: "OptiFine",
 };
 
+/** 接上下一頁。排名在翻頁途中變動時，同一個項目可能出現兩次。 */
+export function appendHits(shown: ModHit[], next: ModHit[]) {
+  const seen = new Set(shown.map((hit) => hit.projectId));
+  return [...shown, ...next.filter((hit) => !seen.has(hit.projectId))];
+}
+
 /** 列表上顯示的分類，只顯示有中文名稱的幾個。 */
 export function hitTags(hit: ModHit) {
   return hit.categories

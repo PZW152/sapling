@@ -28,7 +28,7 @@ const USER_AGENT: &str = concat!(
     " (github.com/PZW152/sapling)"
 );
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-/// 連線後超過這個時間收不到新資料就換一條連線。不設總時限，大檔案在慢網絡下也能下完。
+/// 連線後超過這個時間收不到新資料就換一條連線。不設總時限，大檔案在慢網路下也能下完。
 const READ_TIMEOUT: Duration = Duration::from_secs(15);
 const RETRY_DELAY: Duration = if cfg!(test) {
     Duration::from_millis(1)
@@ -41,9 +41,9 @@ const HASH_BUFFER_SIZE: usize = 64 * 1024;
 pub enum DownloadError {
     #[error("無法準備下載功能")]
     ClientSetup(#[source] reqwest::Error),
-    #[error("下載中斷，請檢查網絡連線後再試一次：{url}")]
+    #[error("下載中斷，請檢查網路連線後再試一次：{url}")]
     Incomplete { url: String },
-    #[error("下載失敗，請檢查網絡連線後再試一次：{url}")]
+    #[error("下載失敗，請檢查網路連線後再試一次：{url}")]
     Network {
         url: String,
         #[source]
@@ -271,13 +271,20 @@ async fn download_to_part_file(
 }
 
 pub(crate) async fn has_expected_sha1(path: &Path, expected: &str) -> Result<bool, DownloadError> {
+    Ok(file_sha1(path)
+        .await?
+        .is_some_and(|actual| actual.eq_ignore_ascii_case(expected)))
+}
+
+/// 檔案的 SHA1。檔案不存在時回傳 `None`。
+pub(crate) async fn file_sha1(path: &Path) -> Result<Option<String>, DownloadError> {
     let io_error = |source| DownloadError::Io {
         path: path.to_path_buf(),
         source,
     };
     let mut file = match File::open(path).await {
         Ok(file) => file,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(io_error(error)),
     };
     let mut hasher = Sha1::new();
@@ -289,7 +296,7 @@ pub(crate) async fn has_expected_sha1(path: &Path, expected: &str) -> Result<boo
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(to_hex(&hasher.finalize()).eq_ignore_ascii_case(expected))
+    Ok(Some(to_hex(&hasher.finalize())))
 }
 
 fn part_path(path: &Path) -> PathBuf {

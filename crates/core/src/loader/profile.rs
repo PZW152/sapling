@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::Deserialize;
 
+use crate::storage::safe_relative_path;
 use crate::versions::details::{
     Arguments, Library, LibraryArtifact, LibraryDownloads, VersionDetails,
 };
@@ -61,6 +62,15 @@ impl LoaderProfile {
 impl ProfileLibrary {
     pub fn to_library(&self) -> Result<Library, LoaderError> {
         if let Some(downloads) = &self.downloads {
+            let safe = downloads
+                .artifact
+                .iter()
+                .all(|artifact| safe_relative_path(&artifact.path).is_some());
+            if !safe {
+                return Err(LoaderError::BadLibrary {
+                    name: self.name.clone(),
+                });
+            }
             return Ok(Library {
                 name: self.name.clone(),
                 downloads: downloads.clone(),
@@ -244,6 +254,19 @@ mod tests {
         let artifact = libraries[0].downloads.artifact.as_ref().unwrap();
         assert_eq!(artifact.url, "");
         assert_eq!(artifact.path, "p.jar");
+    }
+
+    #[test]
+    fn refuses_download_paths_that_leave_the_libraries_folder() {
+        let profile = profile(
+            r#"[{ "name": "a:b:1",
+                  "downloads": { "artifact": { "path": "C:/evil.jar", "sha1": "s", "size": 0, "url": "u" } } }]"#,
+        );
+
+        assert!(matches!(
+            profile.libraries(),
+            Err(LoaderError::BadLibrary { .. })
+        ));
     }
 
     #[test]

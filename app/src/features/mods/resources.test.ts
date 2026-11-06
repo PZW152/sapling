@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Instance, ModHit, ProjectVersion } from "../../shell/types";
-import { compatibleVersions, formatSize, hitTags, versionSummary } from "./resources";
+import { appendHits, compatibleVersions, formatSize, hitTags, versionSummary } from "./resources";
 
 function version(gameVersions: string[], loaders: string[]): ProjectVersion {
   return {
@@ -50,6 +50,14 @@ describe("versionSummary", () => {
 
   it("資源包沒有載入器", () => {
     expect(versionSummary(version(["1.21.8"], ["minecraft"]))).toBe("1.21.8");
+  });
+});
+
+describe("appendHits", () => {
+  it("略過已經顯示的項目", () => {
+    const hit = (projectId: string) => ({ projectId }) as ModHit;
+    const merged = appendHits([hit("a"), hit("b")], [hit("b"), hit("c")]);
+    expect(merged.map(({ projectId }) => projectId)).toEqual(["a", "b", "c"]);
   });
 });
 

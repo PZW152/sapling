@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import { trackDownload } from "../../shell/downloads";
@@ -9,6 +9,7 @@ import { displayTitle, searchTerm } from "./names";
 import {
   CATEGORY_NAMES,
   SORT_OPTIONS,
+  appendHits,
   compatibleVersions,
   formatSize,
   hitTags,
@@ -48,6 +49,8 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
   const [sort, setSort] = useState("");
   const [hits, setHits] = useState<ModHit[]>([]);
   const [total, setTotal] = useState(0);
+  /** Modrinth 已經回傳幾個。重複的不會顯示，所以不能用 `hits.length` 當翻頁位置。 */
+  const [fetched, setFetched] = useState(0);
   const [searching, setSearching] = useState(true);
   const [installing, setInstalling] = useState<string[]>([]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -77,6 +80,8 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
     sort: sort || null,
   };
   const requestKey = JSON.stringify(request);
+  const latestRequest = useRef(requestKey);
+  latestRequest.current = requestKey;
 
   useEffect(() => {
     let current = true;
@@ -87,6 +92,7 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
         .then((page) => {
           if (current) {
             setHits(page.hits);
+            setFetched(page.hits.length);
             setTotal(page.total);
             setError("");
           }
@@ -101,14 +107,24 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
   }, [requestKey]);
 
   async function loadMore() {
+    // 等待途中換了篩選條件，這一頁就是舊的結果，不能接到新清單後面。
+    const isCurrent = () => latestRequest.current === requestKey;
     setSearching(true);
     try {
-      const page = await api.searchProjects({ ...request, offset: hits.length });
-      setHits((shown) => [...shown, ...page.hits]);
+      const page = await api.searchProjects({ ...request, offset: fetched });
+      if (isCurrent()) {
+        setHits((shown) => appendHits(shown, page.hits));
+        setFetched(fetched + page.hits.length);
+        setTotal(page.hits.length === 0 ? fetched : page.total);
+      }
     } catch (reason) {
-      setError(String(reason));
+      if (isCurrent()) {
+        setError(String(reason));
+      }
     }
-    setSearching(false);
+    if (isCurrent()) {
+      setSearching(false);
+    }
   }
 
   async function run(hit: ModHit, versionId: string | null) {
@@ -207,7 +223,10 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
         </button>
       </div>
       {error && <p className="error">{error}</p>}
-      {!error && !searching && shownHits.length === 0 && (
+      {!error && searching && !favoritesOnly && hits.length === 0 && (
+        <p className="hint">正在搜尋</p>
+      )}
+      {!error && (favoritesOnly || !searching) && shownHits.length === 0 && (
         <p className="mods-empty">
           {favoritesOnly
             ? "還沒有收藏。打開項目後按「收藏」就會出現在這裡。"
@@ -238,9 +257,9 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
           );
         })}
       </ul>
-      {!favoritesOnly && hits.length > 0 && hits.length < total && (
+      {!favoritesOnly && hits.length > 0 && fetched < total && (
         <button className="secondary load-more" disabled={searching} onClick={loadMore}>
-          {searching ? "載入中" : `載入更多（還有 ${total - hits.length} 個）`}
+          {searching ? "載入中" : `載入更多（還有 ${total - fetched} 個）`}
         </button>
       )}
     </div>
