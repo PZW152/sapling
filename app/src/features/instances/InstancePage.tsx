@@ -3,7 +3,8 @@ import type { CSSProperties } from "react";
 import { FEATURES } from "..";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
-import type { Instance } from "../../shell/types";
+import { LOADERS, loaderName } from "../../shell/loaders";
+import type { Instance, LoaderKind } from "../../shell/types";
 
 export function InstancePage() {
   const { instances, list, selected, selectInstance, loadInstances } = useApp();
@@ -70,15 +71,20 @@ function CreateInstance({
 }) {
   const [name, setName] = useState("");
   const [version, setVersion] = useState(versions[0] ?? "");
+  const [loader, setLoader] = useState<LoaderKind>("vanilla");
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
   async function create() {
     setError("");
+    setCreating(true);
     try {
-      const instance = await api.createInstance(name, version);
+      const instance = await api.createInstance(name, version, loader);
       await onCreated(instance.id);
     } catch (reason) {
       setError(String(reason));
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -117,10 +123,25 @@ function CreateInstance({
           ))}
         </div>
       </div>
+      <div className="field">
+        <span>載入器</span>
+        <div className="chips">
+          {LOADERS.map(({ kind, name: label }) => (
+            <button
+              key={kind}
+              className="chip"
+              aria-pressed={kind === loader}
+              onClick={() => setLoader(kind)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       {error && <p className="error">{error}</p>}
       <div className="detail-actions">
-        <button className="secondary strong" onClick={create}>
-          建立
+        <button className="secondary strong" disabled={creating} onClick={create}>
+          {creating ? "正在建立" : "建立"}
         </button>
         <button className="secondary" onClick={onCancel}>
           取消
@@ -183,7 +204,9 @@ function InstanceDetail({
           onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
         />
       </label>
-      <p className="detail-meta">Minecraft {instance.version}，原版</p>
+      <p className="detail-meta">
+        Minecraft {instance.version}，{loaderName(instance.loader)}
+      </p>
 
       {panels.length > 0 ? (
         panels.map(

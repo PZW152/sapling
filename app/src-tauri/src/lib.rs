@@ -11,6 +11,7 @@ use sapling_core::instance::Instance;
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
+use sapling_core::loader::{self, LoaderKind};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
@@ -128,8 +129,15 @@ async fn list_instances() -> Result<Vec<Instance>, String> {
 }
 
 #[tauri::command]
-async fn create_instance(name: String, version: String) -> Result<Instance, String> {
-    Instance::create(&data_dirs()?, &name, &version)
+async fn create_instance(
+    name: String,
+    version: String,
+    loader: LoaderKind,
+) -> Result<Instance, String> {
+    let loader_version = loader::latest_version(loader, &version)
+        .await
+        .map_err(text)?;
+    Instance::create_with_loader(&data_dirs()?, &name, &version, loader, loader_version)
         .await
         .map_err(text)
 }

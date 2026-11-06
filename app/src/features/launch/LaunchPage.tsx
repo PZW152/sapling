@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { loaderName } from "../../shell/loaders";
 import { useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
@@ -81,7 +82,7 @@ export function LaunchPage() {
         ) : (
           <div className="hero-top">
             <p className="hero-name" key={selected?.id}>
-              {selected?.name}，原版
+              {selected?.name}，{selected && loaderName(selected.loader)}
             </p>
             <VersionNumber version={selected?.version ?? ""} />
           </div>

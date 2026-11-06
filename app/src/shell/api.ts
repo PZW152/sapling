@@ -4,6 +4,7 @@ import type {
   Instance,
   LaunchEvent,
   LauncherConfig,
+  LoaderKind,
   LoginCode,
   ModFile,
   Profile,
@@ -23,8 +24,8 @@ export const api = {
   saveConfig: (config: LauncherConfig) => invoke<void>("save_config", { config }),
 
   listInstances: () => invoke<Instance[]>("list_instances"),
-  createInstance: (name: string, version: string) =>
-    invoke<Instance>("create_instance", { name, version }),
+  createInstance: (name: string, version: string, loader: LoaderKind) =>
+    invoke<Instance>("create_instance", { name, version, loader }),
   saveInstance: (instance: Instance) => invoke<void>("save_instance", { instance }),
   deleteInstance: (id: string) => invoke<void>("delete_instance", { id }),
   openInstanceFolder: (id: string) => invoke<void>("open_instance_folder", { id }),

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../shell/api";
 import type { ModAction } from "../../shell/api";
+import { useApp } from "../../shell/AppContext";
 import type { ModFile } from "../../shell/types";
 
 const BYTES_PER_MB = 1024 * 1024;
@@ -8,6 +9,8 @@ const BYTES_PER_MB = 1024 * 1024;
 export function ModList({ instanceId }: { instanceId: string }) {
   const [mods, setMods] = useState<ModFile[]>([]);
   const [error, setError] = useState("");
+  const { selected } = useApp();
+  const vanilla = selected?.loader === "vanilla";
 
   const load = useCallback(() => {
     api.listMods(instanceId)
@@ -44,7 +47,9 @@ export function ModList({ instanceId }: { instanceId: string }) {
       <ul className="mods">
         {mods.length === 0 && (
           <li className="mods-empty">
-            把 .jar 放進模組資料夾就會出現在這裡。原版不會載入模組，要等之後支援載入器。
+            {vanilla
+              ? "原版不會載入模組。想用模組，請新增一個 Fabric 實例。"
+              : "把 .jar 放進模組資料夾就會出現在這裡。"}
           </li>
         )}
         {mods.map((file) => (

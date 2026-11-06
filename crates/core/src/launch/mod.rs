@@ -16,6 +16,7 @@ use tokio::sync::{mpsc, watch};
 use crate::auth::Session;
 use crate::download::DownloadProgress;
 use crate::instance::{Instance, worlds};
+use crate::loader::{self, LoaderError};
 use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{
@@ -39,6 +40,8 @@ const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstde
 pub enum LaunchError {
     #[error(transparent)]
     Install(#[from] InstallError),
+    #[error(transparent)]
+    Loader(#[from] LoaderError),
     #[error("無法建立遊戲資料夾：{}", path.display())]
     GameDir {
         path: PathBuf,
@@ -127,7 +130,17 @@ pub async fn play(
         prepared = prepare => prepared?,
         () = cancel.cancelled() => return Ok(()),
     };
-    let details = instance.loader.loader().apply(prepared.details.clone());
+    let apply_loader = loader::prepare(
+        instance.loader,
+        &instance.loader_version,
+        prepared.details.clone(),
+        dirs,
+        concurrency,
+    );
+    let details = tokio::select! {
+        details = apply_loader => details?,
+        () = cancel.cancelled() => return Ok(()),
+    };
     let prepared = PreparedVersion {
         details,
         ..prepared

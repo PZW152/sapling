@@ -37,7 +37,7 @@ export function useInstall() {
     if (existing) {
       return existing;
     }
-    const created = await api.createInstance(version, version);
+    const created = await api.createInstance(version, version, "vanilla");
     await loadInstances();
     return created;
   }

@@ -4,11 +4,15 @@ export type Profile = { id: string; name: string; skinUrl: string | null };
 
 export type LoginCode = { userCode: string; verificationUri: string };
 
+export type LoaderKind = "vanilla" | "fabric";
+
 export type Instance = {
   id: string;
   name: string;
   version: string;
-  loader: string;
+  loader: LoaderKind;
+  /** 載入器版本，原版是空的。 */
+  loaderVersion: string;
   /** 0 代表自動分配。 */
   memoryMb: number;
   javaArgs: string;

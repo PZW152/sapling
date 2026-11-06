@@ -46,6 +46,9 @@ pub struct Instance {
     pub name: String,
     pub version: String,
     pub loader: LoaderKind,
+    /// 載入器版本，原版是空的。舊實例沒有這個欄位。
+    #[serde(default)]
+    pub loader_version: String,
     /// 分配給遊戲的記憶體，`AUTO_MEMORY` 代表自動。
     pub memory_mb: u32,
     /// 額外的 Java 參數，用空白分隔。
@@ -53,14 +56,26 @@ pub struct Instance {
 }
 
 impl Instance {
-    /// 建立並保存一個新實例。
+    /// 建立並保存一個新的原版實例。
     pub async fn create(dirs: &DataDirs, name: &str, version: &str) -> Result<Self, InstanceError> {
+        Self::create_with_loader(dirs, name, version, LoaderKind::Vanilla, String::new()).await
+    }
+
+    /// 建立並保存一個使用指定載入器的新實例。
+    pub async fn create_with_loader(
+        dirs: &DataDirs,
+        name: &str,
+        version: &str,
+        loader: LoaderKind,
+        loader_version: String,
+    ) -> Result<Self, InstanceError> {
         let name = clean_name(name)?;
         let instance = Self {
             id: next_id(&Self::list(dirs).await?),
             name,
             version: version.to_string(),
-            loader: LoaderKind::Vanilla,
+            loader,
+            loader_version,
             memory_mb: AUTO_MEMORY,
             java_args: String::new(),
         };
