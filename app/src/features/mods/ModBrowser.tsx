@@ -55,7 +55,7 @@ export function ModBrowser({
   }
 
   return (
-    <>
+    <div className="mod-browser">
       <div className="mods-head">
         <h3>下載模組</h3>
         <button className="text-button" onClick={onClose}>
@@ -104,6 +104,6 @@ export function ModBrowser({
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }

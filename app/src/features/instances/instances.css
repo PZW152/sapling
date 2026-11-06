@@ -229,3 +229,13 @@
   color: var(--color-faint);
   font-size: var(--text-xs);
 }
+
+/* 搜尋模組時佔滿整個區塊，其他內容暫時收起。 */
+.instance-detail:has(.mod-browser) > :not(.mod-browser) {
+  display: none;
+}
+
+.mod-browser {
+  display: grid;
+  gap: var(--space-3);
+}
