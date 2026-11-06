@@ -19,51 +19,12 @@
   color: var(--color-on-dark);
   background: var(--color-hero);
   container-type: size;
-  transition: background-color var(--slow) var(--ease);
-}
-
-/* 運行時，一道柔光緩緩掃過主區塊。 */
-.hero.running::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.1) 50%, transparent 60%);
-  pointer-events: none;
-  animation: sweep 3.2s ease-in-out infinite;
-  content: "";
-}
-
-@keyframes sweep {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(100%);
-  }
-}
-
-.hero.failed {
-  animation: shake 420ms var(--ease);
-}
-
-@keyframes shake {
-  25% {
-    transform: translateX(-5px);
-  }
-
-  55% {
-    transform: translateX(4px);
-  }
-
-  80% {
-    transform: translateX(-2px);
-  }
+  transition: background-color var(--medium) var(--ease);
 }
 
 .hero-name {
   font-size: var(--text-lg);
   font-weight: 500;
-  animation: title-in var(--medium) var(--ease);
 }
 
 .hero-welcome {
@@ -81,19 +42,6 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.035em;
-}
-
-.digit {
-  display: inline-block;
-  animation: digit-in var(--slow) var(--spring) backwards;
-  animation-delay: calc(var(--i) * 70ms);
-}
-
-@keyframes digit-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.12em) scale(0.98);
-  }
 }
 
 .hero-bottom {
@@ -139,7 +87,7 @@
   font-size: var(--text-sm);
   background: var(--color-surface);
   user-select: text;
-  animation: tile-in var(--medium) var(--spring);
+  animation: tile-in var(--medium) var(--ease);
 }
 
 .hero-error .text-button {
@@ -158,8 +106,7 @@
 }
 
 .primary:hover:enabled {
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.24);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .primary-label {
@@ -288,6 +235,7 @@
 }
 
 .row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -303,7 +251,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  transition: transform var(--medium) var(--spring);
+  transition: transform var(--medium) var(--ease);
 }
 
 .row small {
@@ -455,7 +403,7 @@
   color: var(--color-ink);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
-  animation: tile-in var(--medium) var(--spring);
+  animation: tile-in var(--medium) var(--ease);
 }
 
 .log-panel header {

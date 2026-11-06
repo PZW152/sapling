@@ -4,7 +4,7 @@ import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { loaderName } from "../../shell/loaders";
-import { useSlideMark } from "../../shell/motion";
+import { useChangeFade, useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
 import { LaunchOverlay } from "./LaunchOverlay";
@@ -80,7 +80,7 @@ export function LaunchPage() {
           </div>
         ) : (
           <div className="hero-top">
-            <p className="hero-name" key={selected?.id}>
+            <p className="hero-name">
               {selected?.name}，{selected && loaderName(selected.loader)}
             </p>
             <VersionNumber version={selected?.version ?? ""} />
@@ -181,24 +181,17 @@ function versionUnits(version: string) {
   return Math.max(version.length - dots / 2, 1);
 }
 
-/** 版本號換掉時，只有變動的字元彈入。 */
+/** 換實例時淡入，切分頁回來時不動。 */
 function VersionNumber({ version }: { version: string }) {
+  const number = useChangeFade<HTMLHeadingElement>(version);
+
   return (
     <h2
+      ref={number}
       className="version-number"
-      aria-label={version}
       style={{ "--units": versionUnits(version) } as CSSProperties}
     >
-      {[...version].map((character, index) => (
-        <span
-          key={`${index}-${character}`}
-          className="digit"
-          aria-hidden="true"
-          style={{ "--i": index } as CSSProperties}
-        >
-          {character}
-        </span>
-      ))}
+      {version}
     </h2>
   );
 }

@@ -21,7 +21,7 @@
   fill: none;
   stroke: currentColor;
   stroke-width: 1.4;
-  transition: transform var(--medium) var(--spring);
+  transition: transform var(--medium) var(--ease);
 }
 
 .disclosure[aria-expanded="true"] svg {
@@ -165,7 +165,7 @@
   border-radius: 50%;
   background: var(--color-hero);
   appearance: none;
-  transition: transform var(--medium) var(--spring);
+  transition: transform var(--medium) var(--ease);
 }
 
 .setting input[type="range"]:hover:enabled::-webkit-slider-thumb {

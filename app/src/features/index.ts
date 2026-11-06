@@ -1,9 +1,9 @@
 import type { Feature } from "../shell/feature";
 import { about } from "./about";
 import { appearance } from "./appearance";
-import { arborDay } from "./arbor-day";
 import { crash } from "./crash";
 import { download } from "./download";
+import { easterEggs } from "./easter-eggs";
 import { instances } from "./instances";
 import { launch } from "./launch";
 import { modpacks } from "./modpacks";
@@ -29,5 +29,5 @@ export const FEATURES: Feature[] = [
   storageCleanup,
   settings,
   about,
-  arborDay,
+  easterEggs,
 ];

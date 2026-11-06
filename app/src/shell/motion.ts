@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+const CHANGE_FADE_MS = 300;
+
 /** 讓標記平滑滑到容器裡目前選中的項目。 */
 export function useSlideMark<T extends HTMLElement>(dependency: unknown) {
   const container = useRef<T>(null);
@@ -18,27 +20,23 @@ export function useSlideMark<T extends HTMLElement>(dependency: unknown) {
   return container;
 }
 
-/** 按下按鈕時，從點擊位置擴散一圈水波。 */
-export function useRipples() {
+/** 內容換掉時淡入。切分頁不算換掉，所以不用 CSS 動畫，否則每次回到頁面都會重播。 */
+export function useChangeFade<T extends HTMLElement>(value: unknown) {
+  const element = useRef<T>(null);
+  const previous = useRef(value);
+
   useEffect(() => {
-    function spawn(event: PointerEvent) {
-      const button = (event.target as Element).closest<HTMLElement>(
-        ".primary, .secondary, .row, .instance-item, .theme, .chip, .world",
-      );
-      if (!button || button.matches(":disabled")) {
-        return;
-      }
-      const bounds = button.getBoundingClientRect();
-      const size = Math.max(bounds.width, bounds.height) * 2;
-      const ripple = document.createElement("span");
-      ripple.className = "ripple";
-      ripple.style.width = ripple.style.height = `${size}px`;
-      ripple.style.left = `${event.clientX - bounds.left - size / 2}px`;
-      ripple.style.top = `${event.clientY - bounds.top - size / 2}px`;
-      ripple.addEventListener("animationend", () => ripple.remove());
-      button.append(ripple);
+    if (previous.current === value) {
+      return;
     }
-    document.addEventListener("pointerdown", spawn);
-    return () => document.removeEventListener("pointerdown", spawn);
-  }, []);
+    previous.current = value;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      element.current?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: CHANGE_FADE_MS,
+        easing: "cubic-bezier(0.2, 0, 0, 1)",
+      });
+    }
+  }, [value]);
+
+  return element;
 }

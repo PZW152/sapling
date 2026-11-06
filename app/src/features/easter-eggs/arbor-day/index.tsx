@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
-import { revealChange } from "../../shell/applyTheme";
-import { useApp } from "../../shell/AppContext";
-import type { Feature } from "../../shell/feature";
+import { revealChange } from "../../../shell/applyTheme";
+import { useApp } from "../../../shell/AppContext";
+import type { EasterEgg } from "..";
 import { isArborDay, wearsZhongshan } from "./day";
 import { BloomProgress, PlumBlossom } from "./PlumBlossom";
 import "./arbor-day.css";
@@ -84,11 +84,8 @@ function Motto() {
   );
 }
 
-export const arborDay: Feature = {
-  id: "arbor-day",
-  name: "植樹節",
-  description: "3 月 12 日的限定彩蛋：種下樹後，當天換上中山主題",
-  optional: true,
+/** 3 月 12 日種下樹後，當天換上中山主題。 */
+export const arborDay: EasterEgg = {
   Overlay: ArborDayNote,
   HeroPanel: Motto,
   launchProgress: ({ plantedYears }) =>

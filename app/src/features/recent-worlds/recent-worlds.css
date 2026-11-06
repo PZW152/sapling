@@ -21,8 +21,6 @@
 
 .worlds li {
   min-width: 0;
-  animation: tile-in var(--slow) var(--ease) backwards;
-  animation-delay: calc(var(--i) * var(--stagger));
 }
 
 .world {
@@ -35,14 +33,11 @@
   color: var(--color-on-dark);
   text-align: left;
   background: var(--color-hero-soft);
-  transition:
-    background-color var(--medium) var(--ease),
-    transform var(--medium) var(--ease);
+  transition: background-color var(--fast) var(--ease);
 }
 
 .world:hover:enabled {
   background: color-mix(in srgb, var(--color-hero-soft) 82%, white);
-  transform: translateY(-2px);
 }
 
 .world:disabled {

@@ -70,7 +70,7 @@
   align-items: center;
   gap: var(--space-3);
   font-family: var(--font-brush);
-  animation: title-in var(--slow) var(--ease);
+  animation: title-in var(--medium) var(--ease);
 }
 
 .motto span {
@@ -90,8 +90,8 @@
 .plum-stamens {
   transform-origin: 0 0;
   transition:
-    transform var(--slow) var(--ease),
-    opacity var(--slow) var(--ease);
+    transform var(--medium) var(--ease),
+    opacity var(--medium) var(--ease);
 }
 
 .plum-outline {

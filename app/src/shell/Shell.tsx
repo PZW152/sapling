@@ -1,12 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FEATURES } from "../features";
 import { AppProvider, useApp } from "./AppContext";
 import type { Feature } from "./feature";
 import { FeatureBoundary } from "./FeatureBoundary";
 import { ICONS } from "./icons";
-import { useRipples, useSlideMark } from "./motion";
+import { useSlideMark } from "./motion";
 
 const HOME_TAB = "launch";
 
@@ -24,7 +23,6 @@ export function Shell() {
 
 function Frame() {
   const { activeTab, isEnabled } = useApp();
-  useRipples();
   const features = useMemo(
     () => FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id)),
     [isEnabled],
@@ -36,17 +34,12 @@ function Frame() {
   );
   const current = tabs[index];
 
-  // 內容跟著導航方向滑入：往下一頁從下方進來，往回從上方進來。
-  const lastIndex = useRef(index);
-  const direction = index >= lastIndex.current ? 1 : -1;
-  lastIndex.current = index;
-
   return (
-    <div className="app" style={{ "--dir": direction } as CSSProperties}>
+    <div className="app">
       <Rail tabs={tabs} current={current?.id ?? HOME_TAB} />
       <div className="body">
         <header className="top" data-tauri-drag-region>
-          <h1 key={current?.id} data-tauri-drag-region>
+          <h1 data-tauri-drag-region>
             {current?.tab?.label}
           </h1>
           <WindowControls />

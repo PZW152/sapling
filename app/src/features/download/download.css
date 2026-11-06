@@ -22,11 +22,6 @@
   scrollbar-width: thin;
 }
 
-.vine-series {
-  animation: tile-in var(--slow) var(--spring) backwards;
-  animation-delay: calc(var(--i) * var(--stagger));
-}
-
 .vine-title {
   padding: var(--space-3) var(--space-2) var(--space-1);
   color: var(--color-muted);
@@ -56,16 +51,11 @@
   background: var(--color-line);
   transition:
     background-color var(--medium) var(--ease),
-    transform var(--medium) var(--spring);
-}
-
-.vine-row:hover .vine-leaf {
-  transform: scale(1.4);
+    transform var(--medium) var(--ease);
 }
 
 .vine-row.installed .vine-leaf {
   background: var(--color-hero);
-  animation: pop var(--slow) var(--spring);
 }
 
 @keyframes pop {
