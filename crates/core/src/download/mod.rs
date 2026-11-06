@@ -16,6 +16,12 @@ use tokio::task::{JoinError, JoinSet};
 pub const DEFAULT_CONCURRENCY: usize = 16;
 
 const MAX_ATTEMPTS: u32 = 3;
+/// Modrinth 要求每個程式帶上可以識別的名稱。
+const USER_AGENT: &str = concat!(
+    "sapling-launcher/",
+    env!("CARGO_PKG_VERSION"),
+    " (github.com/PZW152/sapling)"
+);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 /// 連線後超過這個時間收不到新資料就算失敗。不設總時限，大檔案在慢網絡下也能下完。
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
@@ -79,6 +85,7 @@ pub enum DownloadOutcome {
 
 pub fn new_client() -> Result<reqwest::Client, DownloadError> {
     reqwest::Client::builder()
+        .user_agent(USER_AGENT)
         .connect_timeout(CONNECT_TIMEOUT)
         .read_timeout(READ_TIMEOUT)
         .build()

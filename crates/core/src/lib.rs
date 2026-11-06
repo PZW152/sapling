@@ -7,6 +7,7 @@ pub mod instance;
 pub mod java;
 pub mod launch;
 pub mod loader;
+pub mod modrinth;
 pub mod platform;
 mod storage;
 pub mod update;

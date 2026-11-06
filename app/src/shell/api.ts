@@ -7,6 +7,7 @@ import type {
   LoaderKind,
   LoginCode,
   ModFile,
+  ModHit,
   Profile,
   UpdateInfo,
   VersionList,
@@ -34,6 +35,11 @@ export const api = {
   recentWorlds: (id: string) => invoke<World[]>("recent_worlds", { id }),
   listWorlds: (id: string) => invoke<World[]>("list_worlds", { id }),
   backupWorld: (id: string, folder: string) => invoke<string>("backup_world", { id, folder }),
+
+  searchMods: (query: string, version: string, loader: LoaderKind) =>
+    invoke<ModHit[]>("search_mods", { query, version, loader }),
+  installMod: (id: string, projectId: string) =>
+    invoke<string[]>("install_mod", { id, projectId }),
 
   listMods: (id: string) => invoke<ModFile[]>("list_mods", { id }),
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),

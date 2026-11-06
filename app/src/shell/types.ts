@@ -37,6 +37,14 @@ export type World = {
   icon: number[] | null;
 };
 
+export type ModHit = {
+  projectId: string;
+  title: string;
+  description: string;
+  downloads: number;
+  iconUrl: string | null;
+};
+
 export type ModFile = { name: string; enabled: boolean; size: number };
 
 export type UpdateInfo = { version: string; notes: string; url: string; sha256: string };

@@ -12,6 +12,7 @@ use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
+use sapling_core::modrinth::{self, ModHit};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
@@ -195,6 +196,36 @@ async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
     worlds::recent(&instance.game_dir(&dirs), RECENT_WORLD_LIMIT)
         .await
         .map_err(text)
+}
+
+#[tauri::command]
+async fn search_mods(
+    query: String,
+    version: String,
+    loader: LoaderKind,
+) -> Result<Vec<ModHit>, String> {
+    let client = new_client().map_err(text)?;
+    modrinth::search(&client, &query, &version, loader)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn install_mod(id: String, project_id: String) -> Result<Vec<String>, String> {
+    let dirs = data_dirs()?;
+    let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let instance = load_instance(&dirs, &id).await?;
+    let client = new_client().map_err(text)?;
+    modrinth::install(
+        &client,
+        &project_id,
+        &instance.version,
+        instance.loader,
+        &mods::mods_dir(&instance.game_dir(&dirs)),
+        config.download_concurrency,
+    )
+    .await
+    .map_err(text)
 }
 
 #[tauri::command]
@@ -424,6 +455,8 @@ pub fn run() {
             list_worlds,
             backup_world,
             recent_worlds,
+            search_mods,
+            install_mod,
             list_mods,
             set_mod_enabled,
             delete_mod,

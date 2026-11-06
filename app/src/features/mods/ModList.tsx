@@ -3,12 +3,14 @@ import { api } from "../../shell/api";
 import type { ModAction } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { ModFile } from "../../shell/types";
+import { ModBrowser } from "./ModBrowser";
 
 const BYTES_PER_MB = 1024 * 1024;
 
 export function ModList({ instanceId }: { instanceId: string }) {
   const [mods, setMods] = useState<ModFile[]>([]);
   const [error, setError] = useState("");
+  const [browsing, setBrowsing] = useState(false);
   const { selected } = useApp();
   const vanilla = selected?.loader === "vanilla";
 
@@ -31,25 +33,44 @@ export function ModList({ instanceId }: { instanceId: string }) {
       .catch((reason) => setError(String(reason)));
   }
 
+  if (browsing && selected) {
+    return (
+      <ModBrowser
+        instance={selected}
+        onClose={() => {
+          setBrowsing(false);
+          load();
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div className="mods-head">
         <h3>模組</h3>
-        <button
-          className="text-button"
-          onClick={() =>
-            api.openModsFolder(instanceId).catch((reason) => setError(String(reason)))
-          }
-        >
-          打開模組資料夾
-        </button>
+        <div className="mods-actions">
+          {!vanilla && (
+            <button className="text-button" onClick={() => setBrowsing(true)}>
+              下載模組
+            </button>
+          )}
+          <button
+            className="text-button"
+            onClick={() =>
+              api.openModsFolder(instanceId).catch((reason) => setError(String(reason)))
+            }
+          >
+            打開資料夾
+          </button>
+        </div>
       </div>
       <ul className="mods">
         {mods.length === 0 && (
           <li className="mods-empty">
             {vanilla
               ? "原版不會載入模組。想用模組，請新增一個 Fabric 實例。"
-              : "把 .jar 放進模組資料夾就會出現在這裡。"}
+              : "按「下載模組」搜尋，或把 .jar 放進模組資料夾。"}
           </li>
         )}
         {mods.map((file) => (

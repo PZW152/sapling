@@ -22,7 +22,7 @@ pub enum ModrinthError {
     #[error("Modrinth 回傳的資料看不懂，可能是對方改了格式")]
     Parse(#[from] serde_json::Error),
     #[error("模組搜尋的網址有問題")]
-    Url(#[from] url::ParseError),
+    BadUrl,
     #[error("{project} 沒有適合這個遊戲版本和載入器的檔案")]
     NoCompatibleVersion { project: String },
     #[error("原版不能安裝模組，請新增一個 Fabric 實例")]
@@ -112,7 +112,8 @@ pub async fn search(
             ("index", index),
             ("limit", limit.as_str()),
         ],
-    )?;
+    )
+    .map_err(|_| ModrinthError::BadUrl)?;
     let result: SearchResult = serde_json::from_str(&fetch_text(client, url.as_str()).await?)?;
     Ok(result.hits)
 }
@@ -203,7 +204,8 @@ async fn compatible_version(
             ("game_versions", game_versions.as_str()),
             ("loaders", loaders.as_str()),
         ],
-    )?;
+    )
+    .map_err(|_| ModrinthError::BadUrl)?;
     let versions: Vec<ModVersion> = serde_json::from_str(&fetch_text(client, url.as_str()).await?)?;
     pick_version(versions).ok_or_else(|| ModrinthError::NoCompatibleVersion {
         project: project.to_string(),
