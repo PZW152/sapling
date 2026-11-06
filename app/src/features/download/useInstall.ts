@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, onInstallEvent } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
+import { loaderName } from "../../shell/loaders";
 import { overallProgress } from "../../shell/progress";
-import type { Progress } from "../../shell/types";
+import type { LoaderKind, Progress } from "../../shell/types";
 
 /** 目前的下載。失敗時保留 `error`，讓對應版本顯示原因。 */
 export type InstallState = {
@@ -30,23 +31,28 @@ export function useInstall() {
     [],
   );
 
-  /** 找到這個版本的實例；沒有就建立一個，以版本號為名稱。 */
-  async function instanceForVersion(version: string) {
+  /** 找到這個版本和載入器的實例；沒有就建立一個。 */
+  async function instanceFor(version: string, loader: LoaderKind) {
     const instances = await api.listInstances();
-    const existing = instances.find((instance) => instance.version === version);
+    const existing = instances.find(
+      (instance) => instance.version === version && instance.loader === loader,
+    );
     if (existing) {
       return existing;
     }
-    const created = await api.createInstance(version, version, "vanilla");
+    const name = loader === "vanilla" ? version : `${version} ${loaderName(loader)}`;
+    const created = await api.createInstance(name, version, loader);
     await loadInstances();
     return created;
   }
 
-  async function installGame(version: string) {
+  async function installGame(version: string, loader: LoaderKind) {
     setInstall({ id: version, progress: null, percent: 0, error: "" });
     try {
+      // 先建立實例：這個版本沒有對應的載入器時，不用等遊戲下載完才知道。
+      const instance = await instanceFor(version, loader);
       await api.installGame(version);
-      selectInstance((await instanceForVersion(version)).id);
+      selectInstance(instance.id);
       setInstall(null);
       await loadVersions();
     } catch (reason) {
@@ -54,9 +60,13 @@ export function useInstall() {
     }
   }
 
-  async function playVersion(version: string) {
-    selectInstance((await instanceForVersion(version)).id);
-    goTo("launch");
+  async function playVersion(version: string, loader: LoaderKind) {
+    try {
+      selectInstance((await instanceFor(version, loader)).id);
+      goTo("launch");
+    } catch (reason) {
+      setInstall({ id: version, progress: null, percent: 0, error: String(reason) });
+    }
   }
 
   return { install, installGame, playVersion };

@@ -10,12 +10,6 @@ export const ICONS: Record<string, ReactNode> = {
     </>
   ),
   download: <path d="M12 4v11M7 11l5 5 5-5M5 20h14" />,
-  modpacks: (
-    <>
-      <path d="M12 3 4 7.5v9L12 21l8-4.5v-9z" />
-      <path d="M4 7.5 12 12l8-4.5M12 12v9" />
-    </>
-  ),
   settings: (
     <>
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />

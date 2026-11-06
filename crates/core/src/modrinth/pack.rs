@@ -18,7 +18,7 @@ use crate::loader::LoaderKind;
 use crate::platform::DataDirs;
 use crate::versions::fetch_manifest;
 
-use super::{API_URL, FileHashes, ModHit, ModVersion, ModrinthError, pick_version, search_hits};
+use super::{API_URL, FileHashes, ModVersion, ModrinthError, fetch_version, pick_version};
 
 const INDEX_FILE: &str = "modrinth.index.json";
 const SUPPORTED_FORMAT: u32 = 1;
@@ -68,33 +68,20 @@ struct PackTarget {
     loader_version: String,
 }
 
-/// 搜尋目前能安裝的整合包。沒有關鍵字時列出最熱門的。
-pub async fn search_packs(
-    client: &reqwest::Client,
-    query: &str,
-) -> Result<Vec<ModHit>, ModrinthError> {
-    let facets = serde_json::json!([
-        ["project_type:modpack"],
-        [
-            "categories:fabric",
-            "categories:forge",
-            "categories:neoforge"
-        ],
-    ])
-    .to_string();
-    search_hits(client, query, &facets).await
-}
-
 /// 下載並安裝整合包，回傳新建立的實例。中途失敗不會留下半成品。
 pub async fn install_pack(
     client: &reqwest::Client,
     dirs: &DataDirs,
     project_id: &str,
+    version_id: Option<&str>,
     name: &str,
     concurrency: usize,
     on_progress: impl FnMut(DownloadProgress),
 ) -> Result<Instance, ModrinthError> {
-    let version = latest_pack_version(client, project_id).await?;
+    let version = match version_id {
+        Some(id) => fetch_version(client, id).await?,
+        None => latest_pack_version(client, project_id).await?,
+    };
     let pack_path = dirs.root().join(format!("{}.mrpack.tmp", version.id));
     let file = version
         .files

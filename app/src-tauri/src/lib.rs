@@ -15,7 +15,9 @@ use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
 use sapling_core::modrinth::pack;
-use sapling_core::modrinth::{self, ModHit};
+use sapling_core::modrinth::{
+    self, InstallTarget, ProjectKind, ProjectVersion, SearchPage, SearchRequest, Wanted,
+};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
@@ -202,15 +204,24 @@ async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
 }
 
 #[tauri::command]
-async fn search_packs(query: String) -> Result<Vec<ModHit>, String> {
+async fn search_projects(request: SearchRequest) -> Result<SearchPage, String> {
     let client = new_client().map_err(text)?;
-    pack::search_packs(&client, &query).await.map_err(text)
+    modrinth::search(&client, &request).await.map_err(text)
+}
+
+#[tauri::command]
+async fn project_versions(project_id: String) -> Result<Vec<ProjectVersion>, String> {
+    let client = new_client().map_err(text)?;
+    modrinth::project_versions(&client, &project_id)
+        .await
+        .map_err(text)
 }
 
 #[tauri::command]
 async fn install_pack(
     app: AppHandle,
     project_id: String,
+    version_id: Option<String>,
     name: String,
 ) -> Result<Instance, String> {
     let dirs = data_dirs()?;
@@ -221,6 +232,7 @@ async fn install_pack(
         &client,
         &dirs,
         &project_id,
+        version_id.as_deref(),
         &name,
         config.download_concurrency,
         move |progress| {
@@ -237,36 +249,31 @@ async fn install_pack(
     .map_err(text)
 }
 
+/// 指定版本時裝那個版本，否則裝最適合這個實例的版本。
 #[tauri::command]
-async fn search_mods(
-    query: String,
-    version: String,
-    loader: LoaderKind,
-) -> Result<Vec<ModHit>, String> {
-    let client = new_client().map_err(text)?;
-    modrinth::search(&client, &query, &version, loader)
-        .await
-        .map_err(text)
-}
-
-#[tauri::command]
-async fn install_mod(id: String, project_id: String) -> Result<Vec<String>, String> {
+async fn install_project(
+    id: String,
+    kind: ProjectKind,
+    project_id: String,
+    version_id: Option<String>,
+) -> Result<Vec<String>, String> {
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
     let instance = load_instance(&dirs, &id).await?;
     let client = new_client().map_err(text)?;
     let other_mods_dirs = mods::all_mods_dirs(&dirs).await.map_err(text)?;
-    modrinth::install(
-        &client,
-        &project_id,
-        &instance.version,
-        instance.loader,
-        &mods::mods_dir(&instance.game_dir(&dirs)),
-        &other_mods_dirs,
-        config.download_concurrency,
-    )
-    .await
-    .map_err(text)
+    let game_dir = instance.game_dir(&dirs);
+    let wanted = version_id.map_or(Wanted::Project(project_id), Wanted::Version);
+    let target = InstallTarget {
+        game_version: &instance.version,
+        loader: instance.loader,
+        game_dir: &game_dir,
+        other_mods_dirs: &other_mods_dirs,
+        concurrency: config.download_concurrency,
+    };
+    modrinth::install(&client, kind, wanted, &target)
+        .await
+        .map_err(text)
 }
 
 #[tauri::command]
@@ -562,10 +569,10 @@ pub fn run() {
             list_worlds,
             backup_world,
             recent_worlds,
-            search_packs,
+            search_projects,
+            project_versions,
             install_pack,
-            search_mods,
-            install_mod,
+            install_project,
             list_mods,
             set_mod_enabled,
             delete_mod,

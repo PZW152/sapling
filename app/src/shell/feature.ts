@@ -27,6 +27,8 @@ export type Feature = {
     /** 固定在側欄底部。 */
     pinned?: boolean;
   };
+  /** 下載頁的分頁。 */
+  downloadSections?: { id: string; label: string; Panel: ComponentType }[];
   /** 放進設定頁的區塊。 */
   Settings?: ComponentType;
   /** 放進設定頁「進階設定」的區塊，平時收起。 */

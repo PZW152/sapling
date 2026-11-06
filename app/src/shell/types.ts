@@ -45,12 +45,40 @@ export type ImportSource = {
   worlds: World[];
 };
 
+export type ProjectKind = "mod" | "modpack" | "resourcePack" | "shader";
+
 export type ModHit = {
   projectId: string;
   title: string;
   description: string;
   downloads: number;
   iconUrl: string | null;
+  author: string;
+  categories: string[];
+  dateModified: string;
+};
+
+export type SearchRequest = {
+  query: string;
+  kind: ProjectKind;
+  gameVersion: string | null;
+  loader: LoaderKind | null;
+  category: string | null;
+  sort: string | null;
+  offset: number;
+};
+
+export type SearchPage = { hits: ModHit[]; total: number };
+
+export type ProjectVersion = {
+  id: string;
+  name: string;
+  gameVersions: string[];
+  loaders: string[];
+  versionType: string;
+  datePublished: string;
+  fileName: string;
+  size: number;
 };
 
 export type ModFile = { name: string; enabled: boolean; size: number };

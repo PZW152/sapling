@@ -1,12 +1,66 @@
+import { useState } from "react";
 import type { CSSProperties } from "react";
+import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { FeatureBoundary } from "../../shell/FeatureBoundary";
+import { LOADERS } from "../../shell/loaders";
+import type { LoaderKind } from "../../shell/types";
 import { groupBySeries } from "./series";
 import { useInstall } from "./useInstall";
 import type { InstallState } from "./useInstall";
 
+const GAME_SECTION = "game";
+
+/** 頂部分頁切換內容。全部保持掛載，切走時下載進度不會消失。 */
 export function DownloadPage() {
+  const { isEnabled } = useApp();
+  const [current, setCurrent] = useState(GAME_SECTION);
+  const sections = FEATURES.filter(
+    (feature) => !feature.optional || isEnabled(feature.id),
+  ).flatMap((feature) =>
+    (feature.downloadSections ?? []).map((section) => ({ ...section, feature: feature.name })),
+  );
+  const active = sections.some(({ id }) => id === current) ? current : GAME_SECTION;
+
+  function tab(id: string, label: string) {
+    return (
+      <button
+        key={id}
+        className="segment"
+        aria-current={id === active ? "page" : undefined}
+        onClick={() => setCurrent(id)}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <div className="download-page">
+      {sections.length > 0 && (
+        <nav className="segments" aria-label="下載內容">
+          {tab(GAME_SECTION, "遊戲")}
+          {sections.map(({ id, label }) => tab(id, label))}
+        </nav>
+      )}
+      <div className="download-section" hidden={active !== GAME_SECTION}>
+        <GameDownloads />
+      </div>
+      {sections.map(({ id, feature, Panel }) => (
+        <div key={id} className="download-section" hidden={active !== id}>
+          <FeatureBoundary name={feature}>
+            <Panel />
+          </FeatureBoundary>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function GameDownloads() {
   const { list, listError, loadVersions } = useApp();
   const { install, installGame, playVersion } = useInstall();
+  const [loader, setLoader] = useState<LoaderKind>("vanilla");
 
   if (!list && !listError) {
     return (
@@ -41,6 +95,18 @@ export function DownloadPage() {
       <div className="download-head">
         <h2>下載遊戲</h2>
         <p>下載好的版本會自動建立實例，需要的 Java 會一起下載。</p>
+        <div className="chips" role="group" aria-label="載入器">
+          {LOADERS.map(({ kind, name }) => (
+            <button
+              key={kind}
+              className="chip"
+              aria-pressed={kind === loader}
+              onClick={() => setLoader(kind)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
       </div>
       <ul className="vine">
         {groupBySeries(list.versions).map(({ series, versions }, index) => (
@@ -53,8 +119,8 @@ export function DownloadPage() {
                 isLatest={id === list.latest}
                 isInstalled={list.installed.includes(id)}
                 install={install}
-                onInstall={installGame}
-                onPlay={playVersion}
+                onInstall={(version) => installGame(version, loader)}
+                onPlay={(version) => playVersion(version, loader)}
               />
             ))}
           </li>

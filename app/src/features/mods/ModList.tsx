@@ -3,7 +3,7 @@ import { api } from "../../shell/api";
 import type { ModAction } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import type { ModFile } from "../../shell/types";
-import { ModBrowser } from "./ModBrowser";
+import { ResourceBrowser } from "./ResourceBrowser";
 
 const BYTES_PER_MB = 1024 * 1024;
 
@@ -35,8 +35,12 @@ export function ModList({ instanceId }: { instanceId: string }) {
 
   if (browsing && selected) {
     return (
-      <ModBrowser
+      <ResourceBrowser
+        kind="mod"
         instance={selected}
+        install={async (hit, versionId) => {
+          await api.installProject(selected.id, "mod", hit.projectId, versionId);
+        }}
         onClose={() => {
           setBrowsing(false);
           load();

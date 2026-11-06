@@ -9,7 +9,10 @@ import type {
   LoaderKind,
   LoginCode,
   ModFile,
-  ModHit,
+  ProjectKind,
+  ProjectVersion,
+  SearchPage,
+  SearchRequest,
   Profile,
   UpdateInfo,
   VersionList,
@@ -43,13 +46,13 @@ export const api = {
   listWorlds: (id: string) => invoke<World[]>("list_worlds", { id }),
   backupWorld: (id: string, folder: string) => invoke<string>("backup_world", { id, folder }),
 
-  searchPacks: (query: string) => invoke<ModHit[]>("search_packs", { query }),
-  installPack: (projectId: string, name: string) =>
-    invoke<Instance>("install_pack", { projectId, name }),
-  searchMods: (query: string, version: string, loader: LoaderKind) =>
-    invoke<ModHit[]>("search_mods", { query, version, loader }),
-  installMod: (id: string, projectId: string) =>
-    invoke<string[]>("install_mod", { id, projectId }),
+  searchProjects: (request: SearchRequest) => invoke<SearchPage>("search_projects", { request }),
+  projectVersions: (projectId: string) =>
+    invoke<ProjectVersion[]>("project_versions", { projectId }),
+  installProject: (id: string, kind: ProjectKind, projectId: string, versionId: string | null) =>
+    invoke<string[]>("install_project", { id, kind, projectId, versionId }),
+  installPack: (projectId: string, versionId: string | null, name: string) =>
+    invoke<Instance>("install_pack", { projectId, versionId, name }),
 
   listMods: (id: string) => invoke<ModFile[]>("list_mods", { id }),
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
