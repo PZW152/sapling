@@ -126,9 +126,17 @@ export function AppProvider({
   }, [config.colorMode]);
 
   useEffect(() => {
-    if (loaded) {
-      applyMaterial(config.glass);
+    if (!loaded) {
+      return;
     }
+    applyMaterial(config.glass);
+    // 用戶在 Windows 切換透明效果或高對比時要立刻反應。
+    const follow = () => applyMaterial(config.glass);
+    const queries = ["(prefers-reduced-transparency: reduce)", "(forced-colors: active)"].map(
+      (query) => window.matchMedia(query),
+    );
+    queries.forEach((query) => query.addEventListener("change", follow));
+    return () => queries.forEach((query) => query.removeEventListener("change", follow));
   }, [loaded, config.glass]);
 
   const touchContent = useCallback(() => setContentVersion((version) => version + 1), []);

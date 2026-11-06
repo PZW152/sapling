@@ -20,7 +20,8 @@ use crate::auth::Session;
 use crate::download::DownloadProgress;
 use crate::instance::{Instance, worlds};
 use crate::loader::{self, LoaderError};
-use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
+use crate::logbook;
+use crate::platform::{CREATE_NO_WINDOW, DataDirs, prefer_high_performance_gpu, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{
     InstallError, PrepareStage, PreparedVersion, log_config_argument, prepare_version,
@@ -46,6 +47,15 @@ const QUICK_PLAY_ARGUMENT: &str = "--quickPlaySingleplayer";
 const QUICK_JOIN_FEATURE: &str = "is_quick_play_multiplayer";
 /// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
 const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
+/// 官方啟動器的預設值。版本檔沒有這些，少了遊戲會因垃圾回收而週期性卡頓。
+const GC_ARGUMENTS: [&str; 6] = [
+    "-XX:+UnlockExperimentalVMOptions",
+    "-XX:+UseG1GC",
+    "-XX:G1NewSizePercent=20",
+    "-XX:G1ReservePercent=20",
+    "-XX:MaxGCPauseMillis=50",
+    "-XX:G1HeapRegionSize=32M",
+];
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
@@ -225,6 +235,15 @@ pub async fn play(
     let address = server.unwrap_or(&instance.join_server);
     arguments.extend(server_arguments(&prepared.details, address, world));
     let java = chosen_java(instance, &prepared.java)?;
+    let gpu_java = java.clone();
+    // 要在遊戲開始前設好，Windows 才會用。
+    let _ = tokio::task::spawn_blocking(move || prefer_high_performance_gpu(&gpu_java)).await;
+    logbook::record(&format!(
+        "啟動 {} {:?}，Java {}",
+        instance.version,
+        instance.loader,
+        java.display()
+    ));
     let mut child = Command::new(java)
         .args(&arguments)
         .current_dir(&game_dir)
@@ -276,6 +295,11 @@ pub async fn play(
     }
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
+    logbook::record(&format!(
+        "遊戲結束，代碼 {:?}，玩了 {} 秒",
+        status.code(),
+        started.elapsed().as_secs()
+    ));
     // 只是統計，寫不進去不該影響結果。
     let _ = instance
         .record_play(dirs, started.elapsed().as_secs())
@@ -336,12 +360,25 @@ fn build_arguments(
     let memory_mb = instance.effective_memory_mb(total_memory_mb());
     let mut arguments = vec![format!("-Xmx{memory_mb}M")];
     arguments.extend(OUTPUT_ENCODING_ARGUMENTS.map(str::to_string));
+    arguments.extend(gc_arguments(&instance.java_args));
     arguments.extend(instance.java_args.split_whitespace().map(str::to_string));
     arguments.extend(log_config_argument(details, dirs));
     arguments.extend(expand(&details.arguments.jvm, &values));
     arguments.push(details.main_class.clone());
     arguments.extend(expand(&details.arguments.game, &values));
     arguments
+}
+
+/// 用戶自己選了垃圾回收器時不加預設值：同時指定兩種，Java 會拒絕啟動。
+fn gc_arguments(java_args: &str) -> Vec<String> {
+    let chosen = java_args
+        .split_whitespace()
+        .any(|argument| argument.starts_with("-XX:+Use") && argument.ends_with("GC"));
+    if chosen {
+        Vec::new()
+    } else {
+        GC_ARGUMENTS.map(str::to_string).to_vec()
+    }
 }
 
 /// 用戶指定的 Java 優先。路徑失效時要說清楚，不能默默換成別的版本。
@@ -481,6 +518,17 @@ fn path_text(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn adds_gc_defaults_unless_the_user_chose_one() {
+        assert_eq!(gc_arguments("").len(), GC_ARGUMENTS.len());
+        assert_eq!(
+            gc_arguments("-Dfoo=bar -XX:+UseStringDeduplication").len(),
+            GC_ARGUMENTS.len()
+        );
+        assert!(gc_arguments("-XX:+UseZGC -XX:+ZGenerational").is_empty());
+        assert!(gc_arguments("-XX:+UseShenandoahGC").is_empty());
+    }
 
     #[test]
     fn window_size_needs_both_numbers() {

@@ -6,9 +6,11 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, Mutex, PoisonError};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 
+use reqwest::StatusCode;
+use reqwest::header::HeaderMap;
 use serde::Serialize;
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -36,6 +38,7 @@ const RETRY_DELAY: Duration = if cfg!(test) {
     Duration::from_secs(1)
 };
 const HASH_BUFFER_SIZE: usize = 64 * 1024;
+const MAX_RATE_LIMIT_WAIT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Error)]
 pub enum DownloadError {
@@ -92,6 +95,8 @@ pub enum DownloadOutcome {
     Downloaded,
 }
 
+static SHARED_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
 pub fn new_client() -> Result<reqwest::Client, DownloadError> {
     reqwest::Client::builder()
         .user_agent(USER_AGENT)
@@ -101,21 +106,45 @@ pub fn new_client() -> Result<reqwest::Client, DownloadError> {
         .map_err(DownloadError::ClientSetup)
 }
 
+/// 整個啟動器共用的客戶端。連線和 TLS 握手可以重用，每次請求省下一段往返時間。
+pub fn shared_client() -> Result<reqwest::Client, DownloadError> {
+    // 每個測試有自己的執行環境，共用連線會在環境結束時失效。
+    if cfg!(test) {
+        return new_client();
+    }
+    if let Some(client) = SHARED_CLIENT.get() {
+        return Ok(client.clone());
+    }
+    let client = new_client()?;
+    Ok(SHARED_CLIENT.get_or_init(|| client).clone())
+}
+
 /// 下載一小段文字內容（例如清單），不寫入硬碟。
 pub async fn fetch_text(client: &reqwest::Client, url: &str) -> Result<String, DownloadError> {
     let network_error = |source| DownloadError::Network {
         url: url.to_string(),
         source,
     };
-    client
-        .get(url)
-        .send()
-        .await
-        .and_then(|response| response.error_for_status())
+    let mut response = client.get(url).send().await.map_err(network_error)?;
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        tokio::time::sleep(rate_limit_wait(response.headers())).await;
+        response = client.get(url).send().await.map_err(network_error)?;
+    }
+    response
+        .error_for_status()
         .map_err(network_error)?
         .text()
         .await
         .map_err(network_error)
+}
+
+/// 伺服器說要等多久。太久就不等，讓用戶看到錯誤比畫面卡住好。
+fn rate_limit_wait(headers: &HeaderMap) -> Duration {
+    let seconds = ["retry-after", "x-ratelimit-reset"]
+        .iter()
+        .find_map(|name| headers.get(*name)?.to_str().ok()?.parse::<u64>().ok())
+        .unwrap_or(1);
+    Duration::from_secs(seconds).min(MAX_RATE_LIMIT_WAIT)
 }
 
 /// 並行下載一批檔案。任何一個檔案最終失敗，就取消其餘工作並回傳該錯誤。
@@ -360,6 +389,16 @@ mod tests {
             sha1: HELLO_SHA1.to_string(),
             size: 5,
         }
+    }
+
+    #[test]
+    fn waits_as_long_as_the_server_says_but_not_forever() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(rate_limit_wait(&headers), Duration::from_secs(1));
+        headers.insert("x-ratelimit-reset", "3".parse().unwrap());
+        assert_eq!(rate_limit_wait(&headers), Duration::from_secs(3));
+        headers.insert("retry-after", "600".parse().unwrap());
+        assert_eq!(rate_limit_wait(&headers), MAX_RATE_LIMIT_WAIT);
     }
 
     #[tokio::test]

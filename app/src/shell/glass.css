@@ -104,6 +104,11 @@
   backdrop-filter: blur(30px) saturate(160%);
 }
 
+:root[data-glass]:not([data-festival]) .drop-overlay {
+  background: var(--glass-hero);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+
 /* 液態玻璃：滑動標記蓋在文字上面，滑過去時邊緣會折彎底下的字。 */
 :root[data-glass]:not([data-festival]) :is(.rail-mark, .segment-mark) {
   z-index: 1;

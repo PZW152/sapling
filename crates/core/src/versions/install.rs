@@ -10,7 +10,7 @@ use thiserror::Error;
 use super::details::{LoggingFile, VersionDetails};
 use super::{VersionEntry, VersionsError, fetch_manifest};
 use crate::download::{
-    DownloadError, DownloadProgress, DownloadTask, download_all, download_file, new_client,
+    DownloadError, DownloadProgress, DownloadTask, download_all, download_file, shared_client,
 };
 use crate::java::{JavaError, install_runtime, local_runtime};
 use crate::platform::DataDirs;
@@ -81,7 +81,7 @@ pub async fn prepare_version(
         return Ok(prepared);
     }
 
-    let client = new_client()?;
+    let client = shared_client()?;
     let manifest = fetch_manifest(&client).await?;
     let entry = manifest
         .versions

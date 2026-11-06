@@ -7,9 +7,14 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
-use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+use windows_sys::Win32::Foundation::SYSTEMTIME;
+use windows_sys::Win32::System::SystemInformation::{
+    GetLocalTime, GlobalMemoryStatusEx, MEMORYSTATUSEX,
+};
 
 const CRASH_LOG: &str = "crash.log";
+const GPU_PREFERENCE_KEY: &str = r"HKCU\Software\Microsoft\DirectX\UserGpuPreferences";
+const HIGH_PERFORMANCE_GPU: &str = "GpuPreference=2;";
 const SHORTCUT_SCRIPT: &str = "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:SAPLING_LINK); $s.TargetPath = $env:SAPLING_TARGET; $s.Arguments = $env:SAPLING_ARGS; $s.IconLocation = $env:SAPLING_TARGET; $s.Save()";
 
 /// Mojang 的 `rules` 裡用來代表本系統的名稱。
@@ -56,6 +61,47 @@ pub fn total_memory_mb() -> u32 {
 
 /// 用檔案總管打開資料夾。
 /// 程式崩潰時把原因留在資料資料夾。發佈版一崩潰就直接結束，沒有記錄就查不到原因。
+/// 現在的本地時間，記錄用。
+pub fn local_time_text() -> String {
+    // SAFETY: 全 0 是 SYSTEMTIME 的合法值，函數只會把時間填進這個結構。
+    let now = unsafe {
+        let mut now: SYSTEMTIME = std::mem::zeroed();
+        GetLocalTime(&mut now);
+        now
+    };
+    format!(
+        "{}-{:02}-{:02} {:02}:{:02}:{:02}",
+        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond
+    )
+}
+
+/// 筆電有內顯和獨顯時，Windows 常讓遊戲跑在內顯上。這裡請 Windows 改用高性能顯卡。
+/// 用戶在 Windows 設定裡選過就不動。失敗也沒關係，只是用回系統預設。
+pub fn prefer_high_performance_gpu(java: &Path) {
+    let value = java.to_string_lossy();
+    let reg = |arguments: &[&str]| {
+        Command::new("reg")
+            .args(arguments)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+    };
+    let already_set = reg(&["query", GPU_PREFERENCE_KEY, "/v", &value])
+        .is_ok_and(|output| output.status.success());
+    if !already_set {
+        let _ = reg(&[
+            "add",
+            GPU_PREFERENCE_KEY,
+            "/v",
+            &value,
+            "/t",
+            "REG_SZ",
+            "/d",
+            HIGH_PERFORMANCE_GPU,
+            "/f",
+        ]);
+    }
+}
+
 pub fn log_panics(folder: PathBuf) {
     std::panic::set_hook(Box::new(move |info| {
         let time = SystemTime::now()
