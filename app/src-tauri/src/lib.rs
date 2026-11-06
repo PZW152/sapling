@@ -4,10 +4,11 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use sapling_core::auth::{self, DeviceLogin, Profile, Session};
+use sapling_core::auth::{self, DeviceLogin, Profile, Session, accounts};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
+use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
@@ -334,7 +335,54 @@ async fn login_finish(state: State<'_, AppState>) -> Result<Profile, String> {
     let session = auth::finish_login(&client, &login).await.map_err(text)?;
     let profile = session.profile.clone();
     state.set_session(Some(session))?;
+    remember_account(&profile).await;
     Ok(profile)
+}
+
+/// 帳號清單只是方便切換，記不下來也不影響這次登入。
+async fn remember_account(profile: &Profile) {
+    if let Ok(dirs) = data_dirs() {
+        let _ = accounts::remember(&dirs, profile).await;
+    }
+}
+
+#[tauri::command]
+async fn list_accounts() -> Result<Vec<Profile>, String> {
+    accounts::list(&data_dirs()?).await.map_err(text)
+}
+
+#[tauri::command]
+async fn switch_account(state: State<'_, AppState>, id: String) -> Result<Option<Profile>, String> {
+    accounts::switch(&id).map_err(text)?;
+    state.set_session(None)?;
+    Ok(current_session(&state)
+        .await?
+        .map(|session| session.profile))
+}
+
+#[tauri::command]
+async fn list_import_sources() -> Result<Vec<ImportSource>, String> {
+    Ok(import::find_sources(&data_dirs()?).await)
+}
+
+#[tauri::command]
+async fn import_world(id: String, source: String, folder: String) -> Result<String, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let known = import::find_sources(&dirs)
+        .await
+        .into_iter()
+        .any(|found| found.path.as_os_str() == source.as_str());
+    if !known {
+        return Err("找不到這個匯入來源".to_string());
+    }
+    import::import_world(
+        std::path::Path::new(&source),
+        &folder,
+        &instance.game_dir(&dirs),
+    )
+    .await
+    .map_err(text)
 }
 
 #[tauri::command]
@@ -343,8 +391,14 @@ fn has_saved_account() -> Result<bool, String> {
 }
 
 #[tauri::command]
-fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
+async fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
+    let current = state.session()?;
     auth::sign_out().map_err(text)?;
+    if let Some(session) = current {
+        accounts::forget(&data_dirs()?, &session.profile.id)
+            .await
+            .map_err(text)?;
+    }
     state.set_session(None)
 }
 
@@ -457,6 +511,9 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
     let client = new_client().map_err(text)?;
     let session = auth::restore_session(&client).await.map_err(text)?;
     state.set_session(session.clone())?;
+    if let Some(session) = &session {
+        remember_account(&session.profile).await;
+    }
     Ok(session)
 }
 
@@ -506,6 +563,10 @@ pub fn run() {
             login_start,
             login_finish,
             sign_out,
+            list_accounts,
+            switch_account,
+            list_import_sources,
+            import_world,
             has_saved_account,
             install_game,
             open_link,

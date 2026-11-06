@@ -1,6 +1,7 @@
 //! 微軟登入：設備代碼流程 → Xbox Live → XSTS → Minecraft。
 //! 只有 refresh token 會被保存，而且只存在 Windows 憑證管理員。
 
+pub mod accounts;
 mod token_store;
 
 use md5::{Digest, Md5};
@@ -33,6 +34,8 @@ const SLOW_DOWN_STEP_SECS: u64 = 5;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
+    #[error(transparent)]
+    Storage(#[from] crate::storage::StorageError),
     #[error("無法連線到登入伺服器，請檢查網絡連線後再試一次")]
     Network(#[from] reqwest::Error),
     #[error("微軟拒絕了登入請求，應用程式設定可能有問題（{code}）")]
@@ -92,7 +95,7 @@ pub struct DeviceLogin {
 }
 
 /// 可以公開顯示的玩家資料。
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub id: String,

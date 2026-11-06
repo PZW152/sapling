@@ -19,6 +19,13 @@ export function AccountPanel({
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [accounts, setAccounts] = useState<Profile[]>([]);
+  const [choosing, setChoosing] = useState(false);
+
+  // 登入、登出或切換後，其他帳號的清單都會變。
+  useEffect(() => {
+    api.listAccounts().then(setAccounts).catch(() => setAccounts([]));
+  }, [profile]);
 
   useEffect(() => {
     api.restoreAccount()
@@ -43,6 +50,29 @@ export function AccountPanel({
       setCode(null);
     }
   }
+
+  async function switchTo(id: string) {
+    setError("");
+    setChoosing(false);
+    try {
+      onProfileChange(await api.switchAccount(id));
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
+  const others = accounts.filter((account) => account.id !== profile?.id);
+  const accountList = (
+    <ul className="account-list">
+      {others.map((account) => (
+        <li key={account.id}>
+          <button className="row" disabled={disabled} onClick={() => switchTo(account.id)}>
+            <span>{account.name}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
 
   async function signOut() {
     setError("");
@@ -81,10 +111,28 @@ export function AccountPanel({
             <strong>{profile.name}</strong>
             <small>{offline ? "這次不使用" : "正版帳號"}</small>
           </div>
-          <button className="text-button" disabled={disabled} onClick={signOut}>
-            登出
+          <button
+            className="text-button"
+            disabled={disabled}
+            aria-expanded={choosing}
+            onClick={() => setChoosing(!choosing)}
+          >
+            帳號
           </button>
         </div>
+        {choosing && (
+          <>
+            {accountList}
+            <div className="account-actions">
+              <button className="text-button" disabled={disabled || starting} onClick={signIn}>
+                新增帳號
+              </button>
+              <button className="text-button" disabled={disabled} onClick={signOut}>
+                登出
+              </button>
+            </div>
+          </>
+        )}
         {error && <p className="error">{error}</p>}
       </section>
     );
@@ -94,6 +142,7 @@ export function AccountPanel({
     <section className="panel account">
       <h2 className="label">帳號</h2>
       <p className="hint">{restoring ? "正在恢復登入" : "需要正版微軟帳號才能進入遊戲。"}</p>
+      {!restoring && others.length > 0 && accountList}
       <button className="secondary strong" disabled={restoring || starting} onClick={signIn}>
         {starting ? "正在取得代碼" : "用微軟帳號登入"}
       </button>

@@ -37,6 +37,12 @@ export type World = {
   icon: number[] | null;
 };
 
+export type ImportSource = {
+  label: string;
+  path: string;
+  worlds: World[];
+};
+
 export type ModHit = {
   projectId: string;
   title: string;

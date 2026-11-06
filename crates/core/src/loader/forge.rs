@@ -70,7 +70,9 @@ fn pick_neoforge(versions: &[String], game_version: &str) -> Option<String> {
     let newest_stable = matching
         .clone()
         .rfind(|version| !version.contains(BETA_MARK));
-    newest_stable.or_else(|| matching.clone().next_back()).cloned()
+    newest_stable
+        .or_else(|| matching.clone().next_back())
+        .cloned()
 }
 
 /// NeoForge 的版本號開頭對應遊戲版本：`1.21.8` 是 `21.8.`，`1.21` 是 `21.0.`，`26.3` 是 `26.3.`。

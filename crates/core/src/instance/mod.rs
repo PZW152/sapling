@@ -1,6 +1,7 @@
 //! 實例：一個獨立遊戲資料夾 + 遊戲版本 + 載入器 + 設定。
 
 mod copy;
+pub mod import;
 pub mod mods;
 pub mod worlds;
 

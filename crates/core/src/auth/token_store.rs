@@ -8,22 +8,54 @@ const CHUNK_SIZE: usize = 2000;
 /// 分段數量上限，只用來防止讀取或刪除時無限循環。
 const MAX_CHUNKS: usize = 16;
 
-fn entry(index: usize) -> Result<Entry, Error> {
-    Entry::new(SERVICE, &format!("refresh-token-{index}"))
+/// 目前帳號的憑證名稱開頭。
+const ACTIVE: &str = "refresh-token";
+
+fn entry(name: &str, index: usize) -> Result<Entry, Error> {
+    Entry::new(SERVICE, &format!("{name}-{index}"))
+}
+
+/// 某個帳號自己那一格的名稱。
+fn slot(account_id: &str) -> String {
+    format!("account-{account_id}")
 }
 
 pub fn save(token: &str) -> Result<(), Error> {
-    let chunks = split(token);
-    for (index, chunk) in chunks.iter().enumerate() {
-        entry(index)?.set_secret(chunk)?;
-    }
-    delete_from(chunks.len())
+    save_to(ACTIVE, token)
 }
 
 pub fn load() -> Result<Option<String>, Error> {
+    load_from(ACTIVE)
+}
+
+pub fn delete() -> Result<(), Error> {
+    delete_from(ACTIVE, 0)
+}
+
+pub fn save_slot(account_id: &str, token: &str) -> Result<(), Error> {
+    save_to(&slot(account_id), token)
+}
+
+pub fn load_slot(account_id: &str) -> Result<Option<String>, Error> {
+    load_from(&slot(account_id))
+}
+
+pub fn delete_slot(account_id: &str) -> Result<(), Error> {
+    delete_from(&slot(account_id), 0)
+}
+
+fn save_to(name: &str, token: &str) -> Result<(), Error> {
+    let chunks = split(token);
+    for (index, chunk) in chunks.iter().enumerate() {
+        entry(name, index)?.set_secret(chunk)?;
+    }
+    delete_from(name, chunks.len())
+}
+
+fn load_from(name: &str) -> Result<Option<String>, Error> {
     let mut token = Vec::new();
     for index in 0..MAX_CHUNKS {
-        match entry(index)?.get_secret() {
+        match entry(name, index)?.get_secret() {
             Ok(chunk) => token.extend(chunk),
             Err(Error::NoEntry) => break,
             Err(error) => return Err(error),
@@ -37,13 +69,9 @@ pub fn load() -> Result<Option<String>, Error> {
         .map_err(|error| Error::BadEncoding(error.into_bytes()))
 }
 
-pub fn delete() -> Result<(), Error> {
-    delete_from(0)
-}
-
-fn delete_from(first: usize) -> Result<(), Error> {
+fn delete_from(name: &str, first: usize) -> Result<(), Error> {
     for index in first..MAX_CHUNKS {
-        match entry(index)?.delete_credential() {
+        match entry(name, index)?.delete_credential() {
             Ok(()) => {}
             Err(Error::NoEntry) => break,
             Err(error) => return Err(error),

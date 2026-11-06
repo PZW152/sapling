@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  ImportSource,
   Instance,
   LaunchEvent,
   LauncherConfig,
@@ -33,6 +34,9 @@ export const api = {
   openInstanceFolder: (id: string) => invoke<void>("open_instance_folder", { id }),
 
   recentWorlds: (id: string) => invoke<World[]>("recent_worlds", { id }),
+  listImportSources: () => invoke<ImportSource[]>("list_import_sources"),
+  importWorld: (id: string, source: string, folder: string) =>
+    invoke<string>("import_world", { id, source, folder }),
   listWorlds: (id: string) => invoke<World[]>("list_worlds", { id }),
   backupWorld: (id: string, folder: string) => invoke<string>("backup_world", { id, folder }),
 
@@ -53,6 +57,8 @@ export const api = {
   loginStart: () => invoke<LoginCode>("login_start"),
   loginFinish: () => invoke<Profile>("login_finish"),
   signOut: () => invoke<void>("sign_out"),
+  listAccounts: () => invoke<Profile[]>("list_accounts"),
+  switchAccount: (id: string) => invoke<Profile | null>("switch_account", { id }),
   hasSavedAccount: () => invoke<boolean>("has_saved_account"),
 
   installGame: (version: string) => invoke<void>("install_game", { version }),

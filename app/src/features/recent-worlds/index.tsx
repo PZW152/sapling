@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../shell/api";
 import type { Feature, HeroPanelProps } from "../../shell/feature";
-import type { World } from "../../shell/types";
+import type { ImportSource, World } from "../../shell/types";
 import { canEnterWorld, iconUrl, playedAgo } from "./worlds";
 import "./recent-worlds.css";
 
@@ -71,6 +71,8 @@ function WorldList({ instanceId }: { instanceId: string }) {
   const [worlds, setWorlds] = useState<World[]>([]);
   const [working, setWorking] = useState("");
   const [message, setMessage] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [sources, setSources] = useState<ImportSource[]>([]);
 
   const load = useCallback(() => {
     api.listWorlds(instanceId).then(setWorlds).catch((reason) => setMessage(String(reason)));
@@ -91,8 +93,23 @@ function WorldList({ instanceId }: { instanceId: string }) {
     setWorking("");
   }
 
-  if (worlds.length === 0) {
-    return null;
+  async function openImport() {
+    setImporting(!importing);
+    setMessage("");
+    setSources(await api.listImportSources().catch(() => []));
+  }
+
+  async function importFrom(source: ImportSource, folder: string) {
+    setWorking(folder);
+    setMessage("");
+    try {
+      const name = await api.importWorld(instanceId, source.path, folder);
+      setMessage(`已匯入「${name}」。用比原本舊的遊戲版本打開可能會出問題。`);
+      load();
+    } catch (reason) {
+      setMessage(String(reason));
+    }
+    setWorking("");
   }
 
   const now = Date.now();
@@ -101,7 +118,34 @@ function WorldList({ instanceId }: { instanceId: string }) {
     <>
       <div className="mods-head">
         <h3>世界</h3>
+        <button className="text-button" aria-expanded={importing} onClick={openImport}>
+          匯入世界
+        </button>
       </div>
+      {importing && sources.length === 0 && (
+        <p className="hint">找不到其他啟動器的世界。</p>
+      )}
+      {importing &&
+        sources.map((source) => (
+          <div key={source.path}>
+            <p className="hint">{source.label}</p>
+            <ul className="world-list">
+              {source.worlds.map((world) => (
+                <li key={world.folder}>
+                  <span className="mod-name">{world.folder}</span>
+                  <small>{playedAgo(world.lastPlayedMs, now)}</small>
+                  <button
+                    className="text-button"
+                    disabled={working !== ""}
+                    onClick={() => importFrom(source, world.folder)}
+                  >
+                    {working === world.folder ? "正在匯入" : "匯入"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       <ul className="world-list">
         {worlds.map((world) => (
           <li key={world.folder}>
