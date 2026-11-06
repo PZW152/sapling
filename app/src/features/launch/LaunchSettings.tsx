@@ -116,6 +116,21 @@ export function LaunchSettings() {
 
       <section className="setting">
         <div className="setting-head">
+          <label htmlFor="join-server">自動加入伺服器</label>
+        </div>
+        <input
+          id="join-server"
+          type="text"
+          spellCheck={false}
+          placeholder="例如 play.example.com:25565"
+          value={selected?.joinServer ?? ""}
+          onChange={(event) => updateInstance({ joinServer: event.target.value })}
+        />
+        <p>遊戲開始後直接進入這個伺服器。從「繼續玩」進世界時不會加入。</p>
+      </section>
+
+      <section className="setting">
+        <div className="setting-head">
           <label htmlFor="java-path">Java</label>
           {selected?.javaPath && (
             <button className="text-button" onClick={() => updateInstance({ javaPath: "" })}>

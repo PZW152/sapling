@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../shell/api";
 import type { LoginCode, Profile } from "../../shell/types";
+import { open } from "@tauri-apps/plugin-dialog";
 import { ErrorText } from "../../shell/ErrorText";
 import { useEscape } from "../../shell/keyboard";
 
@@ -23,6 +24,8 @@ export function AccountPanel({
   const [error, setError] = useState("");
   const [accounts, setAccounts] = useState<Profile[]>([]);
   const [choosing, setChoosing] = useState(false);
+  const [slim, setSlim] = useState(false);
+  const [changingSkin, setChangingSkin] = useState(false);
   const attempt = useRef(0);
   const panel = useRef<HTMLElement>(null);
 
@@ -64,6 +67,24 @@ export function AccountPanel({
       setStarting(false);
       setCode(null);
     }
+  }
+
+  async function changeSkin() {
+    const path = await open({
+      title: "選擇皮膚圖片",
+      filters: [{ name: "PNG 圖片", extensions: ["png"] }],
+    });
+    if (!path) {
+      return;
+    }
+    setError("");
+    setChangingSkin(true);
+    try {
+      onProfileChange(await api.changeSkin(path, slim));
+    } catch (reason) {
+      setError(String(reason));
+    }
+    setChangingSkin(false);
   }
 
   function cancelSignIn() {
@@ -155,6 +176,23 @@ export function AccountPanel({
         {choosing && (
           <>
             {accountList}
+            <div className="skin-row">
+              <div className="chips" role="group" aria-label="皮膚的手臂粗細">
+                <button className="chip" aria-pressed={!slim} onClick={() => setSlim(false)}>
+                  粗手臂
+                </button>
+                <button className="chip" aria-pressed={slim} onClick={() => setSlim(true)}>
+                  細手臂
+                </button>
+              </div>
+              <button
+                className="text-button"
+                disabled={disabled || changingSkin}
+                onClick={changeSkin}
+              >
+                {changingSkin ? "正在上傳" : "更換皮膚"}
+              </button>
+            </div>
             <div className="account-actions">
               <button className="text-button" disabled={disabled || starting} onClick={signIn}>
                 新增帳號

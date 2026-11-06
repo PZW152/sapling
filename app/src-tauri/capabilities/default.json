@@ -12,6 +12,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:webview:allow-set-webview-zoom",
+    "core:window:allow-set-progress-bar",
     "dialog:allow-open",
     "dialog:allow-save"
   ]

@@ -2,6 +2,7 @@
 //! 只有 refresh token 會被保存，而且只存在 Windows 憑證管理員。
 
 pub mod accounts;
+pub mod skin;
 mod token_store;
 
 use md5::{Digest, Md5};
@@ -37,6 +38,8 @@ const SLOW_DOWN_STEP_SECS: u64 = 5;
 pub enum AuthError {
     #[error("已取消登入")]
     Cancelled,
+    #[error("皮膚要是 64×64 或 64×32 的 PNG 圖片")]
+    BadSkin,
     #[error(transparent)]
     Storage(#[from] crate::storage::StorageError),
     #[error("無法連線到登入伺服器，請檢查網路連線後再試一次")]

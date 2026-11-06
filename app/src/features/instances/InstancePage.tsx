@@ -7,20 +7,38 @@ import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { useEscape } from "../../shell/keyboard";
 import { LOADERS, LOADER_HINT, loaderName } from "../../shell/loaders";
+import { matchesInstance } from "../../shell/instances";
 import { Segments } from "../../shell/Segments";
+import { formatPlaytime, timeAgo } from "../../shell/time";
 import type { Instance, LoaderKind } from "../../shell/types";
+
+/** 實例超過這個數量才顯示搜尋框。 */
+const FILTER_FROM = 8;
 
 export function InstancePage() {
   const { instances, list, selected, selectInstance, loadInstances } = useApp();
   const [creating, setCreating] = useState(false);
   // 放在這裡，換實例時才會停在同一個分頁。
   const [panel, setPanel] = useState("");
+  const [filter, setFilter] = useState("");
+  const shown = instances.filter((instance) => matchesInstance(instance, filter));
 
   return (
     <div className="instances">
       <aside className="panel instance-list">
+        {instances.length >= FILTER_FROM && (
+          <input
+            type="search"
+            className="instance-filter"
+            aria-label="搜尋實例"
+            placeholder="搜尋實例"
+            spellCheck={false}
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+          />
+        )}
         <ul>
-          {instances.map((instance, index) => (
+          {shown.map((instance, index) => (
             <li key={instance.id} style={{ "--i": index } as CSSProperties}>
               <button
                 className="instance-item"
@@ -240,7 +258,14 @@ function InstanceDetail({
         />
       </label>
       <p className="detail-meta">
-        Minecraft {instance.version}，{loaderName(instance.loader)}
+        {[
+          `Minecraft ${instance.version}`,
+          loaderName(instance.loader),
+          formatPlaytime(instance.playedSeconds),
+          instance.lastPlayedMs > 0 && `${timeAgo(instance.lastPlayedMs, Date.now())}玩過`,
+        ]
+          .filter(Boolean)
+          .join("，")}
       </p>
 
       {panels.length > 1 && (

@@ -109,6 +109,17 @@ pub fn exists(game_dir: &Path, folder: &str) -> bool {
     single_name && saves_dir(game_dir).join(folder).join(LEVEL_FILE).is_file()
 }
 
+/// 刪除世界，不能復原。
+pub async fn delete(game_dir: &Path, folder: &str) -> Result<(), InstanceError> {
+    if !exists(game_dir, folder) {
+        return Err(InstanceError::NotFound);
+    }
+    let path = saves_dir(game_dir).join(folder);
+    tokio::fs::remove_dir_all(&path)
+        .await
+        .map_err(|source| InstanceError::Io { path, source })
+}
+
 /// 縮圖只是裝飾，讀不到就當作沒有。
 async fn read_icon(path: &Path) -> Option<Vec<u8>> {
     let metadata = tokio::fs::metadata(path).await.ok()?;
@@ -217,6 +228,20 @@ mod tests {
             backup(&dir, "../mods").await,
             Err(InstanceError::NotFound)
         ));
+    }
+
+    #[tokio::test]
+    async fn deletes_only_real_worlds() {
+        let dir = game_dir("delete");
+        add_world(&dir, "world", 100);
+
+        assert!(matches!(
+            delete(&dir, "../world").await,
+            Err(InstanceError::NotFound)
+        ));
+        delete(&dir, "world").await.unwrap();
+
+        assert!(recent(&dir, 5, false).await.unwrap().is_empty());
     }
 
     #[tokio::test]

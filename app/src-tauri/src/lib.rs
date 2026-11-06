@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use sapling_core::auth::{self, AuthError, DeviceLogin, Profile, Session, accounts};
+use sapling_core::auth::{self, AuthError, DeviceLogin, Profile, Session, accounts, skin};
 use sapling_core::cleanup::{self, CleanupSummary};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
@@ -47,6 +47,8 @@ const SNAPSHOT_LIMIT: usize = 40;
 const RECENT_WORLD_LIMIT: usize = 3;
 /// 實例頁最多列出幾個世界。
 const WORLD_LIST_LIMIT: usize = 50;
+const INSTALL_CANCELLED: &str = "已取消下載";
+const INSTANCE_FOLDERS: [&str; 4] = ["saves", "screenshots", "logs", "crash-reports"];
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 
 #[derive(Default)]
@@ -58,6 +60,7 @@ struct AppState {
     /// 同一時間只做一次恢復登入，避免短時間重複請求被 Minecraft 伺服器限流。
     restoring: AsyncMutex<()>,
     launch_cancel: LaunchCancel,
+    install_cancel: LaunchCancel,
 }
 
 impl AppState {
@@ -592,11 +595,16 @@ async fn sign_out(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn install_game(app: AppHandle, version: String) -> Result<(), String> {
+async fn install_game(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    version: String,
+) -> Result<(), String> {
+    state.install_cancel.reset();
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
     let mut last_progress = Instant::now();
-    prepare_version(
+    let install = prepare_version(
         &version,
         &dirs,
         config.download_concurrency,
@@ -608,10 +616,57 @@ async fn install_game(app: AppHandle, version: String) -> Result<(), String> {
                 let _ = app.emit(INSTALL_EVENT, LaunchEvent::Progress { stage, progress });
             }
         },
-    )
-    .await
-    .map(|_| ())
-    .map_err(text)
+    );
+    match state.install_cancel.until_cancelled(install).await {
+        Some(result) => result.map(|_| ()).map_err(text),
+        None => Err(INSTALL_CANCELLED.to_string()),
+    }
+}
+
+#[tauri::command]
+fn cancel_install(state: State<'_, AppState>) {
+    state.install_cancel.cancel();
+}
+
+#[tauri::command]
+async fn change_skin(
+    state: State<'_, AppState>,
+    path: String,
+    slim: bool,
+) -> Result<Profile, String> {
+    let mut session = current_session(&state)
+        .await?
+        .ok_or_else(|| "請先登入微軟帳號".to_string())?;
+    let client = new_client().map_err(text)?;
+    let profile = skin::upload(&client, &session, Path::new(&path), slim)
+        .await
+        .map_err(text)?;
+    session.profile = profile.clone();
+    state.set_session(Some(session))?;
+    remember_account(&profile).await;
+    Ok(profile)
+}
+
+#[tauri::command]
+async fn delete_world(id: String, folder: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    worlds::delete(&instance.game_dir(&dirs), &folder)
+        .await
+        .map_err(text)
+}
+
+/// 打開實例裡的常用資料夾。只接受這幾個名稱。
+#[tauri::command]
+async fn open_instance_subfolder(id: String, name: String) -> Result<(), String> {
+    if !INSTANCE_FOLDERS.contains(&name.as_str()) {
+        return Err("找不到這個資料夾".to_string());
+    }
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let folder = instance.game_dir(&dirs).join(name);
+    std::fs::create_dir_all(&folder).map_err(text)?;
+    open_folder(&folder).map_err(text)
 }
 
 #[tauri::command]
@@ -729,6 +784,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
+            cancel_install,
+            change_skin,
+            delete_world,
+            open_instance_subfolder,
             install_local_pack,
             export_pack,
             add_instance_file,

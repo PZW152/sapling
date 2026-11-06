@@ -1,0 +1,290 @@
+/* 動效：靈動但不吵。規則見 DESIGN.md。放在所有樣式最後，才能統一覆蓋。 */
+:root {
+  /* 由彈簧公式算出來。soft 用在畫面和大區塊，pop 用在按鈕和小元件。 */
+  --spring: linear(0, 0.026, 0.092, 0.183, 0.288, 0.397, 0.503, 0.603, 0.692, 0.771, 0.838, 0.893, 0.937, 0.971, 0.997, 1.015, 1.027, 1.034, 1.038, 1.038, 1.037, 1.034, 1.03, 1.026, 1.022, 1.018, 1);
+  --spring-pop: linear(0, 0.027, 0.098, 0.199, 0.319, 0.448, 0.576, 0.697, 0.807, 0.903, 0.982, 1.045, 1.091, 1.123, 1.141, 1.147, 1.145, 1.136, 1.122, 1.105, 1.086, 1.067, 1.049, 1.032, 1.017, 1.005, 1);
+  --enter: 520ms;
+  --pop: 420ms;
+  --stagger: 38ms;
+}
+
+/* 按下和懸停：所有能按的東西都有回應 */
+.secondary,
+.chip,
+.theme,
+.world,
+.segment,
+.primary,
+.row,
+.instance-item,
+.hit-main,
+.disclosure {
+  transition:
+    transform var(--pop) var(--spring-pop),
+    background-color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease),
+    box-shadow var(--medium) var(--ease);
+}
+
+.secondary:hover:enabled,
+.chip:hover:enabled {
+  transform: translateY(-1px);
+}
+
+.world:hover:enabled {
+  transform: translateY(-3px);
+}
+
+.theme:hover:enabled {
+  transform: translateY(-2px);
+}
+
+.primary:hover:enabled {
+  transform: translateY(-2px) scale(1.012);
+}
+
+.row:hover:enabled,
+.instance-item:hover {
+  transform: translateX(3px);
+}
+
+.secondary:active:enabled,
+.chip:active:enabled,
+.theme:active:enabled,
+.world:active:enabled,
+.segment:active,
+.row:active:enabled,
+.instance-item:active,
+.hit-main:active {
+  transition-duration: 90ms;
+  transform: scale(0.965);
+}
+
+.primary:active:enabled {
+  transition-duration: 90ms;
+  transform: scale(0.975);
+}
+
+/* 側欄。文字跟著底色慢慢變，否則滑到一半會看不見。 */
+.nav {
+  transition: color var(--medium) var(--ease);
+}
+
+.nav svg {
+  transition: transform var(--pop) var(--spring-pop);
+}
+
+.nav:hover svg {
+  transform: translateY(-2px) scale(1.12);
+}
+
+.nav:active svg {
+  transition-duration: 90ms;
+  transform: scale(0.88);
+}
+
+.nav[aria-current="page"] svg {
+  animation: icon-pop var(--pop) var(--spring-pop);
+}
+
+@keyframes icon-pop {
+  from {
+    transform: scale(0.72);
+  }
+}
+
+.mark {
+  transform-origin: 50% 90%;
+  transition: transform var(--pop) var(--spring-pop);
+}
+
+.mark:hover {
+  transform: rotate(-7deg) scale(1.06);
+}
+
+/* 滑動標記帶一點彈性，像被拉過去 */
+.slide-mark {
+  transition:
+    transform var(--pop) var(--spring),
+    width var(--pop) var(--spring),
+    height var(--pop) var(--spring),
+    opacity var(--medium) var(--ease);
+}
+
+/* 開關和選中 */
+.switch::after {
+  transition:
+    transform var(--pop) var(--spring-pop),
+    width var(--fast) var(--ease);
+}
+
+.switch {
+  transition: background-color var(--medium) var(--ease);
+}
+
+.chip[aria-pressed="true"],
+.theme[aria-pressed="true"] .theme-leaf {
+  animation: pick var(--pop) var(--spring-pop);
+}
+
+@keyframes pick {
+  from {
+    transform: scale(0.86);
+  }
+}
+
+.disclosure svg {
+  transition: transform var(--pop) var(--spring-pop);
+}
+
+/* 換頁：卡片依序浮上來 */
+.page:not([hidden]) :is(.hero, .panel, .notice-card) {
+  animation: rise var(--enter) var(--spring) backwards;
+}
+
+.page:not([hidden]) :is(.hero, .panel):nth-child(2) {
+  animation-delay: var(--stagger);
+}
+
+.page:not([hidden]) :is(.hero, .panel):nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+.page:not([hidden]) :is(.hero, .panel):nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+/* 版本號一個字一個字跳上來 */
+.digit {
+  display: inline-block;
+  animation: digit-in var(--enter) var(--spring-pop) backwards;
+  animation-delay: calc(var(--i) * 34ms + 60ms);
+}
+
+@keyframes digit-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.28em) scale(0.92);
+  }
+}
+
+/* 清單內容進場 */
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series) {
+  animation: item-in var(--enter) var(--spring) backwards;
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(2) {
+  animation-delay: calc(var(--stagger) * 1);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(3) {
+  animation-delay: calc(var(--stagger) * 2);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(4) {
+  animation-delay: calc(var(--stagger) * 3);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(5) {
+  animation-delay: calc(var(--stagger) * 4);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(6) {
+  animation-delay: calc(var(--stagger) * 5);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(7) {
+  animation-delay: calc(var(--stagger) * 6);
+}
+
+:is(.mod, .pack, .mod-hits > li, .world-list > li, .version-list > li, .worlds li, .instance-list li, .row-list > li:not(.slide-mark), .vine-series):nth-child(8) {
+  animation-delay: calc(var(--stagger) * 7);
+}
+
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* 換內容 */
+.detail-panel > * {
+  animation: rise var(--enter) var(--spring) backwards;
+}
+
+.resource-detail {
+  animation: from-right var(--enter) var(--spring) backwards;
+}
+
+.mod-browser:not(.resource-detail) {
+  animation: from-left var(--enter) var(--spring) backwards;
+}
+
+@keyframes from-right {
+  from {
+    opacity: 0;
+    transform: translateX(22px);
+  }
+}
+
+@keyframes from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+/* 彈出的東西從按鈕的方向長出來 */
+.queue-panel {
+  transform-origin: top right;
+  animation: pop-in var(--pop) var(--spring-pop) backwards;
+}
+
+.log-panel {
+  animation: rise var(--enter) var(--spring) backwards;
+}
+
+.account-list,
+.account-actions,
+.skin-row {
+  animation: item-in var(--pop) var(--spring) backwards;
+}
+
+.login-code {
+  animation: pop-in var(--enter) var(--spring-pop) backwards;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.drop-overlay {
+  animation: pop-in var(--pop) var(--spring-pop) backwards;
+}
+
+.drop-results p {
+  animation: from-right var(--enter) var(--spring-pop) backwards;
+}
+
+.error,
+.hero-error,
+.hero-note {
+  animation: item-in var(--pop) var(--spring) backwards;
+}
+
+/* 啟動轉場裡的版本號也要有力道 */
+.overlay-version {
+  animation: pop-in var(--enter) var(--spring-pop) 160ms backwards;
+}

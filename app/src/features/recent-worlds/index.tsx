@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { api } from "../../shell/api";
+import { ConfirmButton } from "../../shell/ConfirmButton";
 import type { Feature, HeroPanelProps } from "../../shell/feature";
 import type { ImportSource, World } from "../../shell/types";
 import { canEnterWorld, iconUrl, playedAgo } from "./worlds";
@@ -99,6 +100,16 @@ function WorldList({ instanceId }: { instanceId: string }) {
     setSources(await api.listImportSources().catch(() => []));
   }
 
+  async function remove(folder: string) {
+    setMessage("");
+    try {
+      await api.deleteWorld(instanceId, folder);
+      load();
+    } catch (reason) {
+      setMessage(String(reason));
+    }
+  }
+
   async function importFrom(source: ImportSource, folder: string) {
     setWorking(folder);
     setMessage("");
@@ -160,6 +171,14 @@ function WorldList({ instanceId }: { instanceId: string }) {
             >
               {working === world.folder ? "正在備份" : "備份"}
             </button>
+            <ConfirmButton
+              className="text-button"
+              label="刪除"
+              warning="再按一次，不能復原"
+              subject={world.folder}
+              disabled={working !== ""}
+              onConfirm={() => remove(world.folder)}
+            />
           </li>
         ))}
       </ul>

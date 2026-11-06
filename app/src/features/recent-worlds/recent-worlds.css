@@ -19,8 +19,9 @@
   gap: var(--space-2);
 }
 
-/* 主區塊變窄時只留兩個，卡片才放得下名字。 */
-@container (max-width: 400px) {
+/* 主區塊變窄時只留兩個，卡片才放得下名字。
+   這裡不能用 @container：Chromium 會讓裡面的 CSS 動畫不停重播。 */
+@media (max-width: 720px) {
   .worlds ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -31,7 +32,7 @@
 }
 
 /* 太矮時收起來，啟動按鈕和版本號優先。 */
-@container (max-height: 300px) {
+@media (max-height: 360px) {
   .worlds {
     display: none;
   }

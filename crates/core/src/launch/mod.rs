@@ -4,9 +4,11 @@ pub mod crash;
 mod natives;
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::time::Instant;
 
 use serde::Serialize;
 use thiserror::Error;
@@ -39,6 +41,7 @@ const LOG_CHANNEL_SIZE: usize = 256;
 /// 版本 JSON 用這個功能開關標記支援直接進入世界，1.20 起才有。
 const QUICK_PLAY_FEATURE: &str = "is_quick_play_singleplayer";
 const QUICK_PLAY_ARGUMENT: &str = "--quickPlaySingleplayer";
+const QUICK_JOIN_FEATURE: &str = "is_quick_play_multiplayer";
 /// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
 const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
 
@@ -98,6 +101,14 @@ impl LaunchCancel {
 
     pub fn cancel(&self) {
         self.0.send_replace(true);
+    }
+
+    /// 執行工作，途中被取消就放棄並回傳 `None`。
+    pub async fn until_cancelled<T>(&self, work: impl Future<Output = T>) -> Option<T> {
+        tokio::select! {
+            result = work => Some(result),
+            () = self.cancelled() => None,
+        }
     }
 
     async fn cancelled(&self) {
@@ -205,6 +216,7 @@ pub async fn play(
     let mut arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
     arguments.extend(world_arguments(&prepared.details, world));
     arguments.extend(window_arguments(instance));
+    arguments.extend(server_arguments(&prepared.details, instance, world));
     let java = chosen_java(instance, &prepared.java)?;
     let mut child = Command::new(java)
         .args(&arguments)
@@ -215,6 +227,7 @@ pub async fn play(
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(LaunchError::Spawn)?;
+    let started = Instant::now();
     on_event(LaunchEvent::Started);
 
     let (sender, mut receiver) = mpsc::channel(LOG_CHANNEL_SIZE);
@@ -238,6 +251,10 @@ pub async fn play(
     }
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
+    // 只是統計，寫不進去不該影響結果。
+    let _ = instance
+        .record_play(dirs, started.elapsed().as_secs())
+        .await;
     if !session.is_offline() {
         for log in GAME_LOGS {
             scrub_token(&game_dir.join(log), session.access_token()).await;
@@ -325,6 +342,35 @@ fn chosen_java(instance: &Instance, automatic: &Path) -> Result<PathBuf, LaunchE
         Ok(path)
     } else {
         Err(LaunchError::CustomJavaMissing { path })
+    }
+}
+
+/// 啟動後自動加入伺服器。點世界進遊戲時以世界為準。
+fn server_arguments(
+    details: &VersionDetails,
+    instance: &Instance,
+    world: Option<&str>,
+) -> Vec<String> {
+    let server = instance.join_server.trim();
+    if server.is_empty() || world.is_some() {
+        return Vec::new();
+    }
+    let quick_join = details
+        .arguments
+        .game
+        .iter()
+        .any(|argument| argument.depends_on_feature(QUICK_JOIN_FEATURE));
+    if quick_join {
+        return vec!["--quickPlayMultiplayer".to_string(), server.to_string()];
+    }
+    match server.rsplit_once(':') {
+        Some((host, port)) => vec![
+            "--server".to_string(),
+            host.to_string(),
+            "--port".to_string(),
+            port.to_string(),
+        ],
+        None => vec!["--server".to_string(), server.to_string()],
     }
 }
 
@@ -441,6 +487,27 @@ mod tests {
             window_arguments(&instance),
             ["--width", "1280", "--height", "720"]
         );
+    }
+
+    #[test]
+    fn joins_a_server_the_way_each_version_understands() {
+        let mut instance = Instance::blank();
+        instance.join_server = "play.example.com:25566".to_string();
+        let modern = details_with_game_arguments(
+            r#"[{ "rules": [{ "action": "allow", "features": { "is_quick_play_multiplayer": true } }],
+                  "value": ["--quickPlayMultiplayer", "${quickPlayMultiplayer}"] }]"#,
+        );
+        let old = details_with_game_arguments("[]");
+
+        assert_eq!(
+            server_arguments(&modern, &instance, None),
+            ["--quickPlayMultiplayer", "play.example.com:25566"]
+        );
+        assert_eq!(
+            server_arguments(&old, &instance, None),
+            ["--server", "play.example.com", "--port", "25566"]
+        );
+        assert!(server_arguments(&modern, &instance, Some("world")).is_empty());
     }
 
     #[test]

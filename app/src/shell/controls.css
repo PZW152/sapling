@@ -85,8 +85,23 @@
 .segment[aria-current="page"] {
   color: var(--color-strong);
   font-weight: 700;
+}
+
+.segment {
+  position: relative;
+}
+
+.segments {
+  position: relative;
+}
+
+.segment-mark {
+  right: auto;
+  width: var(--mark-w, 0);
+  border-radius: 7px;
   background: var(--color-surface);
   box-shadow: var(--shadow-tile);
+  transform: translate(var(--mark-x, 0), var(--mark-y, 0));
 }
 
 .toggle-row {

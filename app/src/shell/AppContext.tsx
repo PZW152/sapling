@@ -4,6 +4,7 @@ import { api } from "./api";
 import { applyColorMode, applyTheme } from "./applyTheme";
 import { applyScale } from "./applyScale";
 import type { Feature } from "./feature";
+import { recentFirst } from "./instances";
 import { createSaveQueue } from "./saveQueue";
 import type { Instance, LauncherConfig, VersionList } from "./types";
 
@@ -89,7 +90,7 @@ export function AppProvider({
     instances.find((instance) => instance.id === config.selectedInstance) ?? instances[0] ?? null;
 
   const loadInstances = useCallback(async () => {
-    setInstances(await api.listInstances());
+    setInstances(recentFirst(await api.listInstances()));
   }, []);
 
   const loadVersions = useCallback(async () => {

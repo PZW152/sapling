@@ -1,3 +1,4 @@
+import { setTaskbarProgress } from "../../shell/taskbar";
 import { useEffect, useState } from "react";
 import { api, onInstallEvent } from "../../shell/api";
 import { trackDownload } from "../../shell/downloads";
@@ -7,6 +8,9 @@ import { overallProgress } from "../../shell/progress";
 import type { LoaderKind, Progress } from "../../shell/types";
 
 /** 目前的下載。失敗時保留 `error`，讓對應版本顯示原因。 */
+/** 和後端取消時回傳的文字相同。 */
+const CANCELLED = "已取消下載";
+
 export type InstallState = {
   id: string;
   progress: Progress | null;
@@ -27,6 +31,7 @@ export function useInstall() {
             (current) =>
               current && { ...current, progress: payload, percent: overallProgress(payload) },
           );
+          setTaskbarProgress(overallProgress(payload));
         }
       }),
     [],
@@ -57,8 +62,10 @@ export function useInstall() {
       setInstall(null);
       await loadVersions();
     } catch (reason) {
-      setInstall({ id: version, progress: null, percent: 0, error: String(reason) });
+      const cancelled = String(reason) === CANCELLED;
+      setInstall(cancelled ? null : { id: version, progress: null, percent: 0, error: String(reason) });
     }
+    setTaskbarProgress(null);
   }
 
   async function playVersion(version: string, loader: LoaderKind) {
@@ -70,5 +77,5 @@ export function useInstall() {
     }
   }
 
-  return { install, installGame, playVersion };
+  return { install, installGame, playVersion, cancelInstall: api.cancelInstall };
 }

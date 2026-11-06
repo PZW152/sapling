@@ -4,7 +4,7 @@ import { useApp } from "../../shell/AppContext";
 import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { loaderName } from "../../shell/loaders";
-import { useChangeFade, useSlideMark } from "../../shell/motion";
+import { useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
 import { AccountPanel } from "./AccountPanel";
 import { LaunchOverlay } from "./LaunchOverlay";
@@ -176,17 +176,21 @@ export function LaunchPage() {
   );
 }
 
-/** 換實例時淡入，切分頁回來時不動。 */
+/** 主視覺：換版本時一個字一個字跳上來。 */
 function VersionNumber({ version }: { version: string }) {
-  const number = useChangeFade<HTMLHeadingElement>(version);
-
   return (
     <h2
-      ref={number}
       className="version-number"
+      aria-label={version}
       style={{ "--units": versionUnits(version) } as CSSProperties}
     >
-      {version}
+      <span key={version} aria-hidden="true">
+        {[...version].map((character, index) => (
+          <span key={index} className="digit" style={{ "--i": index } as CSSProperties}>
+            {character}
+          </span>
+        ))}
+      </span>
     </h2>
   );
 }

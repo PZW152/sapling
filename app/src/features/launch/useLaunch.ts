@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onLaunchEvent } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
+import { overallProgress } from "../../shell/progress";
+import { setTaskbarProgress } from "../../shell/taskbar";
 import type { Progress } from "../../shell/types";
 import type { OverlayOrigin } from "./LaunchOverlay";
 
@@ -20,7 +22,7 @@ async function returnToLauncher() {
 
 /** 一次啟動的完整狀態：準備、運行、失敗，以及啟動轉場。 */
 export function useLaunch() {
-  const { config } = useApp();
+  const { config, loadInstances } = useApp();
   const minimize = config.minimizeOnLaunch;
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -33,8 +35,10 @@ export function useLaunch() {
       onLaunchEvent((payload) => {
         if (payload.kind === "progress") {
           setProgress(payload);
+          setTaskbarProgress(overallProgress(payload));
         } else if (payload.kind === "started") {
           setPhase("running");
+          setTaskbarProgress(null);
         } else {
           setLogs((lines) => [...lines, payload.line].slice(-MAX_LOG_LINES));
         }
@@ -74,7 +78,10 @@ export function useLaunch() {
       setError(String(reason));
       setPhase("failed");
     }
+    setTaskbarProgress(null);
     returnToLauncher();
+    // 遊玩時間和排序更新了。
+    loadInstances();
   }
 
   function reset() {

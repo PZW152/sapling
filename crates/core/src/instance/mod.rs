@@ -9,6 +9,7 @@ pub mod worlds;
 
 use std::io;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -73,6 +74,15 @@ pub struct Instance {
     /// 自訂的 `java.exe`，空的代表自動使用合適的版本。
     #[serde(default)]
     pub java_path: String,
+    /// 遊戲開始後直接加入的伺服器，例如 `play.example.com:25565`。
+    #[serde(default)]
+    pub join_server: String,
+    /// 上次關閉遊戲的時間，0 代表還沒玩過。
+    #[serde(default)]
+    pub last_played_ms: u64,
+    /// 累計遊玩時間。
+    #[serde(default)]
+    pub played_seconds: u64,
 }
 
 impl Instance {
@@ -91,6 +101,9 @@ impl Instance {
             window_height: 0,
             fullscreen: false,
             java_path: String::new(),
+            join_server: String::new(),
+            last_played_ms: 0,
+            played_seconds: 0,
         }
     }
 
@@ -120,6 +133,9 @@ impl Instance {
             window_height: 0,
             fullscreen: false,
             java_path: String::new(),
+            join_server: String::new(),
+            last_played_ms: 0,
+            played_seconds: 0,
         };
         instance.save(dirs).await?;
         Ok(instance)
@@ -153,6 +169,17 @@ impl Instance {
             .into_iter()
             .find(|instance| instance.id == id)
             .ok_or(InstanceError::NotFound)
+    }
+
+    /// 記下這次玩了多久。遊戲開著時設定可能改過，所以重新讀檔，不用啟動時的資料。
+    pub async fn record_play(&self, dirs: &DataDirs, seconds: u64) -> Result<(), InstanceError> {
+        let path = self.game_dir(dirs).join("instance.json");
+        let mut current: Self = read_json(&path).await?.ok_or(InstanceError::NotFound)?;
+        current.played_seconds += seconds;
+        current.last_played_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_millis() as u64);
+        current.save(dirs).await
     }
 
     pub async fn save(&self, dirs: &DataDirs) -> Result<(), InstanceError> {
@@ -270,6 +297,23 @@ mod tests {
         let root = std::env::temp_dir().join(format!("sapling-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         DataDirs::at(root)
+    }
+
+    #[tokio::test]
+    async fn playing_adds_up_without_losing_newer_settings() {
+        let dirs = temp_dirs("played");
+        let started = Instance::create(&dirs, "生存", "26.3").await.unwrap();
+        let mut changed = started.clone();
+        changed.memory_mb = 4096;
+        changed.save(&dirs).await.unwrap();
+
+        started.record_play(&dirs, 60).await.unwrap();
+        started.record_play(&dirs, 30).await.unwrap();
+
+        let saved = Instance::list(&dirs).await.unwrap().remove(0);
+        assert_eq!(saved.played_seconds, 90);
+        assert_eq!(saved.memory_mb, 4096);
+        assert!(saved.last_played_ms > 0);
     }
 
     #[tokio::test]

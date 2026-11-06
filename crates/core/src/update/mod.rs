@@ -10,7 +10,11 @@ use tokio::io::AsyncWriteExt;
 
 const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/PZW152/sapling/releases/latest";
 const USER_AGENT: &str = concat!("Sapling-Launcher/", env!("CARGO_PKG_VERSION"));
-const PORTABLE_SUFFIX: &str = "_portable.exe";
+/// 發佈檔的名稱：`SPL-0.6.0.exe`。
+const ASSET_PREFIX: &str = "SPL-";
+const ASSET_SUFFIX: &str = ".exe";
+/// 0.5.0 以前的檔名，舊版發佈時用的。
+const LEGACY_SUFFIX: &str = "_portable.exe";
 const DIGEST_PREFIX: &str = "sha256:";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -74,7 +78,7 @@ fn update_from(release: Release, current: &str) -> Option<UpdateInfo> {
     let asset = release
         .assets
         .into_iter()
-        .find(|asset| asset.name.ends_with(PORTABLE_SUFFIX))?;
+        .find(|asset| is_release_file(&asset.name))?;
     let sha256 = asset.digest?.strip_prefix(DIGEST_PREFIX)?.to_string();
     Some(UpdateInfo {
         version,
@@ -82,6 +86,11 @@ fn update_from(release: Release, current: &str) -> Option<UpdateInfo> {
         url: asset.browser_download_url,
         sha256,
     })
+}
+
+fn is_release_file(name: &str) -> bool {
+    let current = name.starts_with(ASSET_PREFIX) && name.ends_with(ASSET_SUFFIX);
+    current || name.ends_with(LEGACY_SUFFIX)
 }
 
 fn parse_version(version: &str) -> Option<(u32, u32, u32)> {
@@ -174,6 +183,14 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognises_the_new_and_old_release_names() {
+        assert!(is_release_file("SPL-0.6.0.exe"));
+        assert!(is_release_file("Sapling-Launcher_0.5.0_x64_portable.exe"));
+        assert!(!is_release_file("SPL-0.6.0.exe.sha256"));
+        assert!(!is_release_file("other.exe"));
+    }
 
     fn release(tag: &str, digest: Option<&str>) -> Release {
         Release {

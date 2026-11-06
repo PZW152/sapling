@@ -27,6 +27,11 @@ export type Instance = {
   fullscreen: boolean;
   /** 空的代表自動選擇 Java。 */
   javaPath: string;
+  /** 遊戲開始後直接加入的伺服器。 */
+  joinServer: string;
+  /** 0 代表還沒玩過。 */
+  lastPlayedMs: number;
+  playedSeconds: number;
 };
 
 export type LauncherConfig = {

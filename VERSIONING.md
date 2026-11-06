@@ -42,7 +42,7 @@ Sapling Launcher 使用 `主版本.次版本.修訂號` 格式，例如 `0.2.1`�
    - `crates/core/Cargo.toml`
 2. 在 [CHANGELOG.md](CHANGELOG.md) 寫下這個版本的改動。
 3. 確認 `cargo test --workspace` 和 CI 通過。
-4. 建立 `vX.Y.Z` 標籤和 GitHub Release，附上免安裝版。檔名必須以 `_portable.exe` 結尾，自動更新靠它尋找新版本。
+4. 建立 `vX.Y.Z` 標籤和 GitHub Release，附上 `SPL-X.Y.Z.exe`。自動更新靠這個名稱尋找新版本。0.6.0 要另外附上舊格式的 `Sapling-Launcher_0.6.0_x64_portable.exe`，0.5.0 以前的版本才升得上來。
 5. 在 Release 說明寫上 exe 的 SHA256。
 
 已發佈的版本不修改；要修問題就發佈新的版本號。

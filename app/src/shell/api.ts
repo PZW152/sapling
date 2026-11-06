@@ -68,6 +68,11 @@ export const api = {
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
   openModsFolder: (id: string) => invoke<void>("open_mods_folder", { id }),
+  cancelInstall: () => invoke<void>("cancel_install"),
+  changeSkin: (path: string, slim: boolean) => invoke<Profile>("change_skin", { path, slim }),
+  deleteWorld: (id: string, folder: string) => invoke<void>("delete_world", { id, folder }),
+  openInstanceSubfolder: (id: string, name: string) =>
+    invoke<void>("open_instance_subfolder", { id, name }),
   installLocalPack: (path: string) => invoke<Instance>("install_local_pack", { path }),
   exportPack: (id: string, path: string) => invoke<ExportSummary>("export_pack", { id, path }),
   addInstanceFile: (id: string, path: string) =>

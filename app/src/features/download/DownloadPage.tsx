@@ -52,7 +52,7 @@ export function DownloadPage() {
 
 function GameDownloads() {
   const { list, listError, loadVersions } = useApp();
-  const { install, installGame, playVersion } = useInstall();
+  const { install, installGame, playVersion, cancelInstall } = useInstall();
   const [loader, setLoader] = useState<LoaderKind>("vanilla");
   const [snapshots, setSnapshots] = useState(false);
 
@@ -133,6 +133,7 @@ function GameDownloads() {
                 install={install}
                 onInstall={(version) => installGame(version, loader)}
                 onPlay={(version) => playVersion(version, loader)}
+                onCancel={cancelInstall}
               />
             ))}
           </li>
@@ -149,6 +150,7 @@ function VersionRow({
   install,
   onInstall,
   onPlay,
+  onCancel,
 }: {
   id: string;
   isLatest: boolean;
@@ -156,6 +158,7 @@ function VersionRow({
   install: InstallState | null;
   onInstall: (id: string) => void;
   onPlay: (id: string) => void;
+  onCancel: () => void;
 }) {
   const active = install?.id === id;
   const failed = active && install.error;
@@ -169,6 +172,11 @@ function VersionRow({
         {isLatest && <small>最新</small>}
       </span>
       <div className="vine-actions">
+        {active && !failed && (
+          <button className="text-button" aria-label={`取消下載 ${id}`} onClick={onCancel}>
+            取消
+          </button>
+        )}
         {isInstalled ? (
           <button className="secondary" aria-label={`去啟動 ${id}`} onClick={() => onPlay(id)}>
             去啟動

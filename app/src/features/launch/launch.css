@@ -456,3 +456,17 @@
   justify-content: space-between;
   margin-top: var(--space-2);
 }
+
+.skin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.skin-row .chip {
+  height: 28px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}

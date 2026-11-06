@@ -7,6 +7,13 @@ import { ErrorText } from "../../shell/ErrorText";
 import { LOADERS } from "../../shell/loaders";
 import type { LoaderKind } from "../../shell/types";
 
+const FOLDERS = [
+  { id: "saves", name: "存檔" },
+  { id: "screenshots", name: "截圖" },
+  { id: "logs", name: "日誌" },
+  { id: "crash-reports", name: "崩潰報告" },
+];
+
 /** 實例頁的管理分頁：不常用但需要時一定要有的操作。 */
 export function InstanceManage() {
   const { list, selected, loadInstances, loadVersions } = useApp();
@@ -105,6 +112,25 @@ export function InstanceManage() {
           />
         </div>
         <p>模組可能不相容。換成比較舊的版本可能弄壞世界，建議先在世界分頁備份。</p>
+      </section>
+
+      <section className="setting">
+        <div className="setting-head">
+          <span>資料夾</span>
+        </div>
+        <div className="folder-links">
+          {FOLDERS.map(({ id, name }) => (
+            <button
+              key={id}
+              className="text-button"
+              onClick={() =>
+                api.openInstanceSubfolder(instance.id, id).catch((reason) => setError(String(reason)))
+              }
+            >
+              {name}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="setting">

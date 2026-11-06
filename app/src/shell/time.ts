@@ -24,3 +24,12 @@ export function timeAgo(thenMs: number, nowMs: number) {
   }
   return `${Math.floor(elapsed / YEAR_MS)} 年前`;
 }
+
+/** 累計遊玩時間。不到一分鐘的不值得顯示。 */
+export function formatPlaytime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 1) {
+    return null;
+  }
+  return minutes < 60 ? `玩了 ${minutes} 分鐘` : `玩了 ${(minutes / 60).toFixed(1)} 小時`;
+}
