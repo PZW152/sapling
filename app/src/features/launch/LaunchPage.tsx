@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { loaderName } from "../../shell/loaders";
 import { useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
@@ -93,13 +94,14 @@ export function LaunchPage() {
             active.map(
               ({ id, HeroPanel }) =>
                 HeroPanel && (
-                  <HeroPanel
-                    key={id}
-                    instance={selected}
-                    busy={busy}
-                    canStart={canStart}
-                    onPlay={startGame}
-                  />
+                  <FeatureBoundary key={id}>
+                    <HeroPanel
+                      instance={selected}
+                      busy={busy}
+                      canStart={canStart}
+                      onPlay={startGame}
+                    />
+                  </FeatureBoundary>
                 ),
             )}
           <HeroStatus
@@ -151,7 +153,11 @@ export function LaunchPage() {
         />
         {active.map(
           ({ id, AccountPanel: Extra }) =>
-            Extra && <Extra key={id} profile={profile} disabled={busy} />,
+            Extra && (
+              <FeatureBoundary key={id}>
+                <Extra profile={profile} disabled={busy} />
+              </FeatureBoundary>
+            ),
         )}
         <InstanceList
           loaded={loaded}

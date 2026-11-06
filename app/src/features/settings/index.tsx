@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
+import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import type { Feature } from "../../shell/feature";
 import "./settings.css";
 
@@ -11,7 +12,14 @@ function SettingsPage() {
 
   return (
     <div className="settings">
-      {active.map(({ id, Settings }) => Settings && <Settings key={id} />)}
+      {active.map(
+        ({ id, name, Settings }) =>
+          Settings && (
+            <FeatureBoundary key={id} name={name}>
+              <Settings />
+            </FeatureBoundary>
+          ),
+      )}
       <button
         className="disclosure setting-wide"
         aria-expanded={advanced}
@@ -25,7 +33,12 @@ function SettingsPage() {
       <div className="collapsible setting-wide" data-open={advanced}>
         <div className="collapsible-inner">
           {active.map(
-            ({ id, AdvancedSettings }) => AdvancedSettings && <AdvancedSettings key={id} />,
+            ({ id, name, AdvancedSettings }) =>
+              AdvancedSettings && (
+                <FeatureBoundary key={id} name={name}>
+                  <AdvancedSettings />
+                </FeatureBoundary>
+              ),
           )}
           {config.featureSwitchesUnlocked && <FeatureSwitches />}
         </div>

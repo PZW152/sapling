@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { FEATURES } from "..";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
+import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { LOADERS, loaderName } from "../../shell/loaders";
 import type { Instance, LoaderKind } from "../../shell/types";
 
@@ -226,8 +227,12 @@ function InstanceDetail({
 
       {panels.length > 0 ? (
         panels.map(
-          ({ id, InstancePanel }) =>
-            InstancePanel && <InstancePanel key={id} instanceId={instance.id} />,
+          ({ id, name, InstancePanel }) =>
+            InstancePanel && (
+              <FeatureBoundary key={id} name={name}>
+                <InstancePanel instanceId={instance.id} />
+              </FeatureBoundary>
+            ),
         )
       ) : (
         <div className="detail-spacer" />

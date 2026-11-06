@@ -738,3 +738,15 @@ button:disabled {
     transition: none !important;
   }
 }
+
+/* 單一模塊出錯時顯示 */
+.feature-error {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.feature-error h2 {
+  color: var(--color-strong);
+  font-size: var(--text-lg);
+}

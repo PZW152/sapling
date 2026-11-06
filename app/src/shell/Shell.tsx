@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FEATURES } from "../features";
 import { AppProvider, useApp } from "./AppContext";
 import type { Feature } from "./feature";
+import { FeatureBoundary } from "./FeatureBoundary";
 import { ICONS } from "./icons";
 import { useRipples, useSlideMark } from "./motion";
 
@@ -56,12 +57,21 @@ function Frame() {
           }
           return (
             <main key={id} className="page" hidden={id !== current?.id}>
-              <tab.Page />
+              <FeatureBoundary name={tab.label}>
+                <tab.Page />
+              </FeatureBoundary>
             </main>
           );
         })}
       </div>
-      {features.map(({ id, Overlay }) => Overlay && <Overlay key={id} />)}
+      {features.map(
+        ({ id, Overlay }) =>
+          Overlay && (
+            <FeatureBoundary key={id}>
+              <Overlay />
+            </FeatureBoundary>
+          ),
+      )}
     </div>
   );
 }
