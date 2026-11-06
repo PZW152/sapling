@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::InstanceError;
+use super::{Instance, InstanceError};
+use crate::download::{DownloadTask, has_expected_sha1};
+use crate::platform::DataDirs;
 
 const ENABLED_SUFFIX: &str = ".jar";
 const DISABLED_SUFFIX: &str = ".jar.disabled";
@@ -21,6 +23,57 @@ pub struct ModFile {
 
 pub fn mods_dir(game_dir: &Path) -> PathBuf {
     game_dir.join("mods")
+}
+
+/// 所有實例的模組資料夾。
+pub async fn all_mods_dirs(dirs: &DataDirs) -> Result<Vec<PathBuf>, InstanceError> {
+    let instances = Instance::list(dirs).await?;
+    Ok(instances
+        .iter()
+        .map(|instance| mods_dir(&instance.game_dir(dirs)))
+        .collect())
+}
+
+/// 其他實例已經有完全相同的模組時，用硬連結接過來，回傳還需要下載的工作。
+///
+/// 硬連結只佔一份空間，刪掉任何一邊都不影響另一邊。連結失敗就照常下載，
+/// 例如不同磁碟或隨身碟的 exFAT 格式都不支援。只用於模組：存檔和設定會被修改，
+/// 共用會互相影響。
+pub async fn link_existing(tasks: Vec<DownloadTask>, sources: &[PathBuf]) -> Vec<DownloadTask> {
+    let mut remaining = Vec::new();
+    for task in tasks {
+        if !try_link(&task, sources).await {
+            remaining.push(task);
+        }
+    }
+    remaining
+}
+
+async fn try_link(task: &DownloadTask, sources: &[PathBuf]) -> bool {
+    let Some(name) = task.path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    if !name.ends_with(ENABLED_SUFFIX) || task.path.exists() {
+        return false;
+    }
+    let Some(parent) = task.path.parent() else {
+        return false;
+    };
+    if tokio::fs::create_dir_all(parent).await.is_err() {
+        return false;
+    }
+    for source in sources {
+        let disabled = format!("{}{DISABLED_SUFFIX}", name.trim_end_matches(ENABLED_SUFFIX));
+        for candidate in [source.join(name), source.join(disabled)] {
+            let same = has_expected_sha1(&candidate, &task.sha1)
+                .await
+                .unwrap_or(false);
+            if same && tokio::fs::hard_link(&candidate, &task.path).await.is_ok() {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// 列出所有模組，按名稱排序。沒有 `mods` 資料夾就是空清單。
@@ -117,6 +170,58 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(mods_dir(&dir)).unwrap();
         dir
+    }
+
+    /// "hello" 的 SHA1。
+    const HELLO_SHA1: &str = "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d";
+
+    fn hello_task(dir: &Path) -> DownloadTask {
+        DownloadTask {
+            url: "https://example.invalid/a.jar".to_string(),
+            path: mods_dir(dir).join("a.jar"),
+            sha1: HELLO_SHA1.to_string(),
+            size: 5,
+        }
+    }
+
+    #[tokio::test]
+    async fn links_an_identical_mod_instead_of_downloading() {
+        let source = game_dir("link-source");
+        let target = game_dir("link-target");
+        std::fs::write(mods_dir(&source).join("a.jar"), "hello").unwrap();
+
+        let remaining = link_existing(vec![hello_task(&target)], &[mods_dir(&source)]).await;
+
+        assert!(remaining.is_empty());
+        std::fs::remove_file(mods_dir(&source).join("a.jar")).unwrap();
+        assert_eq!(
+            std::fs::read(mods_dir(&target).join("a.jar")).unwrap(),
+            b"hello"
+        );
+    }
+
+    #[tokio::test]
+    async fn finds_a_disabled_copy_too() {
+        let source = game_dir("link-disabled");
+        let target = game_dir("link-disabled-target");
+        std::fs::write(mods_dir(&source).join("a.jar.disabled"), "hello").unwrap();
+
+        let remaining = link_existing(vec![hello_task(&target)], &[mods_dir(&source)]).await;
+
+        assert!(remaining.is_empty());
+        assert!(mods_dir(&target).join("a.jar").exists());
+    }
+
+    #[tokio::test]
+    async fn downloads_when_the_same_name_has_different_content() {
+        let source = game_dir("link-different");
+        let target = game_dir("link-different-target");
+        std::fs::write(mods_dir(&source).join("a.jar"), "other").unwrap();
+
+        let remaining = link_existing(vec![hello_task(&target)], &[mods_dir(&source)]).await;
+
+        assert_eq!(remaining.len(), 1);
+        assert!(!mods_dir(&target).join("a.jar").exists());
     }
 
     #[tokio::test]

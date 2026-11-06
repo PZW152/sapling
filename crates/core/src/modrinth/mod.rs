@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use crate::download::{DownloadError, DownloadTask, download_all, fetch_text};
 use crate::instance::InstanceError;
+use crate::instance::mods::link_existing;
 use crate::loader::LoaderKind;
 use crate::versions::VersionsError;
 
@@ -157,6 +158,7 @@ pub async fn install(
     game_version: &str,
     loader: LoaderKind,
     mods_dir: &Path,
+    other_mods_dirs: &[PathBuf],
     concurrency: usize,
 ) -> Result<Vec<String>, ModrinthError> {
     let loader = loader_name(loader)?;
@@ -196,6 +198,7 @@ pub async fn install(
             })
         })
         .collect::<Result<Vec<_>, ModrinthError>>()?;
+    let tasks = link_existing(tasks, other_mods_dirs).await;
     download_all(client, tasks, concurrency, |_| {}).await?;
     Ok(names)
 }

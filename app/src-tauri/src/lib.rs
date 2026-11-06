@@ -253,12 +253,14 @@ async fn install_mod(id: String, project_id: String) -> Result<Vec<String>, Stri
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
     let instance = load_instance(&dirs, &id).await?;
     let client = new_client().map_err(text)?;
+    let other_mods_dirs = mods::all_mods_dirs(&dirs).await.map_err(text)?;
     modrinth::install(
         &client,
         &project_id,
         &instance.version,
         instance.loader,
         &mods::mods_dir(&instance.game_dir(&dirs)),
+        &other_mods_dirs,
         config.download_concurrency,
     )
     .await

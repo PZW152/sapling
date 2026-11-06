@@ -24,7 +24,7 @@ const AUTO_MAX_MEMORY_MB: u32 = 8192;
 const AUTO_MEMORY_STEP_MB: u32 = 512;
 const AUTO_MEMORY_SHARE: u32 = 3;
 /// 複製實例時略過的項目。
-const DUPLICATE_SKIP: [&str; 3] = ["logs", "crash-reports", copy::LOCK_FILE];
+const DUPLICATE_SKIP: [&str; 4] = ["logs", "crash-reports", "mods", copy::LOCK_FILE];
 
 #[derive(Debug, Error)]
 pub enum InstanceError {
@@ -171,9 +171,12 @@ async fn copy_in_background(
     to: PathBuf,
     skip: &'static [&'static str],
 ) -> io::Result<()> {
-    tokio::task::spawn_blocking(move || copy::copy_dir(&from, &to, skip))
-        .await
-        .map_err(io::Error::other)?
+    tokio::task::spawn_blocking(move || {
+        copy::copy_dir(&from, &to, skip)?;
+        copy::link_or_copy_files(&mods::mods_dir(&from), &mods::mods_dir(&to))
+    })
+    .await
+    .map_err(io::Error::other)?
 }
 
 fn clean_name(name: &str) -> Result<String, InstanceError> {
@@ -226,6 +229,8 @@ mod tests {
         std::fs::write(game_dir.join("saves/世界/level.dat"), "x").unwrap();
         std::fs::create_dir_all(game_dir.join("logs")).unwrap();
         std::fs::write(game_dir.join("logs/latest.log"), "x").unwrap();
+        std::fs::create_dir_all(game_dir.join("mods")).unwrap();
+        std::fs::write(game_dir.join("mods/a.jar"), "m").unwrap();
 
         let copy = source.duplicate(&dirs).await.unwrap();
 
@@ -234,6 +239,7 @@ mod tests {
         let copied = copy.game_dir(&dirs);
         assert!(copied.join("saves/世界/level.dat").exists());
         assert!(!copied.join("logs").exists());
+        assert_eq!(std::fs::read(copied.join("mods/a.jar")).unwrap(), b"m");
         assert_eq!(Instance::load(&dirs, &copy.id).await.unwrap(), copy);
     }
 

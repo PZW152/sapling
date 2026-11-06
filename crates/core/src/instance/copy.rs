@@ -26,6 +26,25 @@ pub fn copy_dir(from: &Path, to: &Path, skip: &[&str]) -> io::Result<()> {
     Ok(())
 }
 
+/// 複製模組資料夾：能用硬連結就用，不支援時改成一般複製。
+pub fn link_or_copy_files(from: &Path, to: &Path) -> io::Result<()> {
+    if !from.exists() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        let target = to.join(entry.file_name());
+        if std::fs::hard_link(entry.path(), &target).is_err() {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

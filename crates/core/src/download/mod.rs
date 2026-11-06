@@ -253,7 +253,7 @@ async fn download_to_part_file(
     }
 }
 
-async fn has_expected_sha1(path: &Path, expected: &str) -> Result<bool, DownloadError> {
+pub(crate) async fn has_expected_sha1(path: &Path, expected: &str) -> Result<bool, DownloadError> {
     let io_error = |source| DownloadError::Io {
         path: path.to_path_buf(),
         source,

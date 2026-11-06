@@ -13,6 +13,7 @@ use zip::ZipArchive;
 
 use crate::download::{DownloadProgress, DownloadTask, download_all, download_file, fetch_text};
 use crate::instance::Instance;
+use crate::instance::mods::{all_mods_dirs, link_existing};
 use crate::loader::LoaderKind;
 use crate::platform::DataDirs;
 use crate::versions::fetch_manifest;
@@ -154,9 +155,11 @@ async fn install_from_file(
     )
     .await?;
     let game_dir = instance.game_dir(dirs);
+    let sources = all_mods_dirs(dirs).await?;
     let filled = fill_game_dir(
         client,
         index,
+        &sources,
         pack_path.to_path_buf(),
         game_dir,
         concurrency,
@@ -220,12 +223,14 @@ fn pack_target(index: &PackIndex) -> Result<PackTarget, ModrinthError> {
 async fn fill_game_dir(
     client: &reqwest::Client,
     index: PackIndex,
+    sources: &[PathBuf],
     pack_path: PathBuf,
     game_dir: PathBuf,
     concurrency: usize,
     on_progress: impl FnMut(DownloadProgress),
 ) -> Result<(), ModrinthError> {
     let tasks = client_tasks(index.files, &game_dir)?;
+    let tasks = link_existing(tasks, sources).await;
     download_all(client, tasks, concurrency, on_progress).await?;
     tokio::task::spawn_blocking(move || extract_overrides(&pack_path, &game_dir))
         .await
