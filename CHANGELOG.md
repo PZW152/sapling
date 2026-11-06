@@ -2,6 +2,12 @@
 
 版本號規則見 [VERSIONING.md](VERSIONING.md)。
 
+## 未發佈
+
+### 修正
+
+- 下載頁的提示補上 Quilt
+
 ## 1.0.0
 
 ### 功能

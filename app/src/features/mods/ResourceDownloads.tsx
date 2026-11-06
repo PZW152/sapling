@@ -43,7 +43,7 @@ function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string })
       <section className="panel mod-section empty-detail">
         <p>
           {kind === "mod"
-            ? "模組要搭配載入器。先新增一個使用 Fabric、NeoForge 或 Forge 的實例。"
+            ? "模組要搭配載入器。先新增一個使用 Fabric、Quilt、NeoForge 或 Forge 的實例。"
             : "先下載一個遊戲版本，才有地方安裝。"}
         </p>
         <button className="secondary" onClick={() => goTo("instances")}>

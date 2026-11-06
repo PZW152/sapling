@@ -13,9 +13,15 @@ body:
     id: version
     attributes:
       label: 啟動器、遊戲版本和載入器
-      placeholder: 例如 Sapling 0.4.0、Minecraft 26.3、Fabric
+      placeholder: 例如 Sapling 1.0.0、Minecraft 26.3、Fabric
     validations:
       required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 診斷資訊
+      description: 在啟動器的「更多」頁按「複製診斷資訊」後貼上。裡面沒有帳號資料。
+      render: text
   - type: textarea
     id: log
     attributes:
