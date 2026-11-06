@@ -23,7 +23,7 @@ export function useRipples() {
   useEffect(() => {
     function spawn(event: PointerEvent) {
       const button = (event.target as Element).closest<HTMLElement>(
-        ".primary, .secondary, .row, .instance-item, .theme, .chip",
+        ".primary, .secondary, .row, .instance-item, .theme, .chip, .world",
       );
       if (!button || button.matches(":disabled")) {
         return;

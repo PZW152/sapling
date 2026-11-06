@@ -79,7 +79,7 @@ export function AccountPanel({
           <Avatar skinUrl={profile.skinUrl} />
           <div className="me-text">
             <strong>{profile.name}</strong>
-            <small>{offline ? "正版帳號，這次不使用" : "正版帳號"}</small>
+            <small>{offline ? "這次不使用" : "正版帳號"}</small>
           </div>
           <button className="text-button" disabled={disabled} onClick={signOut}>
             登出

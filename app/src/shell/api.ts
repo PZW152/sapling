@@ -9,6 +9,7 @@ import type {
   Profile,
   UpdateInfo,
   VersionList,
+  World,
 } from "./types";
 
 export type ModAction = { instanceId: string; name: string; enabled: boolean };
@@ -28,6 +29,8 @@ export const api = {
   deleteInstance: (id: string) => invoke<void>("delete_instance", { id }),
   openInstanceFolder: (id: string) => invoke<void>("open_instance_folder", { id }),
 
+  recentWorlds: (id: string) => invoke<World[]>("recent_worlds", { id }),
+
   listMods: (id: string) => invoke<ModFile[]>("list_mods", { id }),
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
@@ -40,8 +43,8 @@ export const api = {
   hasSavedAccount: () => invoke<boolean>("has_saved_account"),
 
   installGame: (version: string) => invoke<void>("install_game", { version }),
-  playGame: (instanceId: string, offlineName: string | null) =>
-    invoke<void>("play_game", { instanceId, offlineName }),
+  playGame: (instanceId: string, offlineName: string | null, world: string | null) =>
+    invoke<void>("play_game", { instanceId, offlineName, world }),
   cancelLaunch: () => invoke<void>("cancel_launch"),
 
   openLink: (url: string) => invoke<void>("open_link", { url }),

@@ -9,14 +9,15 @@ use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
 use sapling_core::instance::mods::{self, ModFile};
-use sapling_core::launch::{LaunchCancel, LaunchEvent, play};
+use sapling_core::instance::worlds::{self, World};
+use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
 use sapling_core::versions::install::{is_installed, prepare_version};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex as AsyncMutex;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 const LAUNCH_EVENT: &str = "launch-event";
 /// 與前端功能模塊的 id 相同。
@@ -24,6 +25,8 @@ const CRASH_FEATURE: &str = "crash";
 const OFFLINE_FEATURE: &str = "offline-account";
 const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+/// 首頁最多顯示幾個最近遊玩的世界。
+const RECENT_WORLD_LIMIT: usize = 3;
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 
 #[derive(Default)]
@@ -148,6 +151,15 @@ async fn open_instance_folder(id: String) -> Result<(), String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
     open_folder(&instance.game_dir(&dirs)).map_err(text)
+}
+
+#[tauri::command]
+async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    worlds::recent(&instance.game_dir(&dirs), RECENT_WORLD_LIMIT)
+        .await
+        .map_err(text)
 }
 
 #[tauri::command]
@@ -283,6 +295,7 @@ async fn play_game(
     state: State<'_, AppState>,
     instance_id: String,
     offline_name: Option<String>,
+    world: Option<String>,
 ) -> Result<(), String> {
     state.launch_cancel.reset();
     let dirs = data_dirs()?;
@@ -303,8 +316,11 @@ async fn play_game(
         &session,
         &instance,
         &dirs,
-        config.download_concurrency,
-        config.is_feature_enabled(CRASH_FEATURE),
+        PlayOptions {
+            concurrency: config.download_concurrency,
+            analyze_crash: config.is_feature_enabled(CRASH_FEATURE),
+            world: world.as_deref(),
+        },
         &state.launch_cancel,
         move |event| {
             if let LaunchEvent::Progress { progress, .. } = &event {
@@ -339,11 +355,26 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
     Ok(session)
 }
 
+/// 預設大小就是最小大小。系統算最小值時包含隱形邊框，所以用開啟時的實際外框，不寫死數字。
+fn lock_minimum_size(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if let (Ok(size), Ok(scale)) = (window.outer_size(), window.scale_factor()) {
+        // 設定失敗也不影響使用，只是窗口能再縮小一點。
+        let _ = window.set_min_size(Some(size.to_logical::<f64>(scale)));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     update::remove_old_version();
     tauri::Builder::default()
         .manage(AppState::default())
+        .setup(|app| {
+            lock_minimum_size(app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_versions,
             system_memory_mb,
@@ -354,6 +385,7 @@ pub fn run() {
             save_instance,
             delete_instance,
             open_instance_folder,
+            recent_worlds,
             list_mods,
             set_mod_enabled,
             delete_mod,

@@ -34,12 +34,12 @@
   --radius-pill: 999px;
 
   /* 字級和行高 */
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-md: 14px;
-  --text-lg: 16px;
-  --text-xl: 19px;
-  --text-2xl: 30px;
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 21px;
+  --text-2xl: 34px;
   --leading-tight: 1.25;
   --leading-body: 1.55;
 
@@ -69,12 +69,12 @@
 
   /* 動效 */
   --ease: cubic-bezier(0.22, 0.8, 0.28, 1);
-  --spring: linear(0, 0.2 5%, 0.62 14%, 0.92 23%, 1.06 32%, 1.09 40%, 1.04 54%, 0.995 70%, 1);
-  --fast: 120ms;
-  --medium: 280ms;
-  --slow: 460ms;
-  --stagger: 35ms;
-  --overlay: 560ms;
+  --spring: linear(0, 0.16 6%, 0.46 16%, 0.76 28%, 0.94 40%, 1.01 54%, 1.015 66%, 1.005 82%, 1);
+  --fast: 160ms;
+  --medium: 340ms;
+  --slow: 560ms;
+  --stagger: 55ms;
+  --overlay: 720ms;
 
   /* 字體 */
   --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft JhengHei UI", sans-serif;
@@ -210,7 +210,8 @@ button:disabled {
 .row,
 .instance-item,
 .theme,
-.chip {
+.chip,
+.world {
   position: relative;
   overflow: hidden;
 }
@@ -438,7 +439,7 @@ button:disabled {
 @keyframes tile-in {
   from {
     opacity: 0;
-    transform: translateY(calc(var(--dir) * 22px)) scale(0.98);
+    transform: translateY(calc(var(--dir) * 12px)) scale(0.99);
   }
 }
 
@@ -699,24 +700,29 @@ button:disabled {
 /* 窗口變大時重新安排，不只是把內容撐開。 */
 @media (min-width: 1040px) {
   :root {
-    --side-width: 300px;
+    --side-width: 320px;
     --list-width: 260px;
     --rail-width: 84px;
+    --text-xs: 14px;
+    --text-sm: 15px;
+    --text-md: 16px;
+    --text-lg: 20px;
+    --control-height: 42px;
   }
 }
 
 @media (min-height: 700px) {
   :root {
-    --primary-height: 72px;
-    --text-xl: 21px;
+    --primary-height: 76px;
+    --text-xl: 23px;
   }
 }
 
 @media (min-width: 1400px) {
   :root {
-    --text-md: 15px;
-    --text-sm: 14px;
-    --side-width: 340px;
+    --text-md: 17px;
+    --text-sm: 16px;
+    --side-width: 380px;
   }
 
   .page {

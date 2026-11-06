@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, watch};
 
 use crate::auth::Session;
 use crate::download::DownloadProgress;
-use crate::instance::Instance;
+use crate::instance::{Instance, worlds};
 use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{
@@ -29,6 +29,9 @@ const CLASSPATH_SEPARATOR: &str = ";";
 const UNUSED_ID: &str = "0";
 const HIDDEN_TOKEN: &str = "***";
 const LOG_CHANNEL_SIZE: usize = 256;
+/// 版本 JSON 用這個功能開關標記支援直接進入世界，1.20 起才有。
+const QUICK_PLAY_FEATURE: &str = "is_quick_play_singleplayer";
+const QUICK_PLAY_ARGUMENT: &str = "--quickPlaySingleplayer";
 /// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
 const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
 
@@ -42,6 +45,8 @@ pub enum LaunchError {
         #[source]
         source: io::Error,
     },
+    #[error("找不到這個世界，可能已經被移動或刪除")]
+    WorldNotFound,
     #[error("無法啟動 Java，請重新下載遊戲檔案後再試一次")]
     Spawn(#[source] io::Error),
     #[error("遊戲異常結束。{advice}")]
@@ -90,16 +95,31 @@ impl LaunchCancel {
     }
 }
 
+/// 這次啟動的選項。
+pub struct PlayOptions<'a> {
+    pub concurrency: usize,
+    pub analyze_crash: bool,
+    /// 啟動後直接進入的世界資料夾，`None` 代表停在主畫面。
+    pub world: Option<&'a str>,
+}
+
 /// 準備檔案並啟動遊戲，一直等到遊戲結束。準備途中被取消時直接結束。
 pub async fn play(
     session: &Session,
     instance: &Instance,
     dirs: &DataDirs,
-    concurrency: usize,
-    analyze_crash: bool,
+    options: PlayOptions<'_>,
     cancel: &LaunchCancel,
     mut on_event: impl FnMut(LaunchEvent) + Send,
 ) -> Result<(), LaunchError> {
+    let PlayOptions {
+        concurrency,
+        analyze_crash,
+        world,
+    } = options;
+    if world.is_some_and(|folder| !worlds::exists(&instance.game_dir(dirs), folder)) {
+        return Err(LaunchError::WorldNotFound);
+    }
     let prepare = prepare_version(&instance.version, dirs, concurrency, |stage, progress| {
         on_event(LaunchEvent::Progress { stage, progress })
     });
@@ -124,7 +144,8 @@ pub async fn play(
             })?;
     }
 
-    let arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
+    let mut arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
+    arguments.extend(world_arguments(&prepared.details, world));
     let mut child = Command::new(&prepared.java)
         .args(&arguments)
         .current_dir(&game_dir)
@@ -228,6 +249,19 @@ fn build_arguments(
     arguments
 }
 
+/// 直接進入世界的參數。舊版本不支援時照常停在主畫面。
+fn world_arguments(details: &VersionDetails, world: Option<&str>) -> Vec<String> {
+    let supported = details
+        .arguments
+        .game
+        .iter()
+        .any(|argument| argument.depends_on_feature(QUICK_PLAY_FEATURE));
+    match world {
+        Some(folder) if supported => vec![QUICK_PLAY_ARGUMENT.to_string(), folder.to_string()],
+        _ => Vec::new(),
+    }
+}
+
 fn expand(arguments: &[Argument], values: &HashMap<&str, String>) -> Vec<String> {
     arguments
         .iter()
@@ -327,6 +361,42 @@ mod tests {
         .unwrap();
         let values = HashMap::from([("auth_player_name", "Steve".to_string())]);
         assert_eq!(expand(&arguments, &values), ["--username", "Steve"]);
+    }
+
+    fn details_with_game_arguments(game: &str) -> VersionDetails {
+        VersionDetails::parse(&format!(
+            r#"{{
+                "id": "26.3",
+                "mainClass": "m",
+                "arguments": {{ "game": {game}, "jvm": [] }},
+                "assetIndex": {{ "id": "34", "sha1": "a", "size": 2, "totalSize": 3, "url": "u" }},
+                "downloads": {{ "client": {{ "sha1": "c", "size": 4, "url": "u" }} }},
+                "javaVersion": {{ "component": "j", "majorVersion": 25 }},
+                "libraries": []
+            }}"#
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn enters_the_world_when_the_version_supports_it() {
+        let details = details_with_game_arguments(
+            r#"[{ "rules": [{ "action": "allow", "features": { "is_quick_play_singleplayer": true } }],
+                  "value": ["--quickPlaySingleplayer", "${quickPlaySingleplayer}"] }]"#,
+        );
+
+        assert_eq!(
+            world_arguments(&details, Some("My World")),
+            ["--quickPlaySingleplayer", "My World"]
+        );
+        assert!(world_arguments(&details, None).is_empty());
+    }
+
+    #[test]
+    fn older_versions_stay_on_the_title_screen() {
+        let details = details_with_game_arguments(r#"["--username"]"#);
+
+        assert!(world_arguments(&details, Some("My World")).is_empty());
     }
 
     #[test]

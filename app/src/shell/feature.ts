@@ -1,5 +1,14 @@
 import type { ComponentType } from "react";
-import type { LauncherConfig, Profile } from "./types";
+import type { Instance, LauncherConfig, Profile } from "./types";
+
+export type HeroPanelProps = {
+  instance: Instance;
+  /** 遊戲正在準備或運行。 */
+  busy: boolean;
+  canStart: boolean;
+  /** 啟動遊戲並直接進入這個世界。 */
+  onPlay: (world: string) => void;
+};
 
 /** 一個內建功能模塊。新功能只需要實作這個結構並到 features/index.ts 註冊。 */
 export type Feature = {
@@ -26,6 +35,8 @@ export type Feature = {
   InstancePanel?: ComponentType<{ instanceId: string }>;
   /** 放在啟動頁帳號區塊下面的內容。 */
   AccountPanel?: ComponentType<{ profile: Profile | null; disabled: boolean }>;
+  /** 放在啟動頁主區塊、啟動按鈕上方的內容。 */
+  HeroPanel?: ComponentType<HeroPanelProps>;
   /** 回傳名稱時，下次啟動用這個名稱離線遊玩。 */
   offlineName?: (config: LauncherConfig) => string | null;
   /** 回傳文字時不能啟動，並把文字顯示在啟動按鈕旁邊。 */

@@ -34,7 +34,7 @@ export function LaunchPage() {
     active.map((feature) => feature.launchBlock?.(config)).find((reason) => reason) ?? null;
   const canStart = launchBlock === null && (profile !== null || offlineName !== null);
 
-  function startGame() {
+  function startGame(world: string | null = null) {
     if (!selected) {
       return;
     }
@@ -42,6 +42,7 @@ export function LaunchPage() {
     start(
       selected.id,
       offlineName,
+      world,
       bounds
         ? {
             top: bounds.top,
@@ -87,6 +88,19 @@ export function LaunchPage() {
         )}
 
         <div className="hero-bottom">
+          {selected &&
+            active.map(
+              ({ id, HeroPanel }) =>
+                HeroPanel && (
+                  <HeroPanel
+                    key={id}
+                    instance={selected}
+                    busy={busy}
+                    canStart={canStart}
+                    onPlay={startGame}
+                  />
+                ),
+            )}
           <HeroStatus
             phase={phase}
             error={error}
@@ -103,7 +117,7 @@ export function LaunchPage() {
             <button
               className={phase === "running" ? "primary running" : "primary"}
               disabled={!selected || !canStart || busy}
-              onClick={startGame}
+              onClick={() => startGame()}
             >
               <span key={phase} className="primary-label">
                 {launchLabel(phase)}
@@ -146,6 +160,7 @@ export function LaunchPage() {
           error={listError}
           canManage={isEnabled("instances")}
           onManage={() => goTo("instances")}
+          onDownload={() => goTo("download")}
           onRetry={loadVersions}
           onChoose={choose}
         />
@@ -154,10 +169,20 @@ export function LaunchPage() {
   );
 }
 
+/** 版本號的視覺字數：小數點很窄，只算半個字。 */
+function versionUnits(version: string) {
+  const dots = version.split(".").length - 1;
+  return Math.max(version.length - dots / 2, 1);
+}
+
 /** 版本號換掉時，只有變動的字元彈入。 */
 function VersionNumber({ version }: { version: string }) {
   return (
-    <h2 className="version-number" aria-label={version}>
+    <h2
+      className="version-number"
+      aria-label={version}
+      style={{ "--units": versionUnits(version) } as CSSProperties}
+    >
       {[...version].map((character, index) => (
         <span
           key={`${index}-${character}`}
@@ -180,6 +205,7 @@ function InstanceList({
   error,
   canManage,
   onManage,
+  onDownload,
   onRetry,
   onChoose,
 }: {
@@ -190,6 +216,7 @@ function InstanceList({
   error: string | null;
   canManage: boolean;
   onManage: () => void;
+  onDownload: () => void;
   onRetry: () => void;
   onChoose: (id: string) => void;
 }) {
@@ -233,6 +260,11 @@ function InstanceList({
           </li>
         ))}
       </ul>
+      {instances.length > 0 && (
+        <button className="text-button more-versions" onClick={onDownload}>
+          下載其他版本
+        </button>
+      )}
     </section>
   );
 }

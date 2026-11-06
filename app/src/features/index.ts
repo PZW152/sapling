@@ -8,6 +8,7 @@ import { instances } from "./instances";
 import { launch } from "./launch";
 import { mods } from "./mods";
 import { offlineAccount } from "./offline-account";
+import { recentWorlds } from "./recent-worlds";
 import { settings } from "./settings";
 import { update } from "./update";
 
@@ -18,6 +19,7 @@ export const FEATURES: Feature[] = [
   instances,
   mods,
   offlineAccount,
+  recentWorlds,
   download,
   crash,
   update,

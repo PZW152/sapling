@@ -48,6 +48,16 @@ pub enum ArgumentValue {
 }
 
 impl Argument {
+    /// 這個參數是否由版本 JSON 的某個功能開關控制。
+    pub fn depends_on_feature(&self, feature: &str) -> bool {
+        match self {
+            Argument::Plain(_) => false,
+            Argument::Conditional { rules, .. } => {
+                rules.iter().any(|rule| rule.features.contains_key(feature))
+            }
+        }
+    }
+
     /// 這個參數在本機實際要傳的內容。
     pub fn values_for_this_machine(&self) -> Vec<&str> {
         match self {

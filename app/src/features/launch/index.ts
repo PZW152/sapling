@@ -10,6 +10,6 @@ export const launch: Feature = {
   description: "登入帳號和啟動遊戲",
   optional: false,
   tab: { label: "啟動", Page: LaunchPage, keepAlive: true },
-  Settings: LaunchSettings,
+  InstancePanel: LaunchSettings,
   AdvancedSettings: LaunchAdvanced,
 };

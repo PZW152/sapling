@@ -1,4 +1,4 @@
-const REVEAL_MS = 700;
+const REVEAL_MS = 900;
 
 /** 切換主題。傳入點擊位置時，新顏色會從那裡擴散開來。 */
 export function applyTheme(theme: string, origin?: { x: number; y: number }) {

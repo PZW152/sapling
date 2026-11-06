@@ -1,0 +1,80 @@
+/* 有世界可以顯示時，版本號讓出空間。 */
+.hero:has(.worlds) .version-number {
+  font-size: clamp(72px, min(100cqw / (var(--units) * 0.54), 40cqh), 640px);
+}
+
+.worlds {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.worlds h3 {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.worlds ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.worlds li {
+  min-width: 0;
+  animation: tile-in var(--slow) var(--ease) backwards;
+  animation-delay: calc(var(--i) * var(--stagger));
+}
+
+.world {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--color-on-dark);
+  text-align: left;
+  background: var(--color-hero-soft);
+  transition:
+    background-color var(--medium) var(--ease),
+    transform var(--medium) var(--ease);
+}
+
+.world:hover:enabled {
+  background: color-mix(in srgb, var(--color-hero-soft) 82%, white);
+  transform: translateY(-2px);
+}
+
+.world:disabled {
+  opacity: 0.6;
+}
+
+.world-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  font-weight: 700;
+  background: var(--color-hero);
+  image-rendering: pixelated;
+}
+
+.world-text {
+  display: grid;
+  min-width: 0;
+}
+
+.world-text strong {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.world-text small {
+  font-size: var(--text-xs);
+  opacity: 0.8;
+}

@@ -41,7 +41,7 @@ function UpdateSettings() {
   const busy = state.kind === "checking" || state.kind === "installing";
 
   return (
-    <section className="panel setting">
+    <section className="panel setting setting-wide update-setting">
       <div className="setting-head">
         <span>啟動器更新</span>
       </div>

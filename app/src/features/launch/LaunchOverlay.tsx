@@ -5,7 +5,7 @@ import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
 
 /** 比 theme.css 的 --overlay 稍長，收合動畫播完才移除。 */
-const CLOSE_MS = 600;
+const CLOSE_MS = 780;
 
 /** 主區塊在窗口裡的位置，轉場從這裡展開、也收回這裡。 */
 export type OverlayOrigin = { top: number; right: number; bottom: number; left: number };

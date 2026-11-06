@@ -7,7 +7,7 @@ import type { OverlayOrigin } from "./LaunchOverlay";
 /** 問題記錄最多保留的行數，避免長時間遊玩時佔用太多記憶體。 */
 const MAX_LOG_LINES = 2000;
 /** 遊戲開始後等多久才收起窗口，讓用戶看到轉場完成。 */
-const MINIMIZE_DELAY_MS = 1200;
+const MINIMIZE_DELAY_MS = 1500;
 
 export type Phase = "idle" | "preparing" | "running" | "failed";
 
@@ -51,14 +51,19 @@ export function useLaunch() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  async function start(instanceId: string, offlineName: string | null, from: OverlayOrigin | null) {
+  async function start(
+    instanceId: string,
+    offlineName: string | null,
+    world: string | null,
+    from: OverlayOrigin | null,
+  ) {
     setOrigin(from);
     setPhase("preparing");
     setProgress(null);
     setError("");
     setLogs([]);
     try {
-      await api.playGame(instanceId, offlineName);
+      await api.playGame(instanceId, offlineName, world);
       setPhase("idle");
     } catch (reason) {
       setError(String(reason));

@@ -25,6 +25,14 @@ export type LauncherConfig = {
   offlineName: string;
 };
 
+export type World = {
+  /** 世界的資料夾名稱。 */
+  folder: string;
+  lastPlayedMs: number;
+  /** `icon.png` 的內容，沒有縮圖時為 null。 */
+  icon: number[] | null;
+};
+
 export type ModFile = { name: string; enabled: boolean; size: number };
 
 export type UpdateInfo = { version: string; notes: string; url: string; sha256: string };

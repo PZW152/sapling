@@ -22,7 +22,7 @@ export function LaunchSettings() {
   const autoMemory = memoryMb === AUTO_MEMORY;
 
   return (
-    <section className="panel setting">
+    <section className="setting">
         <div className="setting-head">
           <label htmlFor="memory">遊戲記憶體</label>
           <output htmlFor="memory">
@@ -52,7 +52,6 @@ export function LaunchSettings() {
           onChange={(value) => updateInstance({ memoryMb: value })}
         />
         <p>
-          {selected ? `套用到實例「${selected.name}」。` : "建立實例後可以調整。"}
           {totalMemory > 0 && `電腦共有 ${(totalMemory / MB_PER_GB).toFixed(0)} GB。`}
         </p>
     </section>

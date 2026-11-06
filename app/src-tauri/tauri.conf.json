@@ -13,10 +13,8 @@
     "windows": [
       {
         "title": "Sapling Launcher",
-        "width": 860,
-        "height": 560,
-        "minWidth": 860,
-        "minHeight": 560,
+        "width": 845,
+        "height": 551,
         "center": true,
         "decorations": false
       }

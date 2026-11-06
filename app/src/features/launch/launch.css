@@ -18,6 +18,7 @@
   border-radius: var(--radius-tile);
   color: var(--color-on-dark);
   background: var(--color-hero);
+  container-type: size;
   transition: background-color var(--slow) var(--ease);
 }
 
@@ -91,7 +92,8 @@
 .version-number {
   margin-top: var(--space-2);
   font-family: var(--font-number);
-  font-size: clamp(96px, 16vw, 150px);
+  /* 版本號就是主視覺：寬度撐滿主區塊，高度最多佔六成。--units 是字數，小數點算半個。 */
+  font-size: clamp(96px, min(100cqw / (var(--units) * 0.54), 58cqh), 640px);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.035em;
@@ -100,13 +102,13 @@
 .digit {
   display: inline-block;
   animation: digit-in var(--slow) var(--spring) backwards;
-  animation-delay: calc(var(--i) * 45ms);
+  animation-delay: calc(var(--i) * 70ms);
 }
 
 @keyframes digit-in {
   from {
     opacity: 0;
-    transform: translateY(0.35em) scale(0.92);
+    transform: translateY(0.12em) scale(0.98);
   }
 }
 
@@ -292,6 +294,10 @@
   scrollbar-width: thin;
 }
 
+.more-versions {
+  align-self: flex-start;
+}
+
 .row-mark {
   border-radius: var(--radius-control);
   background: var(--color-soft);
@@ -303,7 +309,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   padding: var(--space-1) 10px;
   border-radius: var(--radius-control);
   text-align: left;
@@ -382,7 +388,7 @@
   justify-items: center;
   gap: var(--space-2);
   width: min(420px, 70%);
-  animation: overlay-content-in var(--overlay) var(--ease) 120ms backwards;
+  animation: overlay-content-in var(--overlay) var(--ease) 180ms backwards;
 }
 
 .launch-overlay.closing .overlay-content {
@@ -393,7 +399,7 @@
 @keyframes overlay-content-in {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.97);
   }
 }
 
@@ -504,6 +510,6 @@
 
 @media (min-height: 700px) {
   .row {
-    min-height: 48px;
+    min-height: 52px;
   }
 }

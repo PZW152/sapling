@@ -75,6 +75,20 @@
   grid-column: 1 / -1;
 }
 
+/* 內容很少的設定佔一整行，標題在左、按鈕在右。 */
+.update-setting {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.update-setting .secondary {
+  padding: 0 var(--space-5);
+}
+
+.update-setting p {
+  grid-column: 1 / -1;
+}
+
 .setting p {
   color: var(--color-muted);
   font-size: var(--text-xs);
@@ -161,6 +175,6 @@
 @media (min-width: 1040px) {
   .settings,
   .collapsible-inner {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
   }
 }

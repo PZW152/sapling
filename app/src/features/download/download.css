@@ -39,7 +39,7 @@
   grid-template-columns: var(--node-size) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  min-height: 42px;
+  min-height: 46px;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-control);
   transition: background-color var(--fast) var(--ease);
@@ -114,5 +114,11 @@
 
   .vine-series {
     break-inside: avoid;
+  }
+}
+
+@media (min-width: 1240px) {
+  .vine {
+    columns: 3;
   }
 }
