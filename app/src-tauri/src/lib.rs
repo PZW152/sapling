@@ -28,6 +28,8 @@ const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
 /// 首頁最多顯示幾個最近遊玩的世界。
 const RECENT_WORLD_LIMIT: usize = 3;
+/// 實例頁最多列出幾個世界。
+const WORLD_LIST_LIMIT: usize = 50;
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 
 #[derive(Default)]
@@ -159,6 +161,31 @@ async fn open_instance_folder(id: String) -> Result<(), String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
     open_folder(&instance.game_dir(&dirs)).map_err(text)
+}
+
+#[tauri::command]
+async fn duplicate_instance(id: String) -> Result<Instance, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    instance.duplicate(&dirs).await.map_err(text)
+}
+
+#[tauri::command]
+async fn list_worlds(id: String) -> Result<Vec<World>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    worlds::recent(&instance.game_dir(&dirs), WORLD_LIST_LIMIT)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn backup_world(id: String, folder: String) -> Result<String, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    worlds::backup(&instance.game_dir(&dirs), &folder)
+        .await
+        .map_err(text)
 }
 
 #[tauri::command]
@@ -393,6 +420,9 @@ pub fn run() {
             save_instance,
             delete_instance,
             open_instance_folder,
+            duplicate_instance,
+            list_worlds,
+            backup_world,
             recent_worlds,
             list_mods,
             set_mod_enabled,

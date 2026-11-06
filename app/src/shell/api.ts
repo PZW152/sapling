@@ -27,10 +27,13 @@ export const api = {
   createInstance: (name: string, version: string, loader: LoaderKind) =>
     invoke<Instance>("create_instance", { name, version, loader }),
   saveInstance: (instance: Instance) => invoke<void>("save_instance", { instance }),
+  duplicateInstance: (id: string) => invoke<Instance>("duplicate_instance", { id }),
   deleteInstance: (id: string) => invoke<void>("delete_instance", { id }),
   openInstanceFolder: (id: string) => invoke<void>("open_instance_folder", { id }),
 
   recentWorlds: (id: string) => invoke<World[]>("recent_worlds", { id }),
+  listWorlds: (id: string) => invoke<World[]>("list_worlds", { id }),
+  backupWorld: (id: string, folder: string) => invoke<string>("backup_world", { id, folder }),
 
   listMods: (id: string) => invoke<ModFile[]>("list_mods", { id }),
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),

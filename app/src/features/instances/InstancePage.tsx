@@ -50,6 +50,10 @@ export function InstancePage() {
           key={selected.id}
           instance={selected}
           onChanged={loadInstances}
+          onDuplicated={async (id) => {
+            await loadInstances();
+            selectInstance(id);
+          }}
         />
       ) : (
         <div className="panel instance-detail empty-detail">
@@ -154,14 +158,17 @@ function CreateInstance({
 function InstanceDetail({
   instance,
   onChanged,
+  onDuplicated,
 }: {
   instance: Instance;
   onChanged: () => Promise<void>;
+  onDuplicated: (id: string) => Promise<void>;
 }) {
   const { isEnabled } = useApp();
   const panels = FEATURES.filter((feature) => feature.InstancePanel && isEnabled(feature.id));
   const [name, setName] = useState(instance.name);
   const [confirming, setConfirming] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [error, setError] = useState("");
 
   async function run(action: () => Promise<unknown>) {
@@ -180,6 +187,15 @@ function InstanceDetail({
         await onChanged();
       });
     }
+  }
+
+  async function duplicate() {
+    setCopying(true);
+    await run(async () => {
+      const copy = await api.duplicateInstance(instance.id);
+      await onDuplicated(copy.id);
+    });
+    setCopying(false);
   }
 
   function deleteInstance() {
@@ -219,12 +235,17 @@ function InstanceDetail({
 
       {error && <p className="error">{error}</p>}
       <div className="detail-actions">
-        <button
-          className="secondary"
-          onClick={() => run(() => api.openInstanceFolder(instance.id))}
-        >
-          打開實例資料夾
-        </button>
+        <div className="detail-group">
+          <button
+            className="secondary"
+            onClick={() => run(() => api.openInstanceFolder(instance.id))}
+          >
+            打開資料夾
+          </button>
+          <button className="secondary" disabled={copying} onClick={duplicate}>
+            {copying ? "正在複製" : "複製實例"}
+          </button>
+        </div>
         <button
           className={confirming ? "secondary danger" : "secondary"}
           onClick={deleteInstance}

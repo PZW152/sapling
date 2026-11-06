@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 use super::InstanceError;
+use super::copy::{LOCK_FILE, copy_dir};
 
 const LEVEL_FILE: &str = "level.dat";
 const ICON_FILE: &str = "icon.png";
@@ -60,6 +61,36 @@ pub async fn recent(game_dir: &Path, limit: usize) -> Result<Vec<World>, Instanc
         });
     }
     Ok(worlds)
+}
+
+/// 備份成 `saves` 裡的另一個世界，回傳新的資料夾名稱。
+/// 要還原時在遊戲裡直接打開它，不需要另外的還原功能。
+pub async fn backup(game_dir: &Path, folder: &str) -> Result<String, InstanceError> {
+    if !exists(game_dir, folder) {
+        return Err(InstanceError::NotFound);
+    }
+    let saves = saves_dir(game_dir);
+    let name = free_backup_name(&saves, folder);
+    let from = saves.join(folder);
+    let to = saves.join(&name);
+    let target = to.clone();
+    let copied = tokio::task::spawn_blocking(move || copy_dir(&from, &target, &[LOCK_FILE]))
+        .await
+        .map_err(io::Error::other)
+        .and_then(|result| result);
+    if let Err(source) = copied {
+        let _ = tokio::fs::remove_dir_all(&to).await;
+        return Err(InstanceError::Io { path: to, source });
+    }
+    Ok(name)
+}
+
+/// 第一個還沒用過的備份名稱。
+fn free_backup_name(saves: &Path, folder: &str) -> String {
+    (1..)
+        .map(|number| format!("{folder} 備份 {number}"))
+        .find(|name| !saves.join(name).exists())
+        .unwrap_or_else(|| format!("{folder} 備份"))
 }
 
 /// 確認這個名稱真的是實例裡的世界，不會指到 `saves` 以外的地方。
@@ -154,6 +185,29 @@ mod tests {
 
         assert_eq!(worlds[0].icon, Some(vec![1, 2, 3]));
         assert_eq!(worlds[1].icon, None);
+    }
+
+    #[tokio::test]
+    async fn backup_becomes_another_world_with_a_free_name() {
+        let dir = game_dir("backup");
+        add_world(&dir, "生存", 100);
+
+        assert_eq!(backup(&dir, "生存").await.unwrap(), "生存 備份 1");
+        assert_eq!(backup(&dir, "生存").await.unwrap(), "生存 備份 2");
+
+        assert!(exists(&dir, "生存 備份 2"));
+        let worlds = recent(&dir, 5).await.unwrap();
+        assert_eq!(worlds.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn backup_refuses_a_path_outside_saves() {
+        let dir = game_dir("backup-outside");
+
+        assert!(matches!(
+            backup(&dir, "../mods").await,
+            Err(InstanceError::NotFound)
+        ));
     }
 
     #[test]

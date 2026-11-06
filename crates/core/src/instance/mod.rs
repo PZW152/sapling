@@ -1,5 +1,6 @@
 //! 實例：一個獨立遊戲資料夾 + 遊戲版本 + 載入器 + 設定。
 
+mod copy;
 pub mod mods;
 pub mod worlds;
 
@@ -22,6 +23,8 @@ const AUTO_MIN_MEMORY_MB: u32 = 2048;
 const AUTO_MAX_MEMORY_MB: u32 = 8192;
 const AUTO_MEMORY_STEP_MB: u32 = 512;
 const AUTO_MEMORY_SHARE: u32 = 3;
+/// 複製實例時略過的項目。
+const DUPLICATE_SKIP: [&str; 3] = ["logs", "crash-reports", copy::LOCK_FILE];
 
 #[derive(Debug, Error)]
 pub enum InstanceError {
@@ -122,6 +125,23 @@ impl Instance {
         Ok(())
     }
 
+    /// 複製出一個新實例，包括存檔、模組和設定。不複製日誌和崩潰報告。
+    pub async fn duplicate(&self, dirs: &DataDirs) -> Result<Self, InstanceError> {
+        let mut copy = self.clone();
+        copy.id = next_id(&Self::list(dirs).await?);
+        copy.name = format!("{} 副本", self.name);
+
+        let from = self.game_dir(dirs);
+        let to = copy.game_dir(dirs);
+        if let Err(source) = copy_in_background(from, to.clone(), &DUPLICATE_SKIP).await {
+            // 複製到一半的資料夾不完整，留著會變成損壞的實例。
+            let _ = tokio::fs::remove_dir_all(&to).await;
+            return Err(InstanceError::Io { path: to, source });
+        }
+        copy.save(dirs).await?;
+        Ok(copy)
+    }
+
     /// 刪除實例和它的整個遊戲資料夾，包括存檔。
     pub async fn delete(&self, dirs: &DataDirs) -> Result<(), InstanceError> {
         let path = self.game_dir(dirs);
@@ -143,6 +163,17 @@ impl Instance {
             self.memory_mb
         }
     }
+}
+
+/// 大量檔案複製放到背景執行緒，不佔用非同步工作。
+async fn copy_in_background(
+    from: PathBuf,
+    to: PathBuf,
+    skip: &'static [&'static str],
+) -> io::Result<()> {
+    tokio::task::spawn_blocking(move || copy::copy_dir(&from, &to, skip))
+        .await
+        .map_err(io::Error::other)?
 }
 
 fn clean_name(name: &str) -> Result<String, InstanceError> {
@@ -184,6 +215,26 @@ mod tests {
         let root = std::env::temp_dir().join(format!("sapling-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         DataDirs::at(root)
+    }
+
+    #[tokio::test]
+    async fn duplicate_keeps_saves_but_not_logs() {
+        let dirs = temp_dirs("duplicate");
+        let source = Instance::create(&dirs, "生存", "26.3").await.unwrap();
+        let game_dir = source.game_dir(&dirs);
+        std::fs::create_dir_all(game_dir.join("saves/世界")).unwrap();
+        std::fs::write(game_dir.join("saves/世界/level.dat"), "x").unwrap();
+        std::fs::create_dir_all(game_dir.join("logs")).unwrap();
+        std::fs::write(game_dir.join("logs/latest.log"), "x").unwrap();
+
+        let copy = source.duplicate(&dirs).await.unwrap();
+
+        assert_ne!(copy.id, source.id);
+        assert_eq!(copy.name, "生存 副本");
+        let copied = copy.game_dir(&dirs);
+        assert!(copied.join("saves/世界/level.dat").exists());
+        assert!(!copied.join("logs").exists());
+        assert_eq!(Instance::load(&dirs, &copy.id).await.unwrap(), copy);
     }
 
     #[tokio::test]
