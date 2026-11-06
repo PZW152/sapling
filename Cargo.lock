@@ -3420,7 +3420,7 @@ dependencies = [
 
 [[package]]
 name = "sapling"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "sapling-core",
  "serde",
@@ -3431,7 +3431,7 @@ dependencies = [
 
 [[package]]
 name = "sapling-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "dirs",
  "keyring",
