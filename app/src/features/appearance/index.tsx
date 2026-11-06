@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { applyScale } from "../../shell/applyScale";
-import { applyColorMode, applyTheme, revealChange } from "../../shell/applyTheme";
+import { applyColorMode, applyMaterial, applyTheme, revealChange } from "../../shell/applyTheme";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
 import type { ColorMode } from "../../shell/types";
@@ -11,6 +11,11 @@ const MODES: { id: ColorMode; name: string }[] = [
   { id: "system", name: "跟隨系統" },
   { id: "light", name: "淺色" },
   { id: "dark", name: "深色" },
+];
+
+const MATERIALS = [
+  { glass: true, name: "玻璃" },
+  { glass: false, name: "純色" },
 ];
 
 const SCALES = [
@@ -63,6 +68,25 @@ function AppearanceSettings() {
               const origin = { x: event.clientX, y: event.clientY };
               revealChange(() => applyColorMode(id), origin);
               updateConfig({ colorMode: id });
+            }}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="setting-head">
+        <span>窗口材質</span>
+      </div>
+      <div className="chips" role="group" aria-label="窗口材質">
+        {MATERIALS.map(({ glass, name }) => (
+          <button
+            key={name}
+            className="chip"
+            aria-pressed={config.glass === glass}
+            onClick={(event) => {
+              const origin = { x: event.clientX, y: event.clientY };
+              revealChange(() => applyMaterial(glass), origin);
+              updateConfig({ glass });
             }}
           >
             {name}

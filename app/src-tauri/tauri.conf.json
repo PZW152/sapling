@@ -16,7 +16,9 @@
         "width": 845,
         "height": 551,
         "center": true,
-        "decorations": false
+        "decorations": false,
+        "transparent": true,
+        "windowEffects": { "effects": ["acrylic"] }
       }
     ],
     "security": {

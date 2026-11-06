@@ -47,6 +47,7 @@ export type LauncherConfig = {
   /** 介面大小的百分比。 */
   uiScale: number;
   colorMode: ColorMode;
+  glass: boolean;
   minimizeOnLaunch: boolean;
   /** 看過「有什麼新內容」的版本。 */
   seenVersion: string;

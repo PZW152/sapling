@@ -38,6 +38,8 @@ pub struct LauncherConfig {
     pub ui_scale: u32,
     /// 淺色、深色或跟隨系統。
     pub color_mode: String,
+    /// 窗口用玻璃材質。關掉就是不透明的純色。
+    pub glass: bool,
     /// 遊戲開始後收起啟動器窗口。
     pub minimize_on_launch: bool,
     /// 用戶看過「有什麼新內容」的版本。
@@ -58,6 +60,7 @@ impl Default for LauncherConfig {
             favorites: Vec::new(),
             ui_scale: DEFAULT_UI_SCALE,
             color_mode: DEFAULT_COLOR_MODE.to_string(),
+            glass: true,
             minimize_on_launch: true,
             seen_version: String::new(),
         }
@@ -112,6 +115,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         DataDirs::at(root)
+    }
+
+    #[test]
+    fn old_config_without_glass_uses_glass() {
+        let config: LauncherConfig = serde_json::from_str("{}").unwrap();
+        assert!(config.glass);
     }
 
     #[tokio::test]

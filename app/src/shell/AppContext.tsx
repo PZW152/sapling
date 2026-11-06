@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "./api";
-import { applyColorMode, applyTheme } from "./applyTheme";
+import { applyColorMode, applyTheme, applyMaterial } from "./applyTheme";
 import { applyScale } from "./applyScale";
 import type { Feature } from "./feature";
 import { recentFirst } from "./instances";
@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   favorites: [],
   uiScale: 100,
   colorMode: "system",
+  glass: true,
   minimizeOnLaunch: true,
   seenVersion: "",
 };
@@ -123,6 +124,12 @@ export function AppProvider({
     query.addEventListener("change", follow);
     return () => query.removeEventListener("change", follow);
   }, [config.colorMode]);
+
+  useEffect(() => {
+    if (loaded) {
+      applyMaterial(config.glass);
+    }
+  }, [loaded, config.glass]);
 
   const touchContent = useCallback(() => setContentVersion((version) => version + 1), []);
 
