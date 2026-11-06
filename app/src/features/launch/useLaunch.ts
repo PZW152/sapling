@@ -64,6 +64,7 @@ export function useLaunch() {
     instanceId: string,
     offlineName: string | null,
     world: string | null,
+    server: string | null,
     from: OverlayOrigin | null,
   ) {
     setOrigin(from);
@@ -72,7 +73,7 @@ export function useLaunch() {
     setError("");
     setLogs([]);
     try {
-      await api.playGame(instanceId, offlineName, world);
+      await api.playGame(instanceId, offlineName, world, server);
       setPhase("idle");
     } catch (reason) {
       setError(String(reason));

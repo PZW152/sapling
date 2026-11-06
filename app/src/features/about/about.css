@@ -15,3 +15,10 @@
   color: var(--color-faint);
   font-size: var(--text-xs);
 }
+
+.about-more {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2) var(--space-4);
+}

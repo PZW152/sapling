@@ -11,13 +11,41 @@ struct Rule {
 }
 
 /// 由最具體到最籠統，只回報第一個符合的原因。
-const RULES: [Rule; 8] = [
+const RULES: [Rule; 13] = [
     Rule {
         markers: &["OutOfMemoryError", "Could not reserve enough space"],
         advice: "遊戲記憶體不足。請到實例頁的「記憶體」分頁調高，或關閉其他佔用記憶體的程式。",
     },
     Rule {
-        markers: &["UnsupportedClassVersionError"],
+        markers: &[
+            "Could not create the Java Virtual Machine",
+            "Unrecognized VM option",
+        ],
+        advice: "Java 不接受目前的參數。請到實例的設定分頁清空額外 Java 參數，或調低記憶體。",
+    },
+    Rule {
+        markers: &[
+            "There is not enough space on the disk",
+            "No space left on device",
+            "磁碟空間不足",
+        ],
+        advice: "硬碟空間不足。請清出一些空間，或到進階設定的清理空間刪除用不到的檔案。",
+    },
+    Rule {
+        markers: &[
+            "nvoglv64.dll",
+            "atio6axx.dll",
+            "ig9icd64.dll",
+            "ig11icd64.dll",
+            "ig12icd64.dll",
+        ],
+        advice: "顯示卡驅動崩潰了。請更新顯示卡驅動，用光影時也可以先停用試試。",
+    },
+    Rule {
+        markers: &[
+            "UnsupportedClassVersionError",
+            "Unsupported class file major version",
+        ],
         advice: "Java 版本和遊戲或模組不相容。請移除最近加入的模組，或換一個遊戲版本。",
     },
     Rule {
@@ -53,6 +81,22 @@ const RULES: [Rule; 8] = [
         advice: "有模組互相衝突。請逐個停用最近加入的模組來找出問題。",
     },
     Rule {
+        markers: &[
+            "zip END header not found",
+            "ZipException",
+            "InvalidModFileException",
+        ],
+        advice: "有檔案損壞了。請重新下載最近加入的模組，或到實例的管理分頁修復遊戲檔案。",
+    },
+    Rule {
+        markers: &[
+            "NoSuchMethodError",
+            "NoSuchFieldError",
+            "NoClassDefFoundError",
+        ],
+        advice: "有模組和這個遊戲版本不相容。請更新模組，或逐個停用最近加入的模組。",
+    },
+    Rule {
         markers: &["Failed to load native library", "UnsatisfiedLinkError"],
         advice: "遊戲檔案可能不完整。請重新啟動一次，Sapling 會自動修復缺少的檔案。",
     },
@@ -61,6 +105,33 @@ const RULES: [Rule; 8] = [
         advice: "崩潰可能和模組有關。請逐個停用最近加入的模組來測試。",
     },
 ];
+
+/// 崩潰報告裡點名模組的幾種寫法。分隔符號之前就是模組名稱。
+const SUSPECT_MARKERS: [(&str, &str); 4] = [
+    ("Suspected Mods: ", " ("),
+    ("Suspected Mod: ", " ("),
+    ("Mixin apply for mod ", " failed"),
+    ("from mod ", "]"),
+];
+
+/// 完整的白話說明：原因加上可能有問題的模組。
+pub fn explain(text: &str) -> String {
+    let advice = analyze(text);
+    match suspect_mod(text) {
+        Some(name) => format!("{advice}可能有問題的模組：{name}。"),
+        None => advice.to_string(),
+    }
+}
+
+/// 找出報告點名的模組。
+fn suspect_mod(text: &str) -> Option<String> {
+    SUSPECT_MARKERS.iter().find_map(|(start, end)| {
+        let rest = text.split_once(start)?.1;
+        let line = rest.lines().next()?;
+        let name = line.split_once(end).map_or(line, |(name, _)| name).trim();
+        (!name.is_empty() && name != "NONE" && name.len() < 80).then(|| name.to_string())
+    })
+}
 
 /// 分析日誌內容，回傳白話建議。
 pub fn analyze(text: &str) -> &'static str {
@@ -76,8 +147,27 @@ pub async fn read_reports(game_dir: &Path) -> String {
     if let Some(report) = newest_crash_report(game_dir).await {
         text.push_str(&read_tail(&report).await);
     }
+    if let Some(report) = newest_file(game_dir, "hs_err_pid").await {
+        text.push_str(&read_tail(&report).await);
+    }
     text.push_str(&read_tail(&game_dir.join("logs").join("latest.log")).await);
     text
+}
+
+/// Java 自己當掉時，報告放在遊戲資料夾最外層。
+async fn newest_file(folder: &Path, prefix: &str) -> Option<PathBuf> {
+    let mut entries = tokio::fs::read_dir(folder).await.ok()?;
+    let mut newest = None;
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        if !entry.file_name().to_string_lossy().starts_with(prefix) {
+            continue;
+        }
+        let modified = entry.metadata().await.ok()?.modified().ok()?;
+        if newest.as_ref().is_none_or(|(time, _)| modified > *time) {
+            newest = Some((modified, entry.path()));
+        }
+    }
+    newest.map(|(_, path)| path)
 }
 
 async fn newest_crash_report(game_dir: &Path) -> Option<PathBuf> {
@@ -105,6 +195,26 @@ async fn read_tail(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_the_mod_the_report_points_at() {
+        let forge = "Suspected Mods: Create (create), Version: 6.0\nStacktrace:";
+        assert!(explain(forge).ends_with("可能有問題的模組：Create。"));
+
+        let mixin = "Mixin apply for mod sodium failed sodium.mixins.json:x";
+        assert!(explain(mixin).contains("模組：sodium。"));
+
+        let none = "Suspected Mods: NONE\n";
+        assert!(!explain(none).contains("模組："));
+    }
+
+    #[test]
+    fn recognises_more_common_causes() {
+        assert!(analyze("# Problematic frame: nvoglv64.dll+0x1").contains("顯示卡"));
+        assert!(analyze("java.util.zip.ZipException: zip END header not found").contains("損壞"));
+        assert!(analyze("Unrecognized VM option 'Foo'").contains("Java 參數"));
+        assert!(analyze("java.lang.NoSuchMethodError: x").contains("不相容"));
+    }
 
     #[test]
     fn explains_common_crashes() {

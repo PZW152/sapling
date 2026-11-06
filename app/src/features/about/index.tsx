@@ -7,6 +7,8 @@ import "./about.css";
 
 const REPOSITORY_URL = "https://github.com/PZW152/sapling";
 const USAGE_URL = `${REPOSITORY_URL}/blob/main/USAGE.md`;
+const LICENSES_URL = `${REPOSITORY_URL}/blob/main/THIRD-PARTY-NOTICES.md`;
+const ISSUES_URL = `${REPOSITORY_URL}/issues/new`;
 /** 連按版本號這麼多次，切換功能模塊開關的顯示。 */
 const UNLOCK_CLICKS = 5;
 
@@ -31,6 +33,11 @@ function AboutPage() {
     getVersion().then(setVersion);
   }, []);
 
+  async function copyDiagnostics() {
+    await navigator.clipboard.writeText(await api.diagnostics());
+    setMessage("診斷資訊已複製，回報問題時貼上。裡面沒有帳號資料。");
+  }
+
   return (
     <div className="notice">
       <div className="notice-card about">
@@ -49,6 +56,20 @@ function AboutPage() {
           </button>
           <button className="secondary" onClick={() => api.openLink(USAGE_URL)}>
             使用指南
+          </button>
+        </div>
+        <div className="about-more">
+          <button className="text-button" onClick={() => api.openLink(ISSUES_URL)}>
+            回報問題
+          </button>
+          <button className="text-button" onClick={copyDiagnostics}>
+            複製診斷資訊
+          </button>
+          <button className="text-button" onClick={() => api.openDataFolder()}>
+            打開資料資料夾
+          </button>
+          <button className="text-button" onClick={() => api.openLink(LICENSES_URL)}>
+            第三方授權
           </button>
         </div>
         <p className="about-note">非 Minecraft 官方產品，與 Mojang 和 Microsoft 無關。</p>

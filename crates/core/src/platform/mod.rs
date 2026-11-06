@@ -1,12 +1,16 @@
 //! 所有 Windows 專屬的設定都集中在這裡，日後移植時只改這個模塊。
 
-use std::io;
+use std::io::{self, Write};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
 use windows_sys::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+
+const CRASH_LOG: &str = "crash.log";
+const SHORTCUT_SCRIPT: &str = "$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:SAPLING_LINK); $s.TargetPath = $env:SAPLING_TARGET; $s.Arguments = $env:SAPLING_ARGS; $s.IconLocation = $env:SAPLING_TARGET; $s.Save()";
 
 /// Mojang 的 `rules` 裡用來代表本系統的名稱。
 pub const MOJANG_OS_NAME: &str = "windows";
@@ -51,6 +55,64 @@ pub fn total_memory_mb() -> u32 {
 }
 
 /// 用檔案總管打開資料夾。
+/// 程式崩潰時把原因留在資料資料夾。發佈版一崩潰就直接結束，沒有記錄就查不到原因。
+pub fn log_panics(folder: PathBuf) {
+    std::panic::set_hook(Box::new(move |info| {
+        let time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_secs());
+        let text = format!("[{time}] Sapling {}: {info}\n", env!("CARGO_PKG_VERSION"));
+        let _ = std::fs::create_dir_all(&folder);
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(folder.join(CRASH_LOG))
+        {
+            let _ = file.write_all(text.as_bytes());
+        }
+    }));
+}
+
+/// Windows 的版本文字，例如 `Microsoft Windows [Version 10.0.26300.1]`。
+pub fn os_version() -> String {
+    Command::new("cmd")
+        .args(["/c", "ver"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// 在桌面建立捷徑，打開後用 `arguments` 啟動這個程式。
+///
+/// 值都用環境變數傳進去，實例名稱裡的引號不會變成指令。
+pub fn create_desktop_shortcut(name: &str, arguments: &str) -> io::Result<()> {
+    let desktop = dirs::desktop_dir().ok_or_else(|| io::Error::other("找不到桌面"))?;
+    let safe: String = name
+        .chars()
+        .map(|character| {
+            if r#"\/:*?"<>|"#.contains(character) {
+                '_'
+            } else {
+                character
+            }
+        })
+        .collect();
+    let exe = std::env::current_exe()?;
+    let status = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", SHORTCUT_SCRIPT])
+        .env("SAPLING_LINK", desktop.join(format!("{safe}.lnk")))
+        .env("SAPLING_TARGET", &exe)
+        .env("SAPLING_ARGS", arguments)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(io::Error::other("建立捷徑失敗"))
+    }
+}
+
 pub fn open_folder(path: &Path) -> io::Result<()> {
     Command::new("explorer").arg(path).spawn().map(|_| ())
 }

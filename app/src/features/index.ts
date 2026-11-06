@@ -12,6 +12,7 @@ import { mods } from "./mods";
 import { offlineAccount } from "./offline-account";
 import { packs } from "./packs";
 import { recentWorlds } from "./recent-worlds";
+import { screenshots } from "./screenshots";
 import { settings } from "./settings";
 import { storageCleanup } from "./storage-cleanup";
 import { update } from "./update";
@@ -25,6 +26,7 @@ export const FEATURES: Feature[] = [
   packs,
   offlineAccount,
   recentWorlds,
+  screenshots,
   download,
   dropInstall,
   modpacks,

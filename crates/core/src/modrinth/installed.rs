@@ -8,7 +8,7 @@ use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-use super::{API_URL, ModVersion, ModrinthError, RELEASE, loader_name};
+use super::{API_URL, ModVersion, ModrinthError, RELEASE, loader_names};
 use crate::download::{fetch_text, file_sha1};
 use crate::instance::mods::{self, ModFile};
 use crate::loader::LoaderKind;
@@ -50,7 +50,7 @@ pub async fn inspect(
     game_version: &str,
     loader: LoaderKind,
 ) -> Result<Vec<InstalledMod>, ModrinthError> {
-    let loader = loader_name(loader)?;
+    let loaders = loader_names(loader)?;
     let files = mods::list(game_dir).await?;
     let hashed = hash_all(game_dir, files).await;
     if hashed.is_empty() {
@@ -70,7 +70,7 @@ pub async fn inspect(
         &serde_json::json!({
             "hashes": hashes,
             "algorithm": "sha1",
-            "loaders": [loader],
+            "loaders": loaders,
             "game_versions": [game_version],
         }),
     )

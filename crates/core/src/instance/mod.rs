@@ -5,6 +5,8 @@ mod copy;
 pub mod import;
 pub mod mods;
 pub mod packs;
+pub mod screenshots;
+pub mod servers;
 pub mod worlds;
 
 use std::io;
@@ -297,6 +299,26 @@ mod tests {
         let root = std::env::temp_dir().join(format!("sapling-test-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         DataDirs::at(root)
+    }
+
+    /// 0.1 的格式。以後新增欄位都要有預設值，這個檔案永遠要讀得開。
+    #[tokio::test]
+    async fn the_oldest_instance_format_still_opens() {
+        let dirs = temp_dirs("oldest");
+        let folder = dirs.instances().join("instance-1");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("instance.json"),
+            r#"{ "id": "instance-1", "name": "舊", "version": "1.20.1", "loader": "vanilla",
+                 "memoryMb": 0, "javaArgs": "" }"#,
+        )
+        .unwrap();
+
+        let found = Instance::list(&dirs).await.unwrap();
+
+        assert_eq!(found[0].name, "舊");
+        assert_eq!(found[0].played_seconds, 0);
+        assert_eq!(found[0].join_server, "");
     }
 
     #[tokio::test]

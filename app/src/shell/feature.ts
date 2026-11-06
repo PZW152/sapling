@@ -8,6 +8,8 @@ export type HeroPanelProps = {
   canStart: boolean;
   /** 啟動遊戲並直接進入這個世界。 */
   onPlay: (world: string) => void;
+  /** 啟動遊戲並加入這個伺服器。 */
+  onJoin: (address: string) => void;
 };
 
 /** 一個內建功能模塊。新功能只需要實作這個結構並到 features/index.ts 註冊。 */

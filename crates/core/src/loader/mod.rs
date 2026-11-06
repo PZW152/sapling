@@ -56,15 +56,34 @@ pub enum LoaderError {
 pub enum LoaderKind {
     Vanilla,
     Fabric,
+    Quilt,
     Forge,
     NeoForge,
+}
+
+/// Fabric 系的載入器，其他的回傳 `None`。
+fn fabric_flavor(kind: LoaderKind) -> Option<fabric::Flavor> {
+    match kind {
+        LoaderKind::Fabric => Some(fabric::FABRIC),
+        LoaderKind::Quilt => Some(fabric::QUILT),
+        _ => None,
+    }
 }
 
 /// 載入器在 `versions` 裡的資料夾名稱。原版沒有。
 pub fn folder_id(kind: LoaderKind, loader_version: &str, game_version: &str) -> Option<String> {
     match kind {
         LoaderKind::Vanilla => None,
-        LoaderKind::Fabric => Some(fabric::profile_id(loader_version, game_version)),
+        LoaderKind::Fabric => Some(fabric::profile_id(
+            fabric::FABRIC,
+            loader_version,
+            game_version,
+        )),
+        LoaderKind::Quilt => Some(fabric::profile_id(
+            fabric::QUILT,
+            loader_version,
+            game_version,
+        )),
         LoaderKind::Forge => Some(forge::forge_request(loader_version, game_version).id),
         LoaderKind::NeoForge => Some(forge::neoforge_request(loader_version, game_version).id),
     }
@@ -76,8 +95,9 @@ pub async fn known_libraries(instance: &Instance, dirs: &DataDirs) -> Option<Vec
     match instance.loader {
         LoaderKind::Vanilla => Some(Vec::new()),
         LoaderKind::Forge | LoaderKind::NeoForge => None,
-        LoaderKind::Fabric => {
-            let id = fabric::profile_id(&instance.loader_version, &instance.version);
+        LoaderKind::Fabric | LoaderKind::Quilt => {
+            let flavor = fabric_flavor(instance.loader)?;
+            let id = fabric::profile_id(flavor, &instance.loader_version, &instance.version);
             let path = dirs.versions().join(&id).join(format!("{id}.json"));
             let raw: Option<Value> = read_json(&path).await.ok()?;
             let Some(raw) = raw else {
@@ -100,7 +120,12 @@ pub async fn known_libraries(instance: &Instance, dirs: &DataDirs) -> Option<Vec
 pub async fn latest_version(kind: LoaderKind, game_version: &str) -> Result<String, LoaderError> {
     match kind {
         LoaderKind::Vanilla => Ok(String::new()),
-        LoaderKind::Fabric => fabric::latest_version(&new_client()?, game_version).await,
+        LoaderKind::Fabric => {
+            fabric::latest_version(&new_client()?, fabric::FABRIC, game_version).await
+        }
+        LoaderKind::Quilt => {
+            fabric::latest_version(&new_client()?, fabric::QUILT, game_version).await
+        }
         LoaderKind::Forge => forge::latest_forge(&new_client()?, game_version).await,
         LoaderKind::NeoForge => forge::latest_neoforge(&new_client()?, game_version).await,
     }
@@ -121,7 +146,12 @@ pub async fn prepare(
     let game_version = details.id.clone();
     let raw = match kind {
         LoaderKind::Vanilla => return Ok(details),
-        LoaderKind::Fabric => fabric_profile(&client, loader_version, &game_version, dirs).await?,
+        LoaderKind::Fabric => {
+            fabric_profile(&client, fabric::FABRIC, loader_version, &game_version, dirs).await?
+        }
+        LoaderKind::Quilt => {
+            fabric_profile(&client, fabric::QUILT, loader_version, &game_version, dirs).await?
+        }
         LoaderKind::Forge => {
             let request = forge::forge_request(loader_version, &game_version);
             installer::ensure_installed(&client, &request, java, dirs, concurrency).await?
@@ -143,16 +173,17 @@ pub async fn prepare(
 
 async fn fabric_profile(
     client: &reqwest::Client,
+    flavor: fabric::Flavor,
     loader_version: &str,
     game_version: &str,
     dirs: &DataDirs,
 ) -> Result<Value, LoaderError> {
-    let id = fabric::profile_id(loader_version, game_version);
+    let id = fabric::profile_id(flavor, loader_version, game_version);
     let path = dirs.versions().join(&id).join(format!("{id}.json"));
     if let Some(saved) = read_json(&path).await? {
         return Ok(saved);
     }
-    let fetched = fabric::fetch_profile(client, loader_version, game_version).await?;
+    let fetched = fabric::fetch_profile(client, flavor, loader_version, game_version).await?;
     write_json(&path, &fetched).await?;
     Ok(fetched)
 }

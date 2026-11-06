@@ -2,6 +2,7 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -16,6 +17,8 @@ const ASSET_SUFFIX: &str = ".exe";
 /// 0.5.0 以前的檔名，舊版發佈時用的。
 const LEGACY_SUFFIX: &str = "_portable.exe";
 const DIGEST_PREFIX: &str = "sha256:";
+const REMOVE_ATTEMPTS: u32 = 10;
+const REMOVE_INTERVAL: Duration = Duration::from_secs(2);
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Error)]
@@ -168,10 +171,24 @@ async fn download_verified(
 }
 
 /// 啟動時清理上次更新留下的舊程式。失敗不影響使用，下次再清。
+///
+/// 剛更新完時舊程式還在結束，刪不掉，所以多試幾次。
 pub fn remove_old_version() {
-    if let Ok(exe) = std::env::current_exe() {
-        let _ = std::fs::remove_file(with_suffix(&exe, ".old"));
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let old = with_suffix(&exe, ".old");
+    if !old.exists() {
+        return;
     }
+    std::thread::spawn(move || {
+        for _ in 0..REMOVE_ATTEMPTS {
+            if std::fs::remove_file(&old).is_ok() {
+                return;
+            }
+            std::thread::sleep(REMOVE_INTERVAL);
+        }
+    });
 }
 
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {

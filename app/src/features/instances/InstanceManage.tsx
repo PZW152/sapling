@@ -60,6 +60,13 @@ export function InstanceManage() {
     });
   }
 
+  function shortcut() {
+    run("shortcut", async () => {
+      await api.createShortcut(instance.id);
+      return "桌面捷徑已建立。";
+    });
+  }
+
   async function exportPack() {
     const path = await save({
       title: "匯出整合包",
@@ -131,6 +138,16 @@ export function InstanceManage() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="setting">
+        <div className="setting-head">
+          <span>桌面捷徑</span>
+          <button className="text-button" disabled={working !== ""} onClick={shortcut}>
+            建立
+          </button>
+        </div>
+        <p>按兩下捷徑就直接啟動這個實例。</p>
       </section>
 
       <section className="setting">

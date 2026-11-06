@@ -12,6 +12,8 @@ import type {
   ExportSummary,
   InstalledMod,
   ModFile,
+  Screenshot,
+  Server,
   PackFile,
   PackKind,
   ProjectKind,
@@ -68,6 +70,14 @@ export const api = {
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
   openModsFolder: (id: string) => invoke<void>("open_mods_folder", { id }),
+  listServers: (id: string) => invoke<Server[]>("list_servers", { id }),
+  listScreenshots: (id: string) => invoke<Screenshot[]>("list_screenshots", { id }),
+  deleteScreenshot: (id: string, name: string) =>
+    invoke<void>("delete_screenshot", { id, name }),
+  createShortcut: (id: string) => invoke<void>("create_shortcut", { id }),
+  takePendingLaunch: () => invoke<string | null>("take_pending_launch"),
+  diagnostics: () => invoke<string>("diagnostics"),
+  openDataFolder: () => invoke<void>("open_data_folder"),
   cancelInstall: () => invoke<void>("cancel_install"),
   changeSkin: (path: string, slim: boolean) => invoke<Profile>("change_skin", { path, slim }),
   deleteWorld: (id: string, folder: string) => invoke<void>("delete_world", { id, folder }),
@@ -98,8 +108,12 @@ export const api = {
   hasSavedAccount: () => invoke<boolean>("has_saved_account"),
 
   installGame: (version: string) => invoke<void>("install_game", { version }),
-  playGame: (instanceId: string, offlineName: string | null, world: string | null) =>
-    invoke<void>("play_game", { instanceId, offlineName, world }),
+  playGame: (
+    instanceId: string,
+    offlineName: string | null,
+    world: string | null,
+    server: string | null,
+  ) => invoke<void>("play_game", { instanceId, offlineName, world, server }),
   cancelLaunch: () => invoke<void>("cancel_launch"),
 
   openLink: (url: string) => invoke<void>("open_link", { url }),
@@ -117,6 +131,14 @@ function subscribe(event: string, handler: (payload: LaunchEvent) => void) {
 /** 訂閱啟動過程的事件，回傳取消訂閱的函數。 */
 export const onLaunchEvent = (handler: (payload: LaunchEvent) => void) =>
   subscribe("launch-event", handler);
+
+/** 從桌面捷徑要求啟動實例，回傳取消訂閱的函數。 */
+export function onLaunchRequest(handler: (instanceId: string) => void) {
+  const stopListening = listen<string>("launch-request", ({ payload }) => handler(payload));
+  return () => {
+    stopListening.then((stop) => stop());
+  };
+}
 
 /** 訂閱下載過程的事件，回傳取消訂閱的函數。 */
 export const onInstallEvent = (handler: (payload: LaunchEvent) => void) =>

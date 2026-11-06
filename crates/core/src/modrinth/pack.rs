@@ -29,11 +29,10 @@ const UNSUPPORTED: &str = "unsupported";
 const SECURE_SCHEME: &str = "https://";
 /// 依序解開，後面的覆蓋前面的。
 const OVERRIDE_FOLDERS: [&str; 2] = ["overrides/", "client-overrides/"];
-/// 還不支援的載入器。規格說之後可能新增，其他未知項目一律忽略。
-const UNSUPPORTED_LOADERS: [(&str, &str); 1] = [("quilt-loader", "Quilt")];
 /// 整合包裡的載入器名稱。
-pub(super) const LOADERS: [(&str, LoaderKind); 3] = [
+pub(super) const LOADERS: [(&str, LoaderKind); 4] = [
     ("fabric-loader", LoaderKind::Fabric),
+    ("quilt-loader", LoaderKind::Quilt),
     ("forge", LoaderKind::Forge),
     ("neoforge", LoaderKind::NeoForge),
 ];
@@ -133,7 +132,7 @@ async fn latest_pack_version(
     client: &reqwest::Client,
     project_id: &str,
 ) -> Result<ModVersion, ModrinthError> {
-    let loaders = serde_json::json!(["fabric", "forge", "neoforge"]).to_string();
+    let loaders = serde_json::json!(super::PACK_LOADERS).to_string();
     let url = Url::parse_with_params(
         &format!("{API_URL}/project/{project_id}/version"),
         [("loaders", loaders.as_str())],
@@ -218,11 +217,6 @@ fn open_archive(path: &Path) -> Result<ZipArchive<File>, ModrinthError> {
 fn pack_target(index: &PackIndex) -> Result<PackTarget, ModrinthError> {
     if index.format_version != FORMAT_VERSION || index.game != GAME {
         return Err(ModrinthError::BadPack);
-    }
-    for (id, name) in UNSUPPORTED_LOADERS {
-        if index.dependencies.contains_key(id) {
-            return Err(ModrinthError::UnsupportedLoader { loader: name });
-        }
     }
     let game_version = index
         .dependencies
@@ -389,15 +383,12 @@ mod tests {
     }
 
     #[test]
-    fn explains_when_the_loader_is_not_supported_yet() {
-        let result = pack_target(&index(
-            r#"{ "minecraft": "1.20.1", "quilt-loader": "0.2" }"#,
+    fn reads_quilt_packs() {
+        let target = pack_target(&index(
+            r#"{ "minecraft": "1.20.1", "quilt-loader": "0.24.0" }"#,
         ));
 
-        assert!(matches!(
-            result,
-            Err(ModrinthError::UnsupportedLoader { loader: "Quilt" })
-        ));
+        assert_eq!(target.unwrap().loader, LoaderKind::Quilt);
     }
 
     #[test]

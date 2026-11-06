@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { api, onLaunchRequest } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
@@ -22,6 +23,8 @@ export function LaunchPage() {
     listError,
     selectInstance,
     goTo,
+    list,
+    loadInstances,
     loadVersions,
     features: active,
     isEnabled,
@@ -29,6 +32,9 @@ export function LaunchPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const { phase, progress, error, logs, origin, start, reset, clearOrigin } = useLaunch();
   const [logOpen, setLogOpen] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [quickError, setQuickError] = useState("");
   const hero = useRef<HTMLElement>(null);
 
   const offlineName =
@@ -38,7 +44,47 @@ export function LaunchPage() {
     active.map((feature) => feature.launchBlock?.(config)).find((reason) => reason) ?? null;
   const canStart = launchBlock === null && (profile !== null || offlineName !== null);
 
-  function startGame(world: string | null = null) {
+  const busy = phase === "preparing" || phase === "running";
+
+  // 從桌面捷徑打開，或第一次按「開始玩」時，等登入好就自動啟動。
+  useEffect(() => {
+    api.takePendingLaunch().then(setPending);
+    return onLaunchRequest(setPending);
+  }, []);
+
+  useEffect(() => {
+    if (!pending || !loaded) {
+      return;
+    }
+    if (busy || !instances.some(({ id }) => id === pending)) {
+      setPending(null);
+    } else if (selected?.id !== pending) {
+      selectInstance(pending);
+    } else if (canStart) {
+      setPending(null);
+      goTo("launch");
+      startGame();
+    }
+  }, [pending, loaded, busy, instances, selected?.id, canStart]);
+
+  async function quickStart() {
+    if (!list) {
+      goTo("download");
+      return;
+    }
+    setCreating(true);
+    setQuickError("");
+    try {
+      const instance = await api.createInstance(list.latest, list.latest, "vanilla");
+      await loadInstances();
+      setPending(instance.id);
+    } catch (reason) {
+      setQuickError(String(reason));
+    }
+    setCreating(false);
+  }
+
+  function startGame(world: string | null = null, server: string | null = null) {
     if (!selected) {
       return;
     }
@@ -47,6 +93,7 @@ export function LaunchPage() {
       selected.id,
       offlineName,
       world,
+      server,
       bounds
         ? {
             top: bounds.top,
@@ -63,7 +110,6 @@ export function LaunchPage() {
     reset();
   }
 
-  const busy = phase === "preparing" || phase === "running";
   const noInstance = instances.length === 0;
 
   return (
@@ -99,10 +145,12 @@ export function LaunchPage() {
                       busy={busy}
                       canStart={canStart}
                       onPlay={startGame}
+                      onJoin={(address) => startGame(null, address)}
                     />
                   </FeatureBoundary>
                 ),
             )}
+          <ErrorText message={quickError} />
           <HeroStatus
             phase={phase}
             error={error}
@@ -110,10 +158,15 @@ export function LaunchPage() {
             noInstance={noInstance}
             hasLogs={logs.length > 0}
             onShowLogs={() => setLogOpen(true)}
+            onShowReports={() =>
+              selected && api.openInstanceSubfolder(selected.id, "crash-reports").catch(() => {})
+            }
           />
           {noInstance && loaded ? (
-            <button className="primary" onClick={() => goTo("download")}>
-              前往下載
+            <button className="primary" disabled={creating} onClick={quickStart}>
+              <span className="primary-label">
+                {creating ? "準備中" : list ? `開始玩 ${list.latest}` : "前往下載"}
+              </span>
             </button>
           ) : (
             <button
@@ -296,6 +349,7 @@ function HeroStatus({
   noInstance,
   hasLogs,
   onShowLogs,
+  onShowReports,
 }: {
   phase: Phase;
   error: string;
@@ -303,16 +357,22 @@ function HeroStatus({
   noInstance: boolean;
   hasLogs: boolean;
   onShowLogs: () => void;
+  onShowReports: () => void;
 }) {
   if (phase === "failed") {
     return (
       <div className="hero-error" role="alert">
         <p>{error}</p>
-        {hasLogs && (
-          <button className="text-button" onClick={onShowLogs}>
-            查看問題記錄
+        <div className="mods-actions">
+          {hasLogs && (
+            <button className="text-button" onClick={onShowLogs}>
+              查看問題記錄
+            </button>
+          )}
+          <button className="text-button" onClick={onShowReports}>
+            打開崩潰報告
           </button>
-        )}
+        </div>
       </div>
     );
   }
@@ -327,7 +387,11 @@ function HeroStatus({
     );
   }
   if (noInstance) {
-    return <p className="hero-note">下載一個遊戲版本，再登入微軟帳號。</p>;
+    return (
+      <p className="hero-note">
+        {note ? "登入微軟帳號，再按下面的按鈕，遊戲會自動下載。" : "按下面的按鈕，遊戲會自動下載。"}
+      </p>
+    );
   }
   return note && <p className="hero-note">{note}</p>;
 }

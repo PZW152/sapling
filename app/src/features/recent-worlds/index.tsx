@@ -3,34 +3,38 @@ import type { CSSProperties } from "react";
 import { api } from "../../shell/api";
 import { ConfirmButton } from "../../shell/ConfirmButton";
 import type { Feature, HeroPanelProps } from "../../shell/feature";
-import type { ImportSource, World } from "../../shell/types";
+import type { ImportSource, Server, World } from "../../shell/types";
 import { canEnterWorld, iconUrl, playedAgo } from "./worlds";
 import "./recent-worlds.css";
 
-function RecentWorlds({ instance, busy, canStart, onPlay }: HeroPanelProps) {
+/** 首頁最多放幾張卡片。 */
+const TILE_LIMIT = 3;
+
+function RecentWorlds({ instance, busy, canStart, onPlay, onJoin }: HeroPanelProps) {
   const [worlds, setWorlds] = useState<World[]>([]);
+  const [servers, setServers] = useState<Server[]>([]);
   const supported = canEnterWorld(instance.version);
 
-  // 切換實例或玩完一局後，世界清單都可能變。
+  // 切換實例或玩完一局後，清單都可能變。
   useEffect(() => {
-    if (!supported || busy) {
+    if (busy) {
       return;
     }
     let current = true;
-    api
-      .recentWorlds(instance.id)
-      .catch(() => [])
-      .then((found) => {
-        if (current) {
-          setWorlds(found);
-        }
-      });
+    const found = supported ? api.recentWorlds(instance.id).catch(() => []) : Promise.resolve([]);
+    Promise.all([found, api.listServers(instance.id).catch(() => [])]).then(([list, saved]) => {
+      if (current) {
+        setWorlds(list);
+        setServers(saved);
+      }
+    });
     return () => {
       current = false;
     };
   }, [instance.id, supported, busy]);
 
-  if (!supported || worlds.length === 0) {
+  const shownServers = servers.slice(0, Math.max(TILE_LIMIT - worlds.length, 0));
+  if (worlds.length === 0 && shownServers.length === 0) {
     return null;
   }
 
@@ -58,6 +62,24 @@ function RecentWorlds({ instance, busy, canStart, onPlay }: HeroPanelProps) {
               <span className="world-text">
                 <strong>{world.folder}</strong>
                 <small>{playedAgo(world.lastPlayedMs, now)}</small>
+              </span>
+            </button>
+          </li>
+        ))}
+        {shownServers.map((server) => (
+          <li key={server.address}>
+            <button
+              className="world"
+              disabled={busy || !canStart}
+              aria-label={`加入伺服器 ${server.name}`}
+              onClick={() => onJoin(server.address)}
+            >
+              <span className="world-icon" aria-hidden="true">
+                {[...server.name][0]}
+              </span>
+              <span className="world-text">
+                <strong>{server.name}</strong>
+                <small>伺服器</small>
               </span>
             </button>
           </li>

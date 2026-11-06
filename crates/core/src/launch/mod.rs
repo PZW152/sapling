@@ -64,7 +64,7 @@ pub enum LaunchError {
     #[error("無法啟動 Java，請重新下載遊戲檔案後再試一次")]
     Spawn(#[source] io::Error),
     #[error("遊戲異常結束。{advice}")]
-    Crashed { advice: &'static str },
+    Crashed { advice: String },
     #[error("遊戲異常結束，請查看問題記錄。")]
     CrashedWithoutAnalysis,
 }
@@ -152,6 +152,8 @@ pub struct PlayOptions<'a> {
     pub analyze_crash: bool,
     /// 啟動後直接進入的世界資料夾，`None` 代表停在主畫面。
     pub world: Option<&'a str>,
+    /// 這次要加入的伺服器。`None` 時用實例的設定。
+    pub server: Option<&'a str>,
 }
 
 /// 準備檔案並啟動遊戲，一直等到遊戲結束。準備途中被取消時直接結束。
@@ -167,6 +169,7 @@ pub async fn play(
         concurrency,
         analyze_crash,
         world,
+        server,
     } = options;
     if world.is_some_and(|folder| !worlds::exists(&instance.game_dir(dirs), folder)) {
         return Err(LaunchError::WorldNotFound);
@@ -216,7 +219,8 @@ pub async fn play(
     let mut arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
     arguments.extend(world_arguments(&prepared.details, world));
     arguments.extend(window_arguments(instance));
-    arguments.extend(server_arguments(&prepared.details, instance, world));
+    let address = server.unwrap_or(&instance.join_server);
+    arguments.extend(server_arguments(&prepared.details, address, world));
     let java = chosen_java(instance, &prepared.java)?;
     let mut child = Command::new(java)
         .args(&arguments)
@@ -270,7 +274,7 @@ pub async fn play(
     } else {
         let reports = crash::read_reports(&game_dir).await;
         Err(LaunchError::Crashed {
-            advice: crash::analyze(&reports),
+            advice: crash::explain(&reports),
         })
     }
 }
@@ -346,12 +350,8 @@ fn chosen_java(instance: &Instance, automatic: &Path) -> Result<PathBuf, LaunchE
 }
 
 /// 啟動後自動加入伺服器。點世界進遊戲時以世界為準。
-fn server_arguments(
-    details: &VersionDetails,
-    instance: &Instance,
-    world: Option<&str>,
-) -> Vec<String> {
-    let server = instance.join_server.trim();
+fn server_arguments(details: &VersionDetails, address: &str, world: Option<&str>) -> Vec<String> {
+    let server = address.trim();
     if server.is_empty() || world.is_some() {
         return Vec::new();
     }
@@ -491,8 +491,7 @@ mod tests {
 
     #[test]
     fn joins_a_server_the_way_each_version_understands() {
-        let mut instance = Instance::blank();
-        instance.join_server = "play.example.com:25566".to_string();
+        let address = "play.example.com:25566";
         let modern = details_with_game_arguments(
             r#"[{ "rules": [{ "action": "allow", "features": { "is_quick_play_multiplayer": true } }],
                   "value": ["--quickPlayMultiplayer", "${quickPlayMultiplayer}"] }]"#,
@@ -500,14 +499,14 @@ mod tests {
         let old = details_with_game_arguments("[]");
 
         assert_eq!(
-            server_arguments(&modern, &instance, None),
+            server_arguments(&modern, address, None),
             ["--quickPlayMultiplayer", "play.example.com:25566"]
         );
         assert_eq!(
-            server_arguments(&old, &instance, None),
+            server_arguments(&old, address, None),
             ["--server", "play.example.com", "--port", "25566"]
         );
-        assert!(server_arguments(&modern, &instance, Some("world")).is_empty());
+        assert!(server_arguments(&modern, address, Some("world")).is_empty());
     }
 
     #[test]

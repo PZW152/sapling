@@ -35,10 +35,12 @@ export const CATEGORY_NAMES: Record<string, string> = {
   worldgen: "世界生成",
 };
 
-const LOADER_IDS: Partial<Record<LoaderKind, string>> = {
-  fabric: "fabric",
-  forge: "forge",
-  neoForge: "neoforge",
+/** Quilt 也能載入 Fabric 的模組。 */
+const LOADER_IDS: Partial<Record<LoaderKind, string[]>> = {
+  fabric: ["fabric"],
+  quilt: ["quilt", "fabric"],
+  forge: ["forge"],
+  neoForge: ["neoforge"],
 };
 
 const LOADER_LABELS: Record<string, string> = {
@@ -65,11 +67,11 @@ export function hitTags(hit: ModHit) {
 }
 
 /** 版本必須帶有這個標記才裝得上。同一個專案可能同時有模組版和資料包版。 */
-function requiredLoader(kind: ProjectKind, instance: Instance) {
+function requiredLoaders(kind: ProjectKind, instance: Instance) {
   if (kind === "dataPack") {
-    return DATAPACK_LOADER;
+    return [DATAPACK_LOADER];
   }
-  return kind === "mod" ? (LOADER_IDS[instance.loader] ?? NO_LOADER) : null;
+  return kind === "mod" ? (LOADER_IDS[instance.loader] ?? [NO_LOADER]) : null;
 }
 
 /** 只留下這個實例裝得上的版本。 */
@@ -81,11 +83,11 @@ export function compatibleVersions(
   if (!instance) {
     return versions;
   }
-  const loader = requiredLoader(kind, instance);
+  const loaders = requiredLoaders(kind, instance);
   return versions.filter(
     (version) =>
       version.gameVersions.includes(instance.version) &&
-      (loader === null || version.loaders.includes(loader)),
+      (loaders === null || version.loaders.some((loader) => loaders.includes(loader))),
   );
 }
 

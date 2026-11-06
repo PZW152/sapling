@@ -9,7 +9,7 @@ export type Profile = { id: string; name: string; skinUrl: string | null };
 
 export type LoginCode = { userCode: string; verificationUri: string };
 
-export type LoaderKind = "vanilla" | "fabric" | "forge" | "neoForge";
+export type LoaderKind = "vanilla" | "fabric" | "quilt" | "forge" | "neoForge";
 
 export type Instance = {
   id: string;
@@ -49,6 +49,9 @@ export type LauncherConfig = {
   colorMode: ColorMode;
   minimizeOnLaunch: boolean;
 };
+
+export type Server = { name: string; address: string };
+export type Screenshot = { name: string; path: string; takenMs: number };
 
 export type ColorMode = "system" | "light" | "dark";
 export type AddedKind = "mod" | "resourcePack" | "shader";

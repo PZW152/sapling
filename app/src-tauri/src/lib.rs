@@ -15,6 +15,8 @@ use sapling_core::instance::add_file::{self, AddedKind};
 use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::packs::{self, PackFile, PackKind};
+use sapling_core::instance::screenshots::{self, Screenshot};
+use sapling_core::instance::servers::{self, Server};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
@@ -24,7 +26,10 @@ use sapling_core::modrinth::pack;
 use sapling_core::modrinth::{
     self, InstallTarget, ProjectKind, ProjectVersion, SearchPage, SearchRequest, Wanted,
 };
-use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
+use sapling_core::platform::{
+    DataDirs, create_desktop_shortcut, log_panics, open_folder, open_in_browser, os_version,
+    total_memory_mb,
+};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
 use sapling_core::versions::install::{
@@ -48,6 +53,8 @@ const RECENT_WORLD_LIMIT: usize = 3;
 /// 實例頁最多列出幾個世界。
 const WORLD_LIST_LIMIT: usize = 50;
 const INSTALL_CANCELLED: &str = "已取消下載";
+const LAUNCH_ARGUMENT: &str = "--launch";
+const LAUNCH_REQUEST_EVENT: &str = "launch-request";
 const INSTANCE_FOLDERS: [&str; 4] = ["saves", "screenshots", "logs", "crash-reports"];
 const STATE_ERROR: &str = "啟動器內部狀態出錯，請重開啟動器";
 
@@ -61,6 +68,8 @@ struct AppState {
     restoring: AsyncMutex<()>,
     launch_cancel: LaunchCancel,
     install_cancel: LaunchCancel,
+    /// 從桌面捷徑打開時要啟動的實例，等介面準備好再拿走。
+    pending_launch: Mutex<Option<String>>,
 }
 
 impl AppState {
@@ -624,6 +633,80 @@ async fn install_game(
 }
 
 #[tauri::command]
+async fn list_servers(id: String) -> Result<Vec<Server>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    Ok(servers::list(&instance.game_dir(&dirs)).await)
+}
+
+#[tauri::command]
+async fn list_screenshots(app: AppHandle, id: String) -> Result<Vec<Screenshot>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let game_dir = instance.game_dir(&dirs);
+    // 介面只能讀這個資料夾的圖片，不開放整個硬碟。
+    let folder = screenshots::folder(&game_dir);
+    app.asset_protocol_scope()
+        .allow_directory(&folder, false)
+        .map_err(text)?;
+    screenshots::list(&game_dir).await.map_err(text)
+}
+
+#[tauri::command]
+async fn delete_screenshot(id: String, name: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    screenshots::delete(&instance.game_dir(&dirs), &name)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn create_shortcut(id: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    create_desktop_shortcut(
+        &instance.name,
+        &format!("{LAUNCH_ARGUMENT} {}", instance.id),
+    )
+    .map_err(text)
+}
+
+#[tauri::command]
+fn take_pending_launch(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    Ok(state.pending_launch.lock().map_err(|_| STATE_ERROR)?.take())
+}
+
+/// 用戶回報問題時貼上。不含帳號、token 和個人路徑。
+#[tauri::command]
+async fn diagnostics() -> Result<String, String> {
+    let dirs = data_dirs()?;
+    let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let mut lines = vec![
+        format!("Sapling {}", env!("CARGO_PKG_VERSION")),
+        os_version(),
+        format!("記憶體 {} MB", total_memory_mb()),
+        format!("同時下載 {}", config.download_concurrency),
+        format!("關閉的模塊 {:?}", config.disabled_features),
+    ];
+    for instance in Instance::list(&dirs).await.map_err(text)? {
+        let mods = mods::list(&instance.game_dir(&dirs))
+            .await
+            .map_or(0, |found| found.len());
+        lines.push(format!(
+            "實例：{} {:?} {}，{mods} 個模組，記憶體 {}",
+            instance.version, instance.loader, instance.loader_version, instance.memory_mb
+        ));
+    }
+    Ok(lines.join("\n"))
+}
+
+#[tauri::command]
+fn open_data_folder() -> Result<(), String> {
+    open_folder(data_dirs()?.root()).map_err(text)
+}
+
+#[tauri::command]
 fn cancel_install(state: State<'_, AppState>) {
     state.install_cancel.cancel();
 }
@@ -699,6 +782,7 @@ async fn play_game(
     instance_id: String,
     offline_name: Option<String>,
     world: Option<String>,
+    server: Option<String>,
 ) -> Result<(), String> {
     state.launch_cancel.reset();
     let dirs = data_dirs()?;
@@ -723,6 +807,7 @@ async fn play_game(
             concurrency: config.download_concurrency,
             analyze_crash: config.is_feature_enabled(CRASH_FEATURE),
             world: world.as_deref(),
+            server: server.as_deref(),
         },
         &state.launch_cancel,
         move |event| {
@@ -762,6 +847,11 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
 }
 
 /// 預設大小就是最小大小。系統算最小值時包含隱形邊框，所以用開啟時的實際外框，不寫死數字。
+fn launch_argument(arguments: &[String]) -> Option<String> {
+    let position = arguments.iter().position(|item| item == LAUNCH_ARGUMENT)?;
+    arguments.get(position + 1).cloned()
+}
+
 fn lock_minimum_size(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -774,16 +864,41 @@ fn lock_minimum_size(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if let Ok(dirs) = DataDirs::locate() {
+        log_panics(dirs.root().to_path_buf());
+    }
     update::remove_old_version();
+    let arguments: Vec<String> = std::env::args().collect();
+    let state = AppState {
+        pending_launch: Mutex::new(launch_argument(&arguments)),
+        ..AppState::default()
+    };
     tauri::Builder::default()
+        // 兩個啟動器同時開會互相覆蓋設定，所以第二次打開時只叫出原本的窗口。
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+            if let Some(id) = launch_argument(&arguments) {
+                let _ = app.emit(LAUNCH_REQUEST_EVENT, id);
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState::default())
+        .manage(state)
         .setup(|app| {
             lock_minimum_size(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
+            list_servers,
+            list_screenshots,
+            delete_screenshot,
+            create_shortcut,
+            take_pending_launch,
+            diagnostics,
+            open_data_folder,
             cancel_install,
             change_skin,
             delete_world,

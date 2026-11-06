@@ -136,6 +136,19 @@ mod tests {
         );
     }
 
+    /// 0.1 的格式。以後新增欄位都要有預設值，這個檔案永遠要讀得開。
+    #[tokio::test]
+    async fn the_oldest_config_format_still_opens() {
+        let dirs = temp_dirs("oldest");
+        std::fs::write(dirs.config_file(), r#"{ "downloadConcurrency": 8 }"#).unwrap();
+
+        let config = LauncherConfig::load(&dirs).await.unwrap();
+
+        assert_eq!(config.download_concurrency, 8);
+        assert_eq!(config.theme, DEFAULT_THEME);
+        assert!(config.minimize_on_launch);
+    }
+
     #[tokio::test]
     async fn the_retired_theme_falls_back_to_the_default() {
         let dirs = temp_dirs("theme");

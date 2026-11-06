@@ -25,7 +25,7 @@ const RELEASE: &str = "release";
 /// 排序方式，其他值一律不接受。
 const SORTS: [&str; 4] = ["relevance", "downloads", "newest", "updated"];
 /// 整合包目前支援的載入器。
-const PACK_LOADERS: [&str; 3] = ["fabric", "forge", "neoforge"];
+const PACK_LOADERS: [&str; 4] = ["fabric", "quilt", "forge", "neoforge"];
 /// 同一個專案可能同時有模組和資料包版本，要指定資料包。
 const DATAPACK_LOADER: &str = "datapack";
 
@@ -45,8 +45,6 @@ pub enum ModrinthError {
     NoLoader,
     #[error("這個整合包的內容看不懂，可能已損壞")]
     BadPack,
-    #[error("這個整合包使用 {loader}，Sapling 還不支援")]
-    UnsupportedLoader { loader: &'static str },
     #[error("這個整合包使用 Minecraft {version}，Sapling 還不支援這麼舊的版本")]
     OldGameVersion { version: String },
     #[error("整合包裡有不安全的路徑，已停止安裝：{path}")]
@@ -218,12 +216,14 @@ struct Dependency {
     dependency_type: String,
 }
 
-fn loader_name(loader: LoaderKind) -> Result<&'static str, ModrinthError> {
+/// 這個載入器能用哪些 Modrinth 分類。Quilt 也能載入 Fabric 的模組。
+fn loader_names(loader: LoaderKind) -> Result<&'static [&'static str], ModrinthError> {
     match loader {
         LoaderKind::Vanilla => Err(ModrinthError::NoLoader),
-        LoaderKind::Fabric => Ok("fabric"),
-        LoaderKind::Forge => Ok("forge"),
-        LoaderKind::NeoForge => Ok("neoforge"),
+        LoaderKind::Fabric => Ok(&["fabric"]),
+        LoaderKind::Quilt => Ok(&["quilt", "fabric"]),
+        LoaderKind::Forge => Ok(&["forge"]),
+        LoaderKind::NeoForge => Ok(&["neoforge"]),
     }
 }
 
@@ -259,7 +259,12 @@ fn facets(request: &SearchRequest) -> Result<String, ModrinthError> {
     }
     match (request.kind, request.loader) {
         (ProjectKind::Mod, Some(loader)) => {
-            groups.push(vec![format!("categories:{}", loader_name(loader)?)]);
+            groups.push(
+                loader_names(loader)?
+                    .iter()
+                    .map(|name| format!("categories:{name}"))
+                    .collect(),
+            );
         }
         (ProjectKind::Modpack, _) => {
             groups.push(
@@ -319,8 +324,8 @@ pub async fn install(
     target: &InstallTarget<'_>,
 ) -> Result<Vec<String>, ModrinthError> {
     let loader = match kind {
-        ProjectKind::Mod => Some(loader_name(target.loader)?),
-        ProjectKind::DataPack => Some(DATAPACK_LOADER),
+        ProjectKind::Mod => Some(loader_names(target.loader)?),
+        ProjectKind::DataPack => Some(&[DATAPACK_LOADER][..]),
         _ => None,
     };
     let folder = kind.folder(target.game_dir, target.world)?;
@@ -462,12 +467,12 @@ async fn compatible_version(
     client: &reqwest::Client,
     project: &str,
     game_version: &str,
-    loader: Option<&str>,
+    loaders: Option<&[&str]>,
 ) -> Result<ModVersion, ModrinthError> {
     let game_versions = serde_json::json!([game_version]).to_string();
     let mut params = vec![("game_versions", game_versions)];
-    if let Some(loader) = loader {
-        params.push(("loaders", serde_json::json!([loader]).to_string()));
+    if let Some(loaders) = loaders {
+        params.push(("loaders", serde_json::json!(loaders).to_string()));
     }
     let url = Url::parse_with_params(&format!("{API_URL}/project/{project}/version"), params)
         .map_err(|_| ModrinthError::BadUrl)?;
@@ -598,7 +603,7 @@ mod tests {
     fn modpacks_accept_any_supported_loader() {
         assert_eq!(
             facets(&request(ProjectKind::Modpack)).unwrap(),
-            r#"[["project_type:modpack"],["categories:fabric","categories:forge","categories:neoforge"]]"#
+            r#"[["project_type:modpack"],["categories:fabric","categories:quilt","categories:forge","categories:neoforge"]]"#
         );
     }
 
@@ -727,7 +732,7 @@ mod tests {
     #[test]
     fn vanilla_cannot_use_mods() {
         assert!(matches!(
-            loader_name(LoaderKind::Vanilla),
+            loader_names(LoaderKind::Vanilla),
             Err(ModrinthError::NoLoader)
         ));
     }

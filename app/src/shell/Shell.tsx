@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { FEATURES } from "../features";
 import { AppProvider, useApp } from "./AppContext";
@@ -22,13 +22,26 @@ export function Shell() {
 }
 
 function Frame() {
-  const { activeTab, features } = useApp();
+  const { activeTab, features, goTo } = useApp();
   const tabs = features.filter((feature) => feature.tab);
   const index = Math.max(
     tabs.findIndex((feature) => feature.id === activeTab),
     0,
   );
   const current = tabs[index];
+
+  // Ctrl + 數字切換分頁。
+  useEffect(() => {
+    function handle(event: KeyboardEvent) {
+      const target = event.ctrlKey ? tabs[Number(event.key) - 1] : undefined;
+      if (target) {
+        event.preventDefault();
+        goTo(target.id);
+      }
+    }
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [tabs, goTo]);
 
   return (
     <div className="app">
