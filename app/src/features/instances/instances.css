@@ -99,7 +99,9 @@
 }
 
 .mods {
+  display: grid;
   flex: none;
+  gap: var(--space-2);
 }
 
 .mods-empty {
@@ -108,20 +110,93 @@
 }
 
 .mod {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 40px;
+  min-height: 44px;
+}
+
+.mod-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  background: var(--color-soft);
+}
+
+.mod-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.mod-text small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mods-status {
+  margin-right: auto;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.mod-filter {
+  flex: none;
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  user-select: text;
+}
+
+.packs {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.packs-head {
+  justify-content: space-between;
+}
+
+.packs-head h2 {
+  color: var(--color-strong);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.pack {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+}
+
+.pack .mod-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.pack small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
 }
 
 .mod-name,
 .mod small {
-  transition: opacity var(--medium) var(--ease);
+  transition: color var(--medium) var(--ease);
 }
 
 .mod.off .mod-name,
 .mod.off small {
+  color: var(--color-faint);
+}
+
+.mod.off .mod-icon {
   opacity: 0.5;
 }
 
@@ -156,7 +231,7 @@
 }
 
 /* 搜尋模組時佔滿整個區塊，其他內容暫時收起。 */
-.instance-detail:has(.mod-browser) > :not(.mod-browser) {
+.instance-detail:has(.mod-browser) > :not(.detail-panel) {
   display: none;
 }
 

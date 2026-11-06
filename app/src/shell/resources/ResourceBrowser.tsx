@@ -31,6 +31,14 @@ const PLACEHOLDERS: Record<ProjectKind, string> = {
   dataPack: "搜尋資料包名稱",
 };
 
+const KIND_NAMES: Record<ProjectKind, string> = {
+  mod: "模組",
+  modpack: "整合包",
+  resourcePack: "資源包",
+  shader: "光影",
+  dataPack: "資料包",
+};
+
 type Props = {
   kind: ProjectKind;
   /** 目標實例。有實例時只列出它裝得上的內容，否則可以自己選遊戲版本。 */
@@ -185,9 +193,9 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
     <div className="mod-browser" ref={browser} hidden={detail !== null}>
       {onClose && (
         <div className="mods-head">
-          <h2>下載模組</h2>
+          <h2>下載{KIND_NAMES[kind]}</h2>
           <button className="text-button" onClick={onClose}>
-            返回模組清單
+            返回
           </button>
         </div>
       )}

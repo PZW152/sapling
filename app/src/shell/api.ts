@@ -8,7 +8,10 @@ import type {
   LauncherConfig,
   LoaderKind,
   LoginCode,
+  InstalledMod,
   ModFile,
+  PackFile,
+  PackKind,
   ProjectKind,
   ProjectVersion,
   SearchPage,
@@ -63,6 +66,12 @@ export const api = {
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
   openModsFolder: (id: string) => invoke<void>("open_mods_folder", { id }),
+  inspectMods: (id: string) => invoke<InstalledMod[]>("inspect_mods", { id }),
+  listPacks: (id: string, kind: PackKind) => invoke<PackFile[]>("list_packs", { id, kind }),
+  deletePack: (id: string, kind: PackKind, name: string) =>
+    invoke<void>("delete_pack", { id, kind, name }),
+  openPackFolder: (id: string, kind: PackKind) =>
+    invoke<void>("open_pack_folder", { id, kind }),
 
   restoreAccount: () => invoke<Profile | null>("restore_account"),
   loginStart: () => invoke<LoginCode>("login_start"),

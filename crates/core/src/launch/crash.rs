@@ -14,7 +14,7 @@ struct Rule {
 const RULES: [Rule; 8] = [
     Rule {
         markers: &["OutOfMemoryError", "Could not reserve enough space"],
-        advice: "遊戲記憶體不足。請到設定頁調高記憶體，或關閉其他佔用記憶體的程式。",
+        advice: "遊戲記憶體不足。請到實例頁的「記憶體」分頁調高，或關閉其他佔用記憶體的程式。",
     },
     Rule {
         markers: &["UnsupportedClassVersionError"],

@@ -1,5 +1,6 @@
 //! Modrinth：搜尋和下載模組、資源包、光影和整合包。所有和 Modrinth 有關的網址和資料格式都在這裡。
 
+pub mod installed;
 pub mod pack;
 
 use std::collections::{HashMap, HashSet};
@@ -35,6 +36,8 @@ pub enum ModrinthError {
     Parse(#[from] serde_json::Error),
     #[error("模組搜尋的網址有問題")]
     BadUrl,
+    #[error("無法查詢模組資料，請檢查網路連線後再試一次")]
+    Lookup,
     #[error("{project} 沒有適合這個遊戲版本和載入器的檔案")]
     NoCompatibleVersion { project: String },
     #[error("原版不能安裝模組，請新增一個使用載入器的實例")]
@@ -400,15 +403,12 @@ async fn projects_of(
     client: &reqwest::Client,
     hashes: &[&str],
 ) -> Result<HashMap<String, String>, ModrinthError> {
-    let response = client
-        .post(format!("{API_URL}/version_files"))
-        .json(&serde_json::json!({ "hashes": hashes, "algorithm": "sha1" }))
-        .send()
-        .await
-        .and_then(reqwest::Response::error_for_status)
-        .map_err(|_| ModrinthError::BadUrl)?;
-    let versions: HashMap<String, ProjectOfFile> =
-        response.json().await.map_err(|_| ModrinthError::BadUrl)?;
+    let versions: HashMap<String, ProjectOfFile> = installed::post(
+        client,
+        "version_files",
+        &serde_json::json!({ "hashes": hashes, "algorithm": "sha1" }),
+    )
+    .await?;
     Ok(versions
         .into_iter()
         .map(|(hash, version)| (hash, version.project_id))

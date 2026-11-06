@@ -12,9 +12,11 @@ use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
 use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
+use sapling_core::instance::packs::{self, PackFile, PackKind};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
+use sapling_core::modrinth::installed::{self, InstalledMod};
 use sapling_core::modrinth::pack;
 use sapling_core::modrinth::{
     self, InstallTarget, ProjectKind, ProjectVersion, SearchPage, SearchRequest, Wanted,
@@ -318,6 +320,48 @@ async fn delete_mod(action: ModAction) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn inspect_mods(id: String) -> Result<Vec<InstalledMod>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let client = new_client().map_err(text)?;
+    installed::inspect(
+        &client,
+        &instance.game_dir(&dirs),
+        &instance.version,
+        instance.loader,
+    )
+    .await
+    .map_err(text)
+}
+
+#[tauri::command]
+async fn list_packs(id: String, kind: PackKind) -> Result<Vec<PackFile>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    packs::list(&instance.game_dir(&dirs), kind)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn delete_pack(id: String, kind: PackKind, name: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    packs::delete(&instance.game_dir(&dirs), kind, &name)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn open_pack_folder(id: String, kind: PackKind) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let folder = packs::pack_dir(&instance.game_dir(&dirs), kind);
+    std::fs::create_dir_all(&folder).map_err(text)?;
+    open_folder(&folder).map_err(text)
+}
+
+#[tauri::command]
 async fn open_mods_folder(id: String) -> Result<(), String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
@@ -604,6 +648,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
+            inspect_mods,
+            list_packs,
+            delete_pack,
+            open_pack_folder,
             list_versions,
             system_memory_mb,
             load_config,

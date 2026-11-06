@@ -65,7 +65,7 @@ const CHINESE_NAMES: Record<string, string> = {
 };
 
 /** 列表上顯示的名稱：有中文名就放在前面。 */
-export function displayTitle(hit: ModHit) {
+export function displayTitle(hit: Pick<ModHit, "slug" | "title">) {
   const chinese = CHINESE_NAMES[hit.slug];
   return chinese ? `${chinese} ${hit.title}` : hit.title;
 }

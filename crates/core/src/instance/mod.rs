@@ -3,6 +3,7 @@
 mod copy;
 pub mod import;
 pub mod mods;
+pub mod packs;
 pub mod worlds;
 
 use std::io;

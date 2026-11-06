@@ -95,6 +95,19 @@ export type ProjectVersion = {
 
 export type ModFile = { name: string; enabled: boolean; size: number };
 
+/** Modrinth 認得的模組。手動放進來的模組沒有這份資料。 */
+export type InstalledMod = {
+  fileName: string;
+  projectId: string;
+  title: string;
+  slug: string;
+  iconUrl: string | null;
+  update: { versionId: string; versionName: string } | null;
+};
+
+export type PackKind = "resourcePack" | "shader";
+export type PackFile = { name: string; size: number };
+
 export type UpdateInfo = { version: string; notes: string; url: string; sha256: string };
 
 export type Progress = {
