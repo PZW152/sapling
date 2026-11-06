@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/banner.png" alt="Sapling Launcher：打開就能玩的 Minecraft Java 版啟動器">
+  <img src="assets/readme/banner.png" alt="Sapling Launcher：Minecraft Java 版啟動器">
 </p>
 
 <p align="center">
@@ -16,7 +16,6 @@
 
 <p align="center">
   <a href="https://pzw152.github.io/sapling/">官網</a> ·
-  <a href="#為什麼是-sapling">為什麼是 Sapling</a> ·
   <a href="#功能">功能</a> ·
   <a href="#開始使用">開始使用</a> ·
   <a href="#常見問題">常見問題</a> ·
@@ -25,24 +24,11 @@
 
 <br>
 
+Sapling 是 Minecraft Java 版啟動器。單一 exe，約 10 MB，不用安裝。
+
 <p align="center">
-  <img src="assets/readme/demo.gif" width="760" alt="操作展示：切換實例、瀏覽模組、下載頁，再切換成深色模式">
+  <img src="assets/readme/demo.gif" width="800" alt="介面操作：切換實例、模組搜尋、Modrinth 下載、切換主題和深色模式、啟動遊戲">
 </p>
-
-## 為什麼是 Sapling
-
-<table>
-  <tr>
-    <td width="33%" valign="top"><b>打開就能玩</b><br>第一次打開只有一個按鈕。登入後，遊戲和需要的 Java 會自動下載，然後直接進遊戲。</td>
-    <td width="33%" valign="top"><b>一個檔案</b><br>約 10 MB 的 exe，不用安裝。放進資料夾就能用，資料都在旁邊，整個資料夾帶著走。</td>
-    <td width="33%" valign="top"><b>裝完也管得好</b><br>模組顯示名稱和圖示，一鍵檢查更新。資源包、光影、截圖、世界都看得到、刪得掉。</td>
-  </tr>
-  <tr>
-    <td valign="top"><b>出事說人話</b><br>遊戲崩潰時用白話說明原因，並指出可能有問題的模組，不用自己讀日誌。</td>
-    <td valign="top"><b>每個人都能用</b><br>支援鍵盤操作、讀屏軟體和 Windows 高對比模式，有三種介面大小，所有主題的文字對比都達標。</td>
-    <td valign="top"><b>乾淨</b><br>沒有廣告，沒有追蹤。登入憑證只存在 Windows 憑證管理員，不寫入任何檔案。</td>
-  </tr>
-</table>
 
 ## 功能
 
@@ -57,7 +43,7 @@
 
 - 正版微軟帳號登入，可以保存多個帳號並切換，也能在啟動器裡換皮膚
 - 支援 1.7.10 以後的正式版和快照版，遊戲檔案全部校驗，已安裝的版本沒有網路也能玩
-- 首頁按一下就直接進世界或伺服器（進世界需要 1.20 以上），桌面捷徑一鍵啟動
+- 首頁按一下進世界或伺服器（進世界需要 1.20 以上），可以建立桌面捷徑
 - 離線模式：這台電腦登入過擁有遊戲的微軟帳號後，可以用自訂名稱玩單人遊戲和區域網路
 
 ### 模組和整合包
@@ -90,12 +76,18 @@
 - 記錄遊玩時間，最近玩過的排前面
 - 相同的檔案不重複下載，用不到的一鍵清理
 
-### 體驗
+### 介面
 
-- 五種綠色主題，支援深色模式
-- 有彈性、有回應的動畫，系統開啟「減少動畫」時全部停用
-- 大檔案分段下載，斷線只補缺少的部分，下載走 Windows 系統代理
+- 五種綠色主題，淺色、深色或跟隨系統
+- 三種介面大小，支援鍵盤操作、讀屏軟體和 Windows 高對比模式
+- 彈簧曲線動畫，跟隨系統的「減少動畫」設定
+
+### 下載和更新
+
+- 遊戲檔案全部校驗，大檔案分段下載，斷線只補缺少的部分
+- 下載走 Windows 系統代理
 - 自動更新，下載後校驗 SHA256
+- 崩潰時說明可能原因，指出可能有問題的模組
 
 ## 開始使用
 
@@ -126,15 +118,15 @@ Sapling 是學生的個人專案，沒有購買數位簽章。按「其他資訊
 </details>
 
 <details>
-<summary><b>我的帳號安全嗎？</b></summary>
+<summary><b>登入資料存在哪裡？</b></summary>
 <br>
 登入走微軟官方的裝置代碼流程，密碼不會經過 Sapling。登入憑證只存在 Windows 憑證管理員，不會寫入檔案，也會從遊戲日誌裡移除。
 </details>
 
 <details>
-<summary><b>遊戲崩潰了怎麼辦？</b></summary>
+<summary><b>怎麼回報問題？</b></summary>
 <br>
-Sapling 會說明可能原因和有問題的模組。解決不了的話，到「更多」頁複製診斷資訊，再<a href="https://github.com/PZW152/sapling/issues/new/choose">回報問題</a>。診斷資訊裡沒有帳號資料。
+到「更多」頁複製診斷資訊，再<a href="https://github.com/PZW152/sapling/issues/new/choose">回報問題</a>。診斷資訊裡沒有帳號資料。
 </details>
 
 <details>
@@ -145,7 +137,7 @@ Sapling 會說明可能原因和有問題的模組。解決不了的話，到「
 
 ## 技術架構
 
-核心邏輯和介面完全分開。每個功能都是獨立模塊，關閉或出錯都不影響其他功能。
+核心邏輯（Rust）和介面（Tauri 2、React、TypeScript）分開，每個功能是獨立模塊。
 
 ```mermaid
 flowchart LR
