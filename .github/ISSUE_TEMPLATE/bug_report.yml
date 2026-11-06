@@ -12,8 +12,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: 啟動器和遊戲版本
-      placeholder: 例如 Sapling 0.1.0、Minecraft 26.3
+      label: 啟動器、遊戲版本和載入器
+      placeholder: 例如 Sapling 0.3.0、Minecraft 26.3、Fabric
     validations:
       required: true
   - type: textarea
