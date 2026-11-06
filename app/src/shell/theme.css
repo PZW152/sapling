@@ -118,12 +118,6 @@
   --color-bg: #e9eeea;
 }
 
-:root[data-theme="zhongshan"] {
-  --color-accent: #1e5a4c;
-  --color-soft: #e4efeb;
-  --color-bg: #f0ede2;
-}
-
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { CSSProperties } from "react";
+import type { ComponentType, CSSProperties } from "react";
 import { api } from "../../shell/api";
 import { overallProgress, toMegabytes } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
@@ -18,6 +18,7 @@ export function LaunchOverlay({
   name,
   version,
   progress,
+  ProgressView,
   onClosed,
 }: {
   origin: OverlayOrigin;
@@ -26,6 +27,8 @@ export function LaunchOverlay({
   name: string;
   version: string;
   progress: Progress | null;
+  /** 功能模塊可以換掉預設的進度條。 */
+  ProgressView?: ComponentType<{ share: number }> | null;
   onClosed: () => void;
 }) {
   const share = running ? 1 : overallProgress(progress);
@@ -58,13 +61,17 @@ export function LaunchOverlay({
         <p className="overlay-version">{version}</p>
         <div className="overlay-status">
           <div
-            className="overlay-bar"
+            className={ProgressView ? undefined : "overlay-bar"}
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(share * 100)}
           >
-            <div style={{ transform: `scaleX(${share})` }} />
+            {ProgressView ? (
+              <ProgressView share={share} />
+            ) : (
+              <div style={{ transform: `scaleX(${share})` }} />
+            )}
           </div>
           <p key={running ? "running" : "preparing"} className="overlay-note">
             {running && "遊戲已啟動"}

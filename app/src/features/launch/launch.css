@@ -60,22 +60,6 @@
   }
 }
 
-.motto {
-  display: none;
-  position: absolute;
-  top: var(--space-5);
-  right: var(--space-5);
-  font-family: var(--font-brush);
-  font-size: 28px;
-  letter-spacing: 0.2em;
-  opacity: 0.4;
-  writing-mode: vertical-rl;
-}
-
-:root[data-theme="zhongshan"] .motto {
-  display: block;
-}
-
 .hero-name {
   font-size: var(--text-lg);
   font-weight: 500;

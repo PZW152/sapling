@@ -6,6 +6,3 @@ export const THEMES = [
   { id: "bamboo", name: "竹林", color: "#4f9e3a" },
   { id: "forest", name: "深林", color: "#1f6f4a" },
 ];
-
-/** 隱藏主題，在植樹節種過樹才會出現。 */
-export const ZHONGSHAN_THEME = { id: "zhongshan", name: "中山", color: "#1e5a4c" };

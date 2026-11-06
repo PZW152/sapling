@@ -20,3 +20,101 @@
   border-radius: 50%;
   background: var(--color-hero);
 }
+
+/* 中山主題：宣紙底、青藍和楷書，白色梅花是主角。 */
+:root[data-festival="zhongshan"] {
+  --color-accent: #1d5f80;
+  --color-soft: #e1e8e8;
+  --color-bg: #efe8d8;
+  --color-surface: #fbf6ea;
+  --color-line: #ddd3bd;
+  --color-ink: #24302a;
+  --color-muted: #5c5f50;
+  --color-hero: #17506e;
+  --color-rail: #0e2d42;
+  --color-plum: #ffffff;
+  --color-plum-line: #a4abde;
+}
+
+/* 楷書筆畫細，只用在大字，小字用了會看不清楚。 */
+:root[data-festival="zhongshan"] :is(.top h1, .hero-name, .primary-label) {
+  font-family: var(--font-brush);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+:root[data-festival="zhongshan"] .top h1 {
+  font-size: var(--text-xl);
+}
+
+:root[data-festival="zhongshan"] .hero-name {
+  font-size: var(--text-xl);
+}
+
+:root[data-festival="zhongshan"] .primary-label {
+  font-size: calc(var(--text-xl) * 1.2);
+  letter-spacing: 0.2em;
+}
+
+/* 版本號讓出右邊給題字。 */
+:root[data-festival="zhongshan"] .hero .version-number {
+  font-size: clamp(72px, min(76cqw / (var(--units) * 0.54), 40cqh), 640px);
+}
+
+.motto {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-brush);
+  animation: title-in var(--slow) var(--ease);
+}
+
+.motto span {
+  font-size: clamp(28px, 7cqh, 44px);
+  letter-spacing: 0.22em;
+  writing-mode: vertical-rl;
+  opacity: 0.92;
+}
+
+.motto .plum {
+  width: clamp(40px, 11cqh, 72px);
+  height: clamp(40px, 11cqh, 72px);
+}
+
+.plum-outline,
+.plum-petal,
+.plum-stamens {
+  transform-origin: 0 0;
+  transition:
+    transform var(--slow) var(--ease),
+    opacity var(--slow) var(--ease);
+}
+
+.plum-outline {
+  fill: none;
+  stroke: var(--color-plum-line);
+  stroke-width: 1.3;
+}
+
+.plum-petal {
+  fill: var(--color-plum);
+}
+
+.plum-stamens line {
+  stroke: var(--color-plum-line);
+  stroke-width: 0.53;
+}
+
+.plum-stamens circle,
+.plum-heart {
+  fill: var(--color-plum-line);
+}
+
+.plum-progress {
+  width: clamp(64px, 16vh, 110px);
+  aspect-ratio: 1;
+}

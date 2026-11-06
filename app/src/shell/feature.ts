@@ -37,6 +37,8 @@ export type Feature = {
   AccountPanel?: ComponentType<{ profile: Profile | null; disabled: boolean }>;
   /** 放在啟動頁主區塊、啟動按鈕上方的內容。 */
   HeroPanel?: ComponentType<HeroPanelProps>;
+  /** 回傳組件時，啟動轉場用它代替進度條。`share` 是 0 到 1。 */
+  launchProgress?: (config: LauncherConfig) => ComponentType<{ share: number }> | null;
   /** 回傳名稱時，下次啟動用這個名稱離線遊玩。 */
   offlineName?: (config: LauncherConfig) => string | null;
   /** 回傳文字時不能啟動，並把文字顯示在啟動按鈕旁邊。 */

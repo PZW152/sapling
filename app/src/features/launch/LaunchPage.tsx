@@ -32,6 +32,7 @@ export function LaunchPage() {
   const active = FEATURES.filter((feature) => !feature.optional || isEnabled(feature.id));
   const offlineName =
     active.map((feature) => feature.offlineName?.(config)).find((name) => name) ?? null;
+  const progressView = active.map((feature) => feature.launchProgress?.(config)).find(Boolean);
   const launchBlock =
     active.map((feature) => feature.launchBlock?.(config)).find((reason) => reason) ?? null;
   const canStart = launchBlock === null && (profile !== null || offlineName !== null);
@@ -67,9 +68,6 @@ export function LaunchPage() {
   return (
     <div className="launch">
       <section className={`hero ${phase}`} ref={hero}>
-        <p className="motto" aria-hidden="true">
-          天下為公
-        </p>
         {!loaded ? (
           <div className="hero-top" aria-hidden="true">
             <span className="skeleton on-dark name-skeleton" />
@@ -140,6 +138,7 @@ export function LaunchPage() {
           name={selected.name}
           version={selected.version}
           progress={progress}
+          ProgressView={progressView}
           onClosed={clearOrigin}
         />
       )}

@@ -1,11 +1,17 @@
 const REVEAL_MS = 900;
 
+type Origin = { x: number; y: number };
+
 /** 切換主題。傳入點擊位置時，新顏色會從那裡擴散開來。 */
-export function applyTheme(theme: string, origin?: { x: number; y: number }) {
+export function applyTheme(theme: string, origin?: Origin) {
+  revealChange(() => {
+    document.documentElement.dataset.theme = theme;
+  }, origin);
+}
+
+/** 執行一次畫面改動，並讓新畫面從點擊位置擴散開來。 */
+export function revealChange(change: () => void, origin?: Origin) {
   const root = document.documentElement;
-  const change = () => {
-    root.dataset.theme = theme;
-  };
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!origin || reducedMotion || !document.startViewTransition) {
     change();
