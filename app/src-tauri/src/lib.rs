@@ -12,11 +12,12 @@ use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
 use sapling_core::instance::add_file::{self, AddedKind};
+use sapling_core::instance::icon;
 use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::packs::{self, PackFile, PackKind};
 use sapling_core::instance::screenshots::{self, Screenshot};
-use sapling_core::instance::servers::{self, Server};
+use sapling_core::instance::servers::{self, Server, ServerStatus};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
@@ -31,7 +32,7 @@ use sapling_core::platform::{
     total_memory_mb,
 };
 use sapling_core::update::{self, UpdateInfo};
-use sapling_core::versions::fetch_manifest;
+use sapling_core::versions::fetch_manifest_cached;
 use sapling_core::versions::install::{
     PrepareStage, is_installed, prepare_version, request_full_check,
 };
@@ -122,8 +123,10 @@ async fn load_instance(dirs: &DataDirs, id: &str) -> Result<Instance, String> {
 #[tauri::command]
 async fn list_versions() -> Result<VersionList, String> {
     let client = new_client().map_err(text)?;
-    let manifest = fetch_manifest(&client).await.map_err(text)?;
     let dirs = data_dirs()?;
+    let manifest = fetch_manifest_cached(&client, &dirs.manifest_cache())
+        .await
+        .map_err(text)?;
     let versions: Vec<String> = manifest
         .supported_releases()
         .map_err(text)?
@@ -633,6 +636,32 @@ async fn install_game(
 }
 
 #[tauri::command]
+async fn ping_server(address: String) -> Option<ServerStatus> {
+    servers::ping(&address).await
+}
+
+#[tauri::command]
+async fn instance_icon(id: String) -> Result<Option<Vec<u8>>, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    Ok(icon::read(&instance.game_dir(&dirs)).await)
+}
+
+#[tauri::command]
+async fn set_instance_icon(id: String, path: Option<String>) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let game_dir = instance.game_dir(&dirs);
+    match path {
+        Some(path) => {
+            let bytes = read_file(&path)?;
+            icon::save(&game_dir, &bytes).await.map_err(text)
+        }
+        None => icon::remove(&game_dir).await.map_err(text),
+    }
+}
+
+#[tauri::command]
 async fn list_servers(id: String) -> Result<Vec<Server>, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
@@ -847,6 +876,10 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
 }
 
 /// 預設大小就是最小大小。系統算最小值時包含隱形邊框，所以用開啟時的實際外框，不寫死數字。
+fn read_file(path: &str) -> Result<Vec<u8>, String> {
+    std::fs::read(path).map_err(text)
+}
+
 fn launch_argument(arguments: &[String]) -> Option<String> {
     let position = arguments.iter().position(|item| item == LAUNCH_ARGUMENT)?;
     arguments.get(position + 1).cloned()
@@ -877,6 +910,8 @@ pub fn run() {
         // 兩個啟動器同時開會互相覆蓋設定，所以第二次打開時只叫出原本的窗口。
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if let Some(window) = app.get_webview_window("main") {
+                // 遊戲開著時關掉窗口只是隱藏，再打開要叫回來。
+                let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -892,6 +927,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
+            ping_server,
+            instance_icon,
+            set_instance_icon,
             list_servers,
             list_screenshots,
             delete_screenshot,

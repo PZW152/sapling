@@ -37,6 +37,8 @@ const HIDDEN_TOKEN: &str = "***";
 const GAME_LOGS: [&str; 2] = ["logs/latest.log", "logs/debug.log"];
 /// 舊版遊戲要求這個參數，內容可以是空的。
 const EMPTY_PROPERTIES: &str = "{}";
+/// 一次送給介面的日誌行數上限。
+const LOG_BATCH_SIZE: usize = 200;
 const LOG_CHANNEL_SIZE: usize = 256;
 /// 版本 JSON 用這個功能開關標記支援直接進入世界，1.20 起才有。
 const QUICK_PLAY_FEATURE: &str = "is_quick_play_singleplayer";
@@ -79,8 +81,9 @@ pub enum LaunchEvent {
         progress: DownloadProgress,
     },
     Started,
+    /// 一批遊戲輸出。分批送，遊戲狂印日誌時介面才不會卡住。
     Log {
-        line: String,
+        lines: Vec<String>,
     },
 }
 
@@ -242,15 +245,33 @@ pub async fn play(
         tokio::spawn(forward_lines(stderr, sender.clone()));
     }
     drop(sender);
-    while let Some(line) = receiver.recv().await {
-        if is_problem_line(&line) {
-            // 離線的 token 只是佔位的 0，替換掉會弄亂記錄裡所有的數字。
-            let line = if session.is_offline() {
-                line
-            } else {
-                hide_token(&line, session.access_token())
-            };
-            on_event(LaunchEvent::Log { line });
+    // 離線的 token 只是佔位的 0，替換掉會弄亂記錄裡所有的數字。
+    let clean = |line: String| {
+        if session.is_offline() {
+            line
+        } else {
+            hide_token(&line, session.access_token())
+        }
+    };
+    let mut stopped = false;
+    loop {
+        tokio::select! {
+            line = receiver.recv() => {
+                let Some(line) = line else { break };
+                let mut lines = vec![clean(line)];
+                while lines.len() < LOG_BATCH_SIZE {
+                    match receiver.try_recv() {
+                        Ok(line) => lines.push(clean(line)),
+                        Err(_) => break,
+                    }
+                }
+                on_event(LaunchEvent::Log { lines });
+            }
+            () = cancel.cancelled(), if !stopped => {
+                stopped = true;
+                // 結束失敗時遊戲多半已經關了，繼續等輸出結束就好。
+                let _ = child.start_kill();
+            }
         }
     }
 
@@ -264,7 +285,7 @@ pub async fn play(
             scrub_token(&game_dir.join(log), session.access_token()).await;
         }
     }
-    if status.success() {
+    if status.success() || stopped {
         return Ok(());
     }
     // 只影響下次啟動的速度和檢查範圍，寫不進去也不該蓋過崩潰原因。
@@ -296,19 +317,6 @@ async fn read_line_lossy(reader: &mut (impl AsyncBufRead + Unpin)) -> Option<Str
         Ok(0) | Err(_) => None,
         Ok(_) => Some(String::from_utf8_lossy(&bytes).trim_end().to_string()),
     }
-}
-
-/// 只保留警告、錯誤和例外堆疊。完整日誌由遊戲自己寫在實例的 `logs/latest.log`。
-fn is_problem_line(line: &str) -> bool {
-    const MARKERS: [&str; 6] = [
-        "/WARN]",
-        "/ERROR]",
-        "/FATAL]",
-        "Exception",
-        "Caused by:",
-        "\tat ",
-    ];
-    MARKERS.iter().any(|marker| line.contains(marker))
 }
 
 fn hide_token(line: &str, token: &str) -> String {
@@ -638,17 +646,6 @@ mod tests {
         assert!(broken.is_some());
         assert_eq!(last.as_deref(), Some("last"));
         assert_eq!(read_line_lossy(&mut reader).await, None);
-    }
-
-    #[test]
-    fn keeps_only_warnings_errors_and_stack_traces() {
-        assert!(is_problem_line("[12:00:00] [Render thread/WARN]: slow"));
-        assert!(is_problem_line("[12:00:00] [main/ERROR]: failed"));
-        assert!(is_problem_line("java.lang.NullPointerException: x"));
-        assert!(is_problem_line(
-            "\tat net.minecraft.client.Main.main(Main.java:1)"
-        ));
-        assert!(!is_problem_line("[12:00:00] [Render thread/INFO]: Loaded"));
     }
 
     #[test]

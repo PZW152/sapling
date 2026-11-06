@@ -23,6 +23,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   uiScale: 100,
   colorMode: "system",
   minimizeOnLaunch: true,
+  seenVersion: "",
 };
 
 type AppState = {

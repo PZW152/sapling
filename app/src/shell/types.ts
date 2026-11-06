@@ -48,7 +48,11 @@ export type LauncherConfig = {
   uiScale: number;
   colorMode: ColorMode;
   minimizeOnLaunch: boolean;
+  /** 看過「有什麼新內容」的版本。 */
+  seenVersion: string;
 };
+
+export type ServerStatus = { online: number; max: number; latencyMs: number };
 
 export type Server = { name: string; address: string };
 export type Screenshot = { name: string; path: string; takenMs: number };
@@ -144,4 +148,4 @@ export type Progress = {
 export type LaunchEvent =
   | ({ kind: "progress" } & Progress)
   | { kind: "started" }
-  | { kind: "log"; line: string };
+  | { kind: "log"; lines: string[] };

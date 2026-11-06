@@ -2,6 +2,7 @@
 
 pub mod add_file;
 mod copy;
+pub mod icon;
 pub mod import;
 pub mod mods;
 pub mod packs;
@@ -40,6 +41,8 @@ pub enum InstanceError {
     EmptyName,
     #[error("看不出「{name}」是什麼。可以放模組（.jar）、資源包或光影（.zip）")]
     UnknownFile { name: String },
+    #[error("圖示要是 2 MB 以內的 PNG、JPG、WebP 或 GIF 圖片")]
+    BadIcon,
     #[error("原版實例不能用模組，請換一個使用載入器的實例")]
     ModsNeedLoader,
     #[error("找不到這個實例")]
@@ -198,6 +201,9 @@ impl Instance {
     pub async fn duplicate(&self, dirs: &DataDirs) -> Result<Self, InstanceError> {
         let mut copy = self.clone();
         copy.id = next_id(dirs).await?;
+        // 新實例還沒玩過。
+        copy.played_seconds = 0;
+        copy.last_played_ms = 0;
         copy.name = format!("{} 副本", self.name);
 
         let from = self.game_dir(dirs);
@@ -350,6 +356,19 @@ mod tests {
 
         let next = Instance::create(&dirs, "新的", "26.3").await.unwrap();
         assert_ne!(next.id, bad.id);
+    }
+
+    #[tokio::test]
+    async fn a_copy_starts_with_no_playtime() {
+        let dirs = temp_dirs("copy-playtime");
+        let original = Instance::create(&dirs, "生存", "26.3").await.unwrap();
+        original.record_play(&dirs, 60).await.unwrap();
+        let saved = Instance::list(&dirs).await.unwrap().remove(0);
+
+        let copy = saved.duplicate(&dirs).await.unwrap();
+
+        assert_eq!(copy.played_seconds, 0);
+        assert_eq!(copy.last_played_ms, 0);
     }
 
     #[tokio::test]

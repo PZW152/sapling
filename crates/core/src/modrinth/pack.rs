@@ -12,8 +12,8 @@ use serde::Deserialize;
 use zip::ZipArchive;
 
 use crate::download::{DownloadProgress, DownloadTask, download_all, download_file, fetch_text};
-use crate::instance::Instance;
 use crate::instance::mods::{all_mods_dirs, link_existing};
+use crate::instance::{Instance, icon};
 use crate::loader::LoaderKind;
 use crate::platform::DataDirs;
 use crate::storage::safe_relative_path;
@@ -106,7 +106,33 @@ pub async fn install_pack(
     let result = install_from_file(client, dirs, &pack_path, name, concurrency, on_progress).await;
     // 清理失敗不影響結果，只是留下一個暫存檔。
     let _ = tokio::fs::remove_file(&pack_path).await;
+    if let Ok(instance) = &result {
+        save_pack_icon(client, project_id, &instance.game_dir(dirs)).await;
+    }
     result
+}
+
+/// 圖示只是裝飾，抓不到就算了。
+async fn save_pack_icon(client: &reqwest::Client, project_id: &str, game_dir: &Path) {
+    #[derive(Deserialize)]
+    struct Project {
+        icon_url: Option<String>,
+    }
+    let url = format!("{API_URL}/project/{project_id}");
+    let Ok(text) = fetch_text(client, &url).await else {
+        return;
+    };
+    let Some(icon_url) = serde_json::from_str::<Project>(&text)
+        .ok()
+        .and_then(|found| found.icon_url)
+    else {
+        return;
+    };
+    if let Ok(response) = client.get(icon_url).send().await
+        && let Ok(bytes) = response.bytes().await
+    {
+        let _ = icon::save(game_dir, &bytes).await;
+    }
 }
 
 /// 安裝電腦上的 `.mrpack`。實例名稱用整合包自己的名稱，沒有才用檔名。

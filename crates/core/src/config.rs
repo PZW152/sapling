@@ -40,6 +40,8 @@ pub struct LauncherConfig {
     pub color_mode: String,
     /// 遊戲開始後收起啟動器窗口。
     pub minimize_on_launch: bool,
+    /// 用戶看過「有什麼新內容」的版本。
+    pub seen_version: String,
 }
 
 impl Default for LauncherConfig {
@@ -57,6 +59,7 @@ impl Default for LauncherConfig {
             ui_scale: DEFAULT_UI_SCALE,
             color_mode: DEFAULT_COLOR_MODE.to_string(),
             minimize_on_launch: true,
+            seen_version: String::new(),
         }
     }
 }

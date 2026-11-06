@@ -14,6 +14,7 @@ import type {
   ModFile,
   Screenshot,
   Server,
+  ServerStatus,
   PackFile,
   PackKind,
   ProjectKind,
@@ -70,6 +71,10 @@ export const api = {
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
   openModsFolder: (id: string) => invoke<void>("open_mods_folder", { id }),
+  pingServer: (address: string) => invoke<ServerStatus | null>("ping_server", { address }),
+  instanceIcon: (id: string) => invoke<number[] | null>("instance_icon", { id }),
+  setInstanceIcon: (id: string, path: string | null) =>
+    invoke<void>("set_instance_icon", { id, path }),
   listServers: (id: string) => invoke<Server[]>("list_servers", { id }),
   listScreenshots: (id: string) => invoke<Screenshot[]>("list_screenshots", { id }),
   deleteScreenshot: (id: string, name: string) =>

@@ -194,6 +194,10 @@ impl DataDirs {
         self.root.join("instances")
     }
 
+    pub fn manifest_cache(&self) -> PathBuf {
+        self.root.join("version-manifest.json")
+    }
+
     pub fn config_file(&self) -> PathBuf {
         self.root.join("config.json")
     }

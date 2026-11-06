@@ -29,6 +29,7 @@
   --color-line: #d7dfd8;
   --color-on-dark: #ffffff;
   --color-danger: #8f3f2d;
+  --color-warn: #7a5a00;
   --color-danger-soft: #fbeeea;
   --color-close: #c4483a;
 
@@ -133,6 +134,7 @@
   --color-link: color-mix(in srgb, var(--color-accent) 55%, white);
   --color-tint: color-mix(in srgb, var(--color-accent) 16%, transparent);
   --color-danger: #f0a493;
+  --color-warn: #e6c56a;
   --color-danger-soft: #3a2420;
   --color-rail: color-mix(in srgb, var(--color-accent) 16%, #0b120f);
   --color-rail-text: #cfdcd4;

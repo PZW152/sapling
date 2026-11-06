@@ -5,6 +5,7 @@ import { useApp } from "../../shell/AppContext";
 import { ConfirmButton } from "../../shell/ConfirmButton";
 import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
+import { InstanceIcon } from "../../shell/InstanceIcon";
 import { useEscape } from "../../shell/keyboard";
 import { LOADERS, LOADER_HINT, loaderName } from "../../shell/loaders";
 import { matchesInstance } from "../../shell/instances";
@@ -49,8 +50,11 @@ export function InstancePage() {
                   selectInstance(instance.id);
                 }}
               >
-                <span>{instance.name}</span>
-                <small>{instance.version}</small>
+                <InstanceIcon id={instance.id} name={instance.name} />
+                <span className="instance-item-text">
+                  <span>{instance.name}</span>
+                  <small>{instance.version}</small>
+                </span>
               </button>
             </li>
           ))}

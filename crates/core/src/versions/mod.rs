@@ -4,6 +4,8 @@ pub mod details;
 pub mod install;
 pub mod rules;
 
+use std::path::Path;
+
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -93,6 +95,25 @@ impl VersionManifest {
 /// 從 Mojang 下載並解析版本清單。
 pub async fn fetch_manifest(client: &reqwest::Client) -> Result<VersionManifest, VersionsError> {
     VersionManifest::parse(&fetch_text(client, MANIFEST_URL).await?)
+}
+
+/// 取得版本清單並存在本機。沒有網路時用上次存的，已安裝的版本和新增實例才能繼續用。
+pub async fn fetch_manifest_cached(
+    client: &reqwest::Client,
+    cache: &Path,
+) -> Result<VersionManifest, VersionsError> {
+    match fetch_text(client, MANIFEST_URL).await {
+        Ok(text) => {
+            let manifest = VersionManifest::parse(&text)?;
+            // 只是快取，寫不進去不影響這次使用。
+            let _ = tokio::fs::write(cache, &text).await;
+            Ok(manifest)
+        }
+        Err(error) => match tokio::fs::read_to_string(cache).await {
+            Ok(text) => VersionManifest::parse(&text),
+            Err(_) => Err(error.into()),
+        },
+    }
 }
 
 /// 下載並解析單個版本的版本 JSON。

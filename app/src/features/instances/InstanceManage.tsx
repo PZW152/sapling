@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import { ConfirmButton } from "../../shell/ConfirmButton";
@@ -16,7 +16,7 @@ const FOLDERS = [
 
 /** 實例頁的管理分頁：不常用但需要時一定要有的操作。 */
 export function InstanceManage() {
-  const { list, selected, loadInstances, loadVersions } = useApp();
+  const { list, selected, loadInstances, loadVersions, touchContent } = useApp();
   const [version, setVersion] = useState(selected?.version ?? "");
   const [loader, setLoader] = useState<LoaderKind>(selected?.loader ?? "vanilla");
   const [working, setWorking] = useState("");
@@ -57,6 +57,28 @@ export function InstanceManage() {
     run("repair", async () => {
       await api.repairInstance(instance.id);
       return "下次啟動時會檢查全部遊戲檔案，並重新下載有問題的檔案。";
+    });
+  }
+
+  async function chooseIcon() {
+    const path = await open({
+      title: "選擇圖示",
+      filters: [{ name: "圖片", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+    });
+    if (path) {
+      run("icon", async () => {
+        await api.setInstanceIcon(instance.id, path);
+        touchContent();
+        return "圖示已更換。";
+      });
+    }
+  }
+
+  function removeIcon() {
+    run("icon", async () => {
+      await api.setInstanceIcon(instance.id, null);
+      touchContent();
+      return "圖示已移除。";
     });
   }
 
@@ -137,6 +159,20 @@ export function InstanceManage() {
               {name}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="setting">
+        <div className="setting-head">
+          <span>圖示</span>
+          <div className="mods-actions">
+            <button className="text-button" disabled={working !== ""} onClick={chooseIcon}>
+              更換
+            </button>
+            <button className="text-button" disabled={working !== ""} onClick={removeIcon}>
+              移除
+            </button>
+          </div>
         </div>
       </section>
 
