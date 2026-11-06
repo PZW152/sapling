@@ -49,8 +49,13 @@ export const api = {
   searchProjects: (request: SearchRequest) => invoke<SearchPage>("search_projects", { request }),
   projectVersions: (projectId: string) =>
     invoke<ProjectVersion[]>("project_versions", { projectId }),
-  installProject: (id: string, kind: ProjectKind, projectId: string, versionId: string | null) =>
-    invoke<string[]>("install_project", { id, kind, projectId, versionId }),
+  installProject: (
+    id: string,
+    kind: ProjectKind,
+    projectId: string,
+    versionId: string | null,
+    world: string | null = null,
+  ) => invoke<string[]>("install_project", { id, kind, projectId, versionId, world }),
   installPack: (projectId: string, versionId: string | null, name: string) =>
     invoke<Instance>("install_pack", { projectId, versionId, name }),
 

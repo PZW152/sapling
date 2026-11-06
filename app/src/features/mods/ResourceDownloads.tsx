@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
 import { loaderName } from "../../shell/loaders";
-import type { ProjectKind } from "../../shell/types";
+import type { ProjectKind, World } from "../../shell/types";
 import { ResourceBrowser } from "./ResourceBrowser";
 
 /** 下載頁的分頁：先選實例，只列出和它相容的內容，不會裝錯版本。 */
@@ -14,6 +14,16 @@ function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string })
     usable.find((instance) => instance.id === chosenId) ??
     usable.find((instance) => instance.id === selected?.id) ??
     usable[0];
+  const needsWorld = kind === "dataPack";
+  const [worlds, setWorlds] = useState<World[]>([]);
+  const [worldChoice, setWorldChoice] = useState("");
+  const world = worlds.find(({ folder }) => folder === worldChoice) ?? worlds[0];
+
+  useEffect(() => {
+    if (needsWorld && chosen) {
+      api.listWorlds(chosen.id).then(setWorlds).catch(() => setWorlds([]));
+    }
+  }, [needsWorld, chosen?.id]);
 
   if (!chosen) {
     return (
@@ -42,13 +52,28 @@ function ResourceDownloads({ kind, hint }: { kind: ProjectKind; hint?: string })
           ))}
         </select>
       </label>
+      {needsWorld && worlds.length > 0 && (
+        <label className="field">
+          <span>世界</span>
+          <select value={world?.folder} onChange={(event) => setWorldChoice(event.target.value)}>
+            {worlds.map(({ folder }) => (
+              <option key={folder} value={folder}>
+                {folder}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {needsWorld && worlds.length === 0 && (
+        <p className="hint">這個實例還沒有世界。先進遊戲建立一個，再回來安裝。</p>
+      )}
       {hint && <p className="hint">{hint}</p>}
       <ResourceBrowser
         key={chosen.id}
         kind={kind}
         instance={chosen}
         install={async (hit, versionId) => {
-          await api.installProject(chosen.id, kind, hit.projectId, versionId);
+          await api.installProject(chosen.id, kind, hit.projectId, versionId, world?.folder ?? null);
         }}
       />
     </section>
@@ -61,6 +86,10 @@ export function ModDownloads() {
 
 export function ResourcePackDownloads() {
   return <ResourceDownloads kind="resourcePack" hint="裝好後在遊戲的「選項、資源包」裡啟用。" />;
+}
+
+export function DataPackDownloads() {
+  return <ResourceDownloads kind="dataPack" hint="資料包只對選定的世界生效，下次進世界時載入。" />;
 }
 
 export function ShaderDownloads() {

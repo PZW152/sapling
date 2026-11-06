@@ -1,4 +1,9 @@
-export type VersionList = { latest: string; versions: string[]; installed: string[] };
+export type VersionList = {
+  latest: string;
+  versions: string[];
+  snapshots: string[];
+  installed: string[];
+};
 
 export type Profile = { id: string; name: string; skinUrl: string | null };
 
@@ -27,6 +32,7 @@ export type LauncherConfig = {
   plantedYears: number[];
   offlineEnabled: boolean;
   offlineName: string;
+  favorites: Favorite[];
 };
 
 export type World = {
@@ -45,7 +51,7 @@ export type ImportSource = {
   worlds: World[];
 };
 
-export type ProjectKind = "mod" | "modpack" | "resourcePack" | "shader";
+export type ProjectKind = "mod" | "modpack" | "resourcePack" | "shader" | "dataPack";
 
 export type ModHit = {
   projectId: string;
@@ -53,10 +59,14 @@ export type ModHit = {
   description: string;
   downloads: number;
   iconUrl: string | null;
+  slug: string;
   author: string;
   categories: string[];
   dateModified: string;
 };
+
+/** 收藏的資源。 */
+export type Favorite = ModHit & { kind: ProjectKind };
 
 export type SearchRequest = {
   query: string;

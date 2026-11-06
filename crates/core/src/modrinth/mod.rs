@@ -12,6 +12,7 @@ use thiserror::Error;
 use crate::download::{DownloadError, DownloadTask, download_all, fetch_text};
 use crate::instance::InstanceError;
 use crate::instance::mods::link_existing;
+use crate::instance::worlds;
 use crate::loader::LoaderKind;
 use crate::versions::VersionsError;
 
@@ -23,6 +24,8 @@ const RELEASE: &str = "release";
 const SORTS: [&str; 4] = ["relevance", "downloads", "newest", "updated"];
 /// 整合包目前支援的載入器。
 const PACK_LOADERS: [&str; 3] = ["fabric", "forge", "neoforge"];
+/// 同一個專案可能同時有模組和資料包版本，要指定資料包。
+const DATAPACK_LOADER: &str = "datapack";
 
 #[derive(Debug, Error)]
 pub enum ModrinthError {
@@ -54,6 +57,8 @@ pub enum ModrinthError {
     Instance(#[from] InstanceError),
     #[error(transparent)]
     Versions(#[from] VersionsError),
+    #[error("請先選擇要安裝到哪個世界")]
+    NoWorld,
     #[error("這個模組的檔案名稱有問題：{name}")]
     BadFileName { name: String },
 }
@@ -66,6 +71,7 @@ pub enum ProjectKind {
     Modpack,
     ResourcePack,
     Shader,
+    DataPack,
 }
 
 impl ProjectKind {
@@ -75,16 +81,23 @@ impl ProjectKind {
             ProjectKind::Modpack => "modpack",
             ProjectKind::ResourcePack => "resourcepack",
             ProjectKind::Shader => "shader",
+            ProjectKind::DataPack => "datapack",
         }
     }
 
-    /// 這種資源放在實例的哪個資料夾。整合包會建立新實例，沒有固定資料夾。
-    fn folder(self) -> &'static str {
-        match self {
-            ProjectKind::Mod | ProjectKind::Modpack => "mods",
-            ProjectKind::ResourcePack => "resourcepacks",
-            ProjectKind::Shader => "shaderpacks",
-        }
+    /// 這種資源放在實例的哪裡。資料包屬於單一世界，整合包會建立新實例。
+    fn folder(self, game_dir: &Path, world: Option<&str>) -> Result<PathBuf, ModrinthError> {
+        Ok(match self {
+            ProjectKind::Mod | ProjectKind::Modpack => game_dir.join("mods"),
+            ProjectKind::ResourcePack => game_dir.join("resourcepacks"),
+            ProjectKind::Shader => game_dir.join("shaderpacks"),
+            ProjectKind::DataPack => {
+                let world = world
+                    .filter(|folder| worlds::exists(game_dir, folder))
+                    .ok_or(ModrinthError::NoWorld)?;
+                game_dir.join("saves").join(world).join("datapacks")
+            }
+        })
     }
 }
 
@@ -109,6 +122,8 @@ pub struct ModHit {
     pub description: String,
     pub downloads: u64,
     pub icon_url: Option<String>,
+    #[serde(default)]
+    pub slug: String,
     #[serde(default)]
     pub author: String,
     #[serde(default)]
@@ -151,6 +166,8 @@ pub struct InstallTarget<'a> {
     pub game_version: &'a str,
     pub loader: LoaderKind,
     pub game_dir: &'a Path,
+    /// 資料包要裝進的世界。
+    pub world: Option<&'a str>,
     pub other_mods_dirs: &'a [PathBuf],
     pub concurrency: usize,
 }
@@ -297,8 +314,10 @@ pub async fn install(
 ) -> Result<Vec<String>, ModrinthError> {
     let loader = match kind {
         ProjectKind::Mod => Some(loader_name(target.loader)?),
+        ProjectKind::DataPack => Some(DATAPACK_LOADER),
         _ => None,
     };
+    let folder = kind.folder(target.game_dir, target.world)?;
     let mut pending = vec![wanted];
     let mut seen_projects = HashSet::new();
     let mut files = Vec::new();
@@ -325,7 +344,6 @@ pub async fn install(
         files.push(primary_file(&version)?);
     }
 
-    let folder = target.game_dir.join(kind.folder());
     let names = files.iter().map(|file| file.filename.clone()).collect();
     let tasks = files
         .into_iter()
@@ -523,9 +541,40 @@ mod tests {
 
     #[test]
     fn resources_go_to_their_own_folders() {
-        assert_eq!(ProjectKind::Mod.folder(), "mods");
-        assert_eq!(ProjectKind::ResourcePack.folder(), "resourcepacks");
-        assert_eq!(ProjectKind::Shader.folder(), "shaderpacks");
+        let game = Path::new("game");
+
+        assert_eq!(
+            ProjectKind::Mod.folder(game, None).unwrap(),
+            game.join("mods")
+        );
+        assert_eq!(
+            ProjectKind::ResourcePack.folder(game, None).unwrap(),
+            game.join("resourcepacks")
+        );
+        assert_eq!(
+            ProjectKind::Shader.folder(game, None).unwrap(),
+            game.join("shaderpacks")
+        );
+    }
+
+    #[test]
+    fn data_packs_go_into_an_existing_world() {
+        let game = std::env::temp_dir().join(format!("sapling-datapack-{}", std::process::id()));
+        std::fs::create_dir_all(game.join("saves/生存")).unwrap();
+        std::fs::write(game.join("saves/生存/level.dat"), "x").unwrap();
+
+        assert_eq!(
+            ProjectKind::DataPack.folder(&game, Some("生存")).unwrap(),
+            game.join("saves/生存/datapacks")
+        );
+        assert!(matches!(
+            ProjectKind::DataPack.folder(&game, None),
+            Err(ModrinthError::NoWorld)
+        ));
+        assert!(matches!(
+            ProjectKind::DataPack.folder(&game, Some("../mods")),
+            Err(ModrinthError::NoWorld)
+        ));
     }
 
     #[test]

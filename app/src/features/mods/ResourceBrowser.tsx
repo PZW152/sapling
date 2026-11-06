@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
+import { trackDownload } from "../../shell/downloads";
 import { timeAgo } from "../../shell/time";
 import type { Instance, ModHit, ProjectKind, ProjectVersion } from "../../shell/types";
 import { formatDownloads } from "./downloads";
+import { displayTitle, searchTerm } from "./names";
 import {
   CATEGORY_NAMES,
   SORT_OPTIONS,
@@ -22,6 +24,7 @@ const PLACEHOLDERS: Record<ProjectKind, string> = {
   modpack: "搜尋整合包名稱",
   resourcePack: "搜尋資源包名稱",
   shader: "搜尋光影名稱",
+  dataPack: "搜尋資料包名稱",
 };
 
 type Props = {
@@ -38,7 +41,7 @@ type Props = {
 
 /** 搜尋、篩選和安裝 Modrinth 的資源。模組、資源包、光影和整合包都用它。 */
 export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }: Props) {
-  const { list } = useApp();
+  const { list, config, updateConfig } = useApp();
   const [query, setQuery] = useState("");
   const [gameVersion, setGameVersion] = useState("");
   const [category, setCategory] = useState("");
@@ -46,14 +49,27 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
   const [hits, setHits] = useState<ModHit[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(true);
-  const [installing, setInstalling] = useState("");
+  const [installing, setInstalling] = useState<string[]>([]);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [installed, setInstalled] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [detail, setDetail] = useState<ModHit | null>(null);
 
   const targetVersion = instance?.version ?? gameVersion;
+  const favorites = config.favorites.filter((favorite) => favorite.kind === kind);
+  const isFavorite = (hit: ModHit) =>
+    favorites.some((favorite) => favorite.projectId === hit.projectId);
+
+  function toggleFavorite(hit: ModHit) {
+    updateConfig({
+      favorites: isFavorite(hit)
+        ? config.favorites.filter((favorite) => favorite.projectId !== hit.projectId)
+        : [...config.favorites, { ...hit, kind }],
+    });
+  }
+
   const request = {
-    query,
+    query: searchTerm(query),
     kind,
     gameVersion: targetVersion || null,
     loader: kind === "mod" ? (instance?.loader ?? null) : null,
@@ -96,16 +112,19 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
   }
 
   async function run(hit: ModHit, versionId: string | null) {
-    setInstalling(versionId ?? hit.projectId);
+    const key = versionId ?? hit.projectId;
+    setInstalling((running) => [...running, key]);
     setError("");
     try {
-      await install(hit, versionId);
+      await trackDownload(displayTitle(hit), () => install(hit, versionId));
       setInstalled((done) => [...done, hit.projectId, ...(versionId ? [versionId] : [])]);
     } catch (reason) {
       setError(String(reason));
     }
-    setInstalling("");
+    setInstalling((running) => running.filter((item) => item !== key));
   }
+
+  const shownHits = favoritesOnly ? favorites : hits;
 
   if (detail) {
     return (
@@ -117,6 +136,8 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
         installed={installed}
         busyLabel={busyLabel}
         error={error}
+        favorite={isFavorite(detail)}
+        onToggleFavorite={() => toggleFavorite(detail)}
         onInstall={(versionId) => run(detail, versionId)}
         onBack={() => setDetail(null)}
       />
@@ -177,13 +198,24 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
             </option>
           ))}
         </select>
+        <button
+          className="chip"
+          aria-pressed={favoritesOnly}
+          onClick={() => setFavoritesOnly(!favoritesOnly)}
+        >
+          收藏 {favorites.length}
+        </button>
       </div>
       {error && <p className="error">{error}</p>}
-      {!error && !searching && hits.length === 0 && (
-        <p className="mods-empty">找不到符合的內容，換個關鍵字或篩選條件試試。</p>
+      {!error && !searching && shownHits.length === 0 && (
+        <p className="mods-empty">
+          {favoritesOnly
+            ? "還沒有收藏。打開項目後按「收藏」就會出現在這裡。"
+            : "找不到符合的內容，換個關鍵字或篩選條件試試。"}
+        </p>
       )}
       <ul className="mod-hits">
-        {hits.map((hit) => {
+        {shownHits.map((hit) => {
           const done = installed.includes(hit.projectId);
           return (
             <li key={hit.projectId}>
@@ -193,12 +225,12 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
               </button>
               <button
                 className="secondary"
-                disabled={done || installing !== ""}
+                disabled={done || installing.includes(hit.projectId)}
                 onClick={() => run(hit, null)}
               >
                 {done
                   ? "已安裝"
-                  : installing === hit.projectId
+                  : installing.includes(hit.projectId)
                     ? (busyLabel ?? "正在安裝")
                     : "安裝"}
               </button>
@@ -206,7 +238,7 @@ export function ResourceBrowser({ kind, instance, install, busyLabel, onClose }:
           );
         })}
       </ul>
-      {hits.length > 0 && hits.length < total && (
+      {!favoritesOnly && hits.length > 0 && hits.length < total && (
         <button className="secondary load-more" disabled={searching} onClick={loadMore}>
           {searching ? "載入中" : `載入更多（還有 ${total - hits.length} 個）`}
         </button>
@@ -228,7 +260,7 @@ function HitText({ hit }: { hit: ModHit }) {
 
   return (
     <span className="hit-text">
-      <strong>{hit.title}</strong>
+      <strong>{displayTitle(hit)}</strong>
       <span className="hit-description">{hit.description}</span>
       <span className="hit-meta">
         {hitTags(hit).map((tag) => (
@@ -251,16 +283,20 @@ function ProjectDetail({
   installed,
   busyLabel,
   error,
+  favorite,
+  onToggleFavorite,
   onInstall,
   onBack,
 }: {
   hit: ModHit;
   kind: ProjectKind;
   instance?: Instance | null;
-  installing: string;
+  installing: string[];
   installed: string[];
   busyLabel?: string;
   error: string;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   onInstall: (versionId: string) => void;
   onBack: () => void;
 }) {
@@ -271,7 +307,7 @@ function ProjectDetail({
     api.projectVersions(hit.projectId).then(setVersions).catch((reason) => setLoadError(String(reason)));
   }, [hit.projectId]);
 
-  const shown = versions && compatibleVersions(versions, instance, kind === "mod");
+  const shown = versions && compatibleVersions(versions, instance, kind);
 
   return (
     <div className="mod-browser resource-detail">
@@ -281,15 +317,20 @@ function ProjectDetail({
       <header className="detail-head">
         <HitIcon hit={hit} />
         <div>
-          <h3>{hit.title}</h3>
+          <h3>{displayTitle(hit)}</h3>
           {hit.author && <small>作者 {hit.author}</small>}
           <p>{hit.description}</p>
-          <button
-            className="text-button"
-            onClick={() => api.openLink(`${MODRINTH_PROJECT}${hit.projectId}`)}
-          >
-            在 Modrinth 查看
-          </button>
+          <div className="detail-links">
+            <button className="text-button" aria-pressed={favorite} onClick={onToggleFavorite}>
+              {favorite ? "已收藏" : "收藏"}
+            </button>
+            <button
+              className="text-button"
+              onClick={() => api.openLink(`${MODRINTH_PROJECT}${hit.projectId}`)}
+            >
+              在 Modrinth 查看
+            </button>
+          </div>
         </div>
       </header>
       {(error || loadError) && <p className="error">{error || loadError}</p>}
@@ -322,12 +363,12 @@ function ProjectDetail({
                   </div>
                   <button
                     className="secondary"
-                    disabled={done || installing !== ""}
+                    disabled={done || installing.includes(version.id)}
                     onClick={() => onInstall(version.id)}
                   >
                     {done
                       ? "已安裝"
-                      : installing === version.id
+                      : installing.includes(version.id)
                         ? (busyLabel ?? "正在安裝")
                         : "安裝"}
                   </button>

@@ -1,8 +1,11 @@
-import type { Instance, LoaderKind, ModHit, ProjectVersion } from "../../shell/types";
+import type { Instance, LoaderKind, ModHit, ProjectKind, ProjectVersion } from "../../shell/types";
 
 const BYTES_PER_MB = 1024 * 1024;
 const MAX_TAGS = 3;
 const MAX_LISTED_VERSIONS = 3;
+const DATAPACK_LOADER = "datapack";
+/** 原版實例裝不了模組，用一個不存在的名稱讓清單變空。 */
+const NO_LOADER = "none";
 
 export const SORT_OPTIONS = [
   { id: "", name: "預設排序" },
@@ -55,20 +58,28 @@ export function hitTags(hit: ModHit) {
     .slice(0, MAX_TAGS);
 }
 
+/** 版本必須帶有這個標記才裝得上。同一個專案可能同時有模組版和資料包版。 */
+function requiredLoader(kind: ProjectKind, instance: Instance) {
+  if (kind === "dataPack") {
+    return DATAPACK_LOADER;
+  }
+  return kind === "mod" ? (LOADER_IDS[instance.loader] ?? NO_LOADER) : null;
+}
+
 /** 只留下這個實例裝得上的版本。 */
 export function compatibleVersions(
   versions: ProjectVersion[],
   instance: Instance | null | undefined,
-  needsLoader: boolean,
+  kind: ProjectKind,
 ) {
   if (!instance) {
     return versions;
   }
-  const loader = LOADER_IDS[instance.loader];
+  const loader = requiredLoader(kind, instance);
   return versions.filter(
     (version) =>
       version.gameVersions.includes(instance.version) &&
-      (!needsLoader || (loader !== undefined && version.loaders.includes(loader))),
+      (loader === null || version.loaders.includes(loader)),
   );
 }
 

@@ -32,6 +32,8 @@ const CRASH_FEATURE: &str = "crash";
 const OFFLINE_FEATURE: &str = "offline-account";
 const INSTALL_EVENT: &str = "install-event";
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(50);
+/// 下載頁最多列出幾個快照版。
+const SNAPSHOT_LIMIT: usize = 40;
 /// 首頁最多顯示幾個最近遊玩的世界。
 const RECENT_WORLD_LIMIT: usize = 3;
 /// 實例頁最多列出幾個世界。
@@ -63,6 +65,7 @@ impl AppState {
 struct VersionList {
     latest: String,
     versions: Vec<String>,
+    snapshots: Vec<String>,
     installed: Vec<String>,
 }
 
@@ -104,14 +107,21 @@ async fn list_versions() -> Result<VersionList, String> {
         .iter()
         .map(|entry| entry.id.clone())
         .collect();
+    let snapshots: Vec<String> = manifest
+        .recent_snapshots(SNAPSHOT_LIMIT)
+        .iter()
+        .map(|entry| entry.id.clone())
+        .collect();
     let installed = versions
         .iter()
+        .chain(&snapshots)
         .filter(|id| is_installed(&dirs, id))
         .cloned()
         .collect();
     Ok(VersionList {
         latest: manifest.latest.release.clone(),
         versions,
+        snapshots,
         installed,
     })
 }
@@ -256,6 +266,7 @@ async fn install_project(
     kind: ProjectKind,
     project_id: String,
     version_id: Option<String>,
+    world: Option<String>,
 ) -> Result<Vec<String>, String> {
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
@@ -268,6 +279,7 @@ async fn install_project(
         game_version: &instance.version,
         loader: instance.loader,
         game_dir: &game_dir,
+        world: world.as_deref(),
         other_mods_dirs: &other_mods_dirs,
         concurrency: config.download_concurrency,
     };

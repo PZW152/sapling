@@ -27,6 +27,8 @@ pub struct LauncherConfig {
     /// 下次啟動是否用離線模式。
     pub offline_enabled: bool,
     pub offline_name: String,
+    /// 收藏的資源，內容由介面決定。
+    pub favorites: Vec<serde_json::Value>,
 }
 
 impl Default for LauncherConfig {
@@ -40,6 +42,7 @@ impl Default for LauncherConfig {
             planted_years: Vec::new(),
             offline_enabled: false,
             offline_name: String::new(),
+            favorites: Vec::new(),
         }
     }
 }

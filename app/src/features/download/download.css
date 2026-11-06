@@ -164,3 +164,60 @@
 .download-section[hidden] {
   display: none;
 }
+
+.download-bar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.queue {
+  position: relative;
+}
+
+.queue-panel {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  display: grid;
+  gap: var(--space-2);
+  width: 300px;
+  padding: var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-popover);
+  animation: tile-in var(--medium) var(--ease);
+}
+
+.queue-panel ul {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.queue-panel li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.queue-panel span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.queue-panel small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.queue-panel .error {
+  grid-column: 1 / -1;
+}

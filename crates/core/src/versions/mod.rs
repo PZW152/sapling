@@ -66,6 +66,15 @@ impl VersionManifest {
         Ok(serde_json::from_str(json)?)
     }
 
+    /// 最近的快照版，最新的排最前。
+    pub fn recent_snapshots(&self, limit: usize) -> Vec<&VersionEntry> {
+        self.versions
+            .iter()
+            .filter(|entry| entry.kind == VersionKind::Snapshot)
+            .take(limit)
+            .collect()
+    }
+
     /// v1 支援的正式版，最新的排最前。
     pub fn supported_releases(&self) -> Result<Vec<&VersionEntry>, VersionsError> {
         let releases: Vec<&VersionEntry> = self
@@ -109,6 +118,19 @@ mod tests {
             { "id": "b1.7.3", "type": "old_beta", "url": "u", "sha1": "s", "complianceLevel": 0 }
         ]
     }"#;
+
+    #[test]
+    fn lists_recent_snapshots_only() {
+        let manifest = VersionManifest::parse(SAMPLE).unwrap();
+
+        let ids: Vec<&str> = manifest
+            .recent_snapshots(5)
+            .iter()
+            .map(|entry| entry.id.as_str())
+            .collect();
+
+        assert_eq!(ids, ["26.4-snapshot-7"]);
+    }
 
     #[test]
     fn keeps_only_releases_down_to_the_oldest_supported() {

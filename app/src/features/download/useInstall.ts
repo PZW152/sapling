@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, onInstallEvent } from "../../shell/api";
+import { trackDownload } from "../../shell/downloads";
 import { useApp } from "../../shell/AppContext";
 import { loaderName } from "../../shell/loaders";
 import { overallProgress } from "../../shell/progress";
@@ -51,7 +52,7 @@ export function useInstall() {
     try {
       // 先建立實例：這個版本沒有對應的載入器時，不用等遊戲下載完才知道。
       const instance = await instanceFor(version, loader);
-      await api.installGame(version);
+      await trackDownload(`Minecraft ${version}`, () => api.installGame(version));
       selectInstance(instance.id);
       setInstall(null);
       await loadVersions();

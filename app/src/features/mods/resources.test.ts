@@ -25,15 +25,20 @@ describe("compatibleVersions", () => {
   ];
 
   it("模組要同時符合遊戲版本和載入器", () => {
-    expect(compatibleVersions(list, fabric261, true)).toEqual([list[0]]);
+    expect(compatibleVersions(list, fabric261, "mod")).toEqual([list[0]]);
   });
 
   it("資源包只看遊戲版本", () => {
-    expect(compatibleVersions(list, fabric261, false)).toEqual([list[0], list[1]]);
+    expect(compatibleVersions(list, fabric261, "resourcePack")).toEqual([list[0], list[1]]);
   });
 
   it("沒有目標實例時全部列出", () => {
-    expect(compatibleVersions(list, null, true)).toHaveLength(3);
+    expect(compatibleVersions(list, null, "mod")).toHaveLength(3);
+  });
+
+  it("資料包不會選到同專案的模組版", () => {
+    const both = [version(["1.21.8"], ["fabric"]), version(["1.21.8"], ["datapack"])];
+    expect(compatibleVersions(both, fabric261, "dataPack")).toEqual([both[1]]);
   });
 });
 

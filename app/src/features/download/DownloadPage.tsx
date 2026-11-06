@@ -4,6 +4,7 @@ import { FEATURES } from "..";
 import { useApp } from "../../shell/AppContext";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { LOADERS } from "../../shell/loaders";
+import { DownloadQueue } from "./DownloadQueue";
 import type { LoaderKind } from "../../shell/types";
 import { groupBySeries } from "./series";
 import { useInstall } from "./useInstall";
@@ -37,12 +38,15 @@ export function DownloadPage() {
 
   return (
     <div className="download-page">
-      {sections.length > 0 && (
-        <nav className="segments" aria-label="下載內容">
-          {tab(GAME_SECTION, "遊戲")}
-          {sections.map(({ id, label }) => tab(id, label))}
-        </nav>
-      )}
+      <div className="download-bar">
+        {sections.length > 0 && (
+          <nav className="segments" aria-label="下載內容">
+            {tab(GAME_SECTION, "遊戲")}
+            {sections.map(({ id, label }) => tab(id, label))}
+          </nav>
+        )}
+        <DownloadQueue />
+      </div>
       <div className="download-section" hidden={active !== GAME_SECTION}>
         <GameDownloads />
       </div>
@@ -61,6 +65,7 @@ function GameDownloads() {
   const { list, listError, loadVersions } = useApp();
   const { install, installGame, playVersion } = useInstall();
   const [loader, setLoader] = useState<LoaderKind>("vanilla");
+  const [snapshots, setSnapshots] = useState(false);
 
   if (!list && !listError) {
     return (
@@ -106,10 +111,20 @@ function GameDownloads() {
               {name}
             </button>
           ))}
+          <button
+            className="chip"
+            aria-pressed={snapshots}
+            onClick={() => setSnapshots(!snapshots)}
+          >
+            快照版
+          </button>
         </div>
       </div>
       <ul className="vine">
-        {groupBySeries(list.versions).map(({ series, versions }, index) => (
+        {(snapshots
+          ? [{ series: "快照版（測試用，可能不穩定）", versions: list.snapshots }]
+          : groupBySeries(list.versions)
+        ).map(({ series, versions }, index) => (
           <li key={series} className="vine-series" style={{ "--i": index } as CSSProperties}>
             <p className="vine-title">{series}</p>
             {versions.map((id) => (

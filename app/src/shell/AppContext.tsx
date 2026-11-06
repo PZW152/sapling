@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   plantedYears: [],
   offlineEnabled: false,
   offlineName: "",
+  favorites: [],
 };
 
 type AppState = {
