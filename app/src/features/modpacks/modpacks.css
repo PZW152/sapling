@@ -1,0 +1,14 @@
+.modpacks {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.modpacks .mod-hits {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}

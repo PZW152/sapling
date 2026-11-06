@@ -36,6 +36,9 @@ export const api = {
   listWorlds: (id: string) => invoke<World[]>("list_worlds", { id }),
   backupWorld: (id: string, folder: string) => invoke<string>("backup_world", { id, folder }),
 
+  searchPacks: (query: string) => invoke<ModHit[]>("search_packs", { query }),
+  installPack: (projectId: string, name: string) =>
+    invoke<Instance>("install_pack", { projectId, name }),
   searchMods: (query: string, version: string, loader: LoaderKind) =>
     invoke<ModHit[]>("search_mods", { query, version, loader }),
   installMod: (id: string, projectId: string) =>

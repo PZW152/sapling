@@ -1,14 +1,18 @@
 //! Modrinth：搜尋和下載模組。所有和 Modrinth 有關的網址和資料格式都在這裡。
 
+pub mod pack;
+
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::download::{DownloadError, DownloadTask, download_all, fetch_text};
+use crate::instance::InstanceError;
 use crate::loader::LoaderKind;
+use crate::versions::VersionsError;
 
 const API_URL: &str = "https://api.modrinth.com/v2";
 const SEARCH_LIMIT: usize = 20;
@@ -27,6 +31,24 @@ pub enum ModrinthError {
     NoCompatibleVersion { project: String },
     #[error("原版不能安裝模組，請新增一個 Fabric 實例")]
     NoLoader,
+    #[error("這個整合包的內容看不懂，可能已損壞")]
+    BadPack,
+    #[error("這個整合包使用 {loader}，Sapling 還不支援")]
+    UnsupportedLoader { loader: &'static str },
+    #[error("這個整合包使用 Minecraft {version}，Sapling 還不支援這麼舊的版本")]
+    OldGameVersion { version: String },
+    #[error("整合包裡有不安全的路徑，已停止安裝：{path}")]
+    UnsafePath { path: String },
+    #[error("無法寫入檔案：{}", path.display())]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error(transparent)]
+    Instance(#[from] InstanceError),
+    #[error(transparent)]
+    Versions(#[from] VersionsError),
     #[error("這個模組的檔案名稱有問題：{name}")]
     BadFileName { name: String },
 }
@@ -98,6 +120,15 @@ pub async fn search(
         [format!("categories:{}", loader_name(loader)?)],
     ])
     .to_string();
+    search_hits(client, query, &facets).await
+}
+
+/// 用 Modrinth 的篩選條件搜尋。
+async fn search_hits(
+    client: &reqwest::Client,
+    query: &str,
+    facets: &str,
+) -> Result<Vec<ModHit>, ModrinthError> {
     let limit = SEARCH_LIMIT.to_string();
     let index = if query.trim().is_empty() {
         "downloads"
@@ -108,7 +139,7 @@ pub async fn search(
         &format!("{API_URL}/search"),
         [
             ("query", query),
-            ("facets", facets.as_str()),
+            ("facets", facets),
             ("index", index),
             ("limit", limit.as_str()),
         ],

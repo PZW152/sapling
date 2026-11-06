@@ -1,0 +1,463 @@
+//! 安裝 Modrinth 整合包（`.mrpack`）：建立實例、下載檔案、解開內含的設定。
+//!
+//! 格式說明：<https://support.modrinth.com/en/articles/8802351>
+
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{self, Read};
+use std::path::{Component, Path, PathBuf};
+
+use reqwest::Url;
+use serde::Deserialize;
+use zip::ZipArchive;
+
+use crate::download::{DownloadProgress, DownloadTask, download_all, download_file, fetch_text};
+use crate::instance::Instance;
+use crate::loader::LoaderKind;
+use crate::platform::DataDirs;
+use crate::versions::fetch_manifest;
+
+use super::{API_URL, FileHashes, ModHit, ModVersion, ModrinthError, pick_version, search_hits};
+
+const INDEX_FILE: &str = "modrinth.index.json";
+const SUPPORTED_FORMAT: u32 = 1;
+const GAME: &str = "minecraft";
+const UNSUPPORTED: &str = "unsupported";
+const SECURE_SCHEME: &str = "https://";
+/// 依序解開，後面的覆蓋前面的。
+const OVERRIDE_FOLDERS: [&str; 2] = ["overrides/", "client-overrides/"];
+/// 還不支援的載入器。規格說之後可能新增，其他未知項目一律忽略。
+const UNSUPPORTED_LOADERS: [(&str, &str); 3] = [
+    ("forge", "Forge"),
+    ("neoforge", "NeoForge"),
+    ("quilt-loader", "Quilt"),
+];
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PackIndex {
+    format_version: u32,
+    game: String,
+    files: Vec<PackFile>,
+    dependencies: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PackFile {
+    path: String,
+    hashes: FileHashes,
+    env: Option<PackEnv>,
+    downloads: Vec<String>,
+    file_size: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct PackEnv {
+    client: String,
+}
+
+/// 整合包需要的遊戲版本和載入器。
+#[derive(Debug, PartialEq, Eq)]
+struct PackTarget {
+    game_version: String,
+    loader: LoaderKind,
+    loader_version: String,
+}
+
+/// 搜尋目前能安裝的整合包。沒有關鍵字時列出最熱門的。
+pub async fn search_packs(
+    client: &reqwest::Client,
+    query: &str,
+) -> Result<Vec<ModHit>, ModrinthError> {
+    let facets = serde_json::json!([["project_type:modpack"], ["categories:fabric"]]).to_string();
+    search_hits(client, query, &facets).await
+}
+
+/// 下載並安裝整合包，回傳新建立的實例。中途失敗不會留下半成品。
+pub async fn install_pack(
+    client: &reqwest::Client,
+    dirs: &DataDirs,
+    project_id: &str,
+    name: &str,
+    concurrency: usize,
+    on_progress: impl FnMut(DownloadProgress),
+) -> Result<Instance, ModrinthError> {
+    let version = latest_pack_version(client, project_id).await?;
+    let pack_path = dirs.root().join(format!("{}.mrpack.tmp", version.id));
+    let file = version
+        .files
+        .iter()
+        .find(|file| file.primary)
+        .or_else(|| version.files.first())
+        .ok_or(ModrinthError::BadPack)?;
+    download_file(
+        client,
+        &DownloadTask {
+            url: file.url.clone(),
+            path: pack_path.clone(),
+            sha1: file.hashes.sha1.clone(),
+            size: file.size,
+        },
+    )
+    .await?;
+
+    let result = install_from_file(client, dirs, &pack_path, name, concurrency, on_progress).await;
+    // 清理失敗不影響結果，只是留下一個暫存檔。
+    let _ = tokio::fs::remove_file(&pack_path).await;
+    result
+}
+
+async fn latest_pack_version(
+    client: &reqwest::Client,
+    project_id: &str,
+) -> Result<ModVersion, ModrinthError> {
+    let loaders = serde_json::json!(["fabric"]).to_string();
+    let url = Url::parse_with_params(
+        &format!("{API_URL}/project/{project_id}/version"),
+        [("loaders", loaders.as_str())],
+    )
+    .map_err(|_| ModrinthError::BadUrl)?;
+    let versions: Vec<ModVersion> = serde_json::from_str(&fetch_text(client, url.as_str()).await?)?;
+    pick_version(versions).ok_or_else(|| ModrinthError::NoCompatibleVersion {
+        project: project_id.to_string(),
+    })
+}
+
+async fn install_from_file(
+    client: &reqwest::Client,
+    dirs: &DataDirs,
+    pack_path: &Path,
+    name: &str,
+    concurrency: usize,
+    on_progress: impl FnMut(DownloadProgress),
+) -> Result<Instance, ModrinthError> {
+    let index = read_index(pack_path.to_path_buf()).await?;
+    let target = pack_target(&index)?;
+    let manifest = fetch_manifest(client).await?;
+    let supported = manifest
+        .supported_releases()?
+        .iter()
+        .any(|entry| entry.id == target.game_version);
+    if !supported {
+        return Err(ModrinthError::OldGameVersion {
+            version: target.game_version,
+        });
+    }
+
+    let instance = Instance::create_with_loader(
+        dirs,
+        name,
+        &target.game_version,
+        target.loader,
+        target.loader_version,
+    )
+    .await?;
+    let game_dir = instance.game_dir(dirs);
+    let filled = fill_game_dir(
+        client,
+        index,
+        pack_path.to_path_buf(),
+        game_dir,
+        concurrency,
+        on_progress,
+    )
+    .await;
+    if let Err(error) = filled {
+        // 裝到一半的實例不能用，不要留在清單裡。
+        let _ = instance.delete(dirs).await;
+        return Err(error);
+    }
+    Ok(instance)
+}
+
+async fn read_index(pack_path: PathBuf) -> Result<PackIndex, ModrinthError> {
+    tokio::task::spawn_blocking(move || {
+        let mut archive = open_archive(&pack_path)?;
+        let mut entry = archive
+            .by_name(INDEX_FILE)
+            .map_err(|_| ModrinthError::BadPack)?;
+        let mut text = String::new();
+        entry
+            .read_to_string(&mut text)
+            .map_err(|_| ModrinthError::BadPack)?;
+        Ok::<_, ModrinthError>(serde_json::from_str(&text)?)
+    })
+    .await
+    .map_err(|_| ModrinthError::BadPack)?
+}
+
+fn open_archive(path: &Path) -> Result<ZipArchive<File>, ModrinthError> {
+    let file = File::open(path).map_err(|_| ModrinthError::BadPack)?;
+    ZipArchive::new(file).map_err(|_| ModrinthError::BadPack)
+}
+
+fn pack_target(index: &PackIndex) -> Result<PackTarget, ModrinthError> {
+    if index.format_version != SUPPORTED_FORMAT || index.game != GAME {
+        return Err(ModrinthError::BadPack);
+    }
+    for (id, name) in UNSUPPORTED_LOADERS {
+        if index.dependencies.contains_key(id) {
+            return Err(ModrinthError::UnsupportedLoader { loader: name });
+        }
+    }
+    let game_version = index
+        .dependencies
+        .get("minecraft")
+        .ok_or(ModrinthError::BadPack)?
+        .clone();
+    let (loader, loader_version) = match index.dependencies.get("fabric-loader") {
+        Some(version) => (LoaderKind::Fabric, version.clone()),
+        None => (LoaderKind::Vanilla, String::new()),
+    };
+    Ok(PackTarget {
+        game_version,
+        loader,
+        loader_version,
+    })
+}
+
+async fn fill_game_dir(
+    client: &reqwest::Client,
+    index: PackIndex,
+    pack_path: PathBuf,
+    game_dir: PathBuf,
+    concurrency: usize,
+    on_progress: impl FnMut(DownloadProgress),
+) -> Result<(), ModrinthError> {
+    let tasks = client_tasks(index.files, &game_dir)?;
+    download_all(client, tasks, concurrency, on_progress).await?;
+    tokio::task::spawn_blocking(move || extract_overrides(&pack_path, &game_dir))
+        .await
+        .map_err(|_| ModrinthError::BadPack)?
+}
+
+/// 客戶端要下載的檔案。標記為不支援客戶端的不裝，可選項目一律安裝。
+fn client_tasks(files: Vec<PackFile>, game_dir: &Path) -> Result<Vec<DownloadTask>, ModrinthError> {
+    files
+        .into_iter()
+        .filter(|file| {
+            file.env
+                .as_ref()
+                .is_none_or(|env| env.client != UNSUPPORTED)
+        })
+        .map(|file| {
+            let path = safe_relative_path(&file.path).ok_or_else(|| ModrinthError::UnsafePath {
+                path: file.path.clone(),
+            })?;
+            let url = file
+                .downloads
+                .into_iter()
+                .find(|url| url.starts_with(SECURE_SCHEME))
+                .ok_or(ModrinthError::BadPack)?;
+            Ok(DownloadTask {
+                url,
+                path: game_dir.join(path),
+                sha1: file.hashes.sha1,
+                size: file.file_size,
+            })
+        })
+        .collect()
+}
+
+/// 整合包的內容來自網路，路徑只能留在實例資料夾裡。
+fn safe_relative_path(path: &str) -> Option<PathBuf> {
+    // 在其他系統上 `\` 不算分隔符，所以另外擋掉。
+    if path.is_empty() || path.contains('\\') {
+        return None;
+    }
+    let path = Path::new(path);
+    path.components()
+        .all(|part| matches!(part, Component::Normal(_)))
+        .then(|| path.to_path_buf())
+}
+
+fn extract_overrides(pack_path: &Path, game_dir: &Path) -> Result<(), ModrinthError> {
+    let mut archive = open_archive(pack_path)?;
+    for folder in OVERRIDE_FOLDERS {
+        for index in 0..archive.len() {
+            let mut entry = archive
+                .by_index(index)
+                .map_err(|_| ModrinthError::BadPack)?;
+            let full_name = entry
+                .name()
+                .map_err(|_| ModrinthError::BadPack)?
+                .to_string();
+            let Some(name) = full_name.strip_prefix(folder).map(str::to_string) else {
+                continue;
+            };
+            if entry.is_dir() || name.is_empty() {
+                continue;
+            }
+            let relative = safe_relative_path(&name)
+                .ok_or(ModrinthError::UnsafePath { path: name.clone() })?;
+            let target = game_dir.join(relative);
+            let io_error = |source| ModrinthError::Write {
+                path: target.clone(),
+                source,
+            };
+            if let Some(parent) = target.parent() {
+                std::fs::create_dir_all(parent).map_err(io_error)?;
+            }
+            let mut output = File::create(&target).map_err(io_error)?;
+            io::copy(&mut entry, &mut output).map_err(io_error)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use zip::ZipWriter;
+    use zip::write::SimpleFileOptions;
+
+    use super::*;
+
+    fn index(dependencies: &str) -> PackIndex {
+        serde_json::from_str(&format!(
+            r#"{{ "formatVersion": 1, "game": "minecraft", "versionId": "1", "name": "p",
+                 "files": [], "dependencies": {dependencies} }}"#
+        ))
+        .unwrap()
+    }
+
+    fn pack_file(path: &str, client: Option<&str>, url: &str) -> PackFile {
+        PackFile {
+            path: path.to_string(),
+            hashes: FileHashes {
+                sha1: "a".to_string(),
+            },
+            env: client.map(|client| PackEnv {
+                client: client.to_string(),
+            }),
+            downloads: vec![url.to_string()],
+            file_size: 1,
+        }
+    }
+
+    #[test]
+    fn reads_the_game_and_fabric_versions() {
+        let target = pack_target(&index(
+            r#"{ "minecraft": "26.3", "fabric-loader": "0.20.1" }"#,
+        ))
+        .unwrap();
+
+        assert_eq!(
+            target,
+            PackTarget {
+                game_version: "26.3".to_string(),
+                loader: LoaderKind::Fabric,
+                loader_version: "0.20.1".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn explains_when_the_loader_is_not_supported_yet() {
+        let result = pack_target(&index(r#"{ "minecraft": "1.20.1", "forge": "47.0" }"#));
+
+        assert!(matches!(
+            result,
+            Err(ModrinthError::UnsupportedLoader { loader: "Forge" })
+        ));
+    }
+
+    #[test]
+    fn ignores_dependencies_it_does_not_know() {
+        let target = pack_target(&index(r#"{ "minecraft": "26.3", "something-new": "1" }"#));
+
+        assert_eq!(target.unwrap().loader, LoaderKind::Vanilla);
+    }
+
+    #[test]
+    fn skips_files_the_client_must_not_install() {
+        let tasks = client_tasks(
+            vec![
+                pack_file("mods/both.jar", None, "https://x/a"),
+                pack_file("mods/optional.jar", Some("optional"), "https://x/b"),
+                pack_file("mods/server.jar", Some("unsupported"), "https://x/c"),
+            ],
+            Path::new("game"),
+        )
+        .unwrap();
+
+        assert_eq!(tasks.len(), 2);
+    }
+
+    #[test]
+    fn refuses_insecure_downloads() {
+        let result = client_tasks(
+            vec![pack_file("mods/a.jar", None, "http://x/a")],
+            Path::new("game"),
+        );
+
+        assert!(matches!(result, Err(ModrinthError::BadPack)));
+    }
+
+    #[test]
+    fn refuses_paths_that_leave_the_instance() {
+        for path in [
+            "../evil.jar",
+            "mods/../../evil.jar",
+            "/etc/evil",
+            "C:/evil.jar",
+            "C:\\evil.jar",
+            "\\evil.jar",
+            "",
+        ] {
+            assert_eq!(safe_relative_path(path), None, "{path}");
+        }
+        assert!(safe_relative_path("mods/ok.jar").is_some());
+    }
+
+    fn write_pack(name: &str, entries: &[(&str, &str)]) -> (PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(format!("sapling-pack-{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("test.mrpack");
+        let mut writer = ZipWriter::new(File::create(&path).unwrap());
+        for (entry, content) in entries {
+            writer
+                .start_file(*entry, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(content.as_bytes()).unwrap();
+        }
+        writer.finish().unwrap();
+        (path, root.join("game"))
+    }
+
+    #[test]
+    fn client_overrides_win_over_shared_overrides() {
+        let (pack, game) = write_pack(
+            "overrides",
+            &[
+                ("overrides/config/a.txt", "shared"),
+                ("overrides/options.txt", "keep"),
+                ("client-overrides/config/a.txt", "client"),
+                ("server-overrides/config/a.txt", "server"),
+                ("modrinth.index.json", "{}"),
+            ],
+        );
+
+        extract_overrides(&pack, &game).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(game.join("config/a.txt")).unwrap(),
+            "client"
+        );
+        assert!(game.join("options.txt").exists());
+        assert!(!game.join("modrinth.index.json").exists());
+    }
+
+    #[test]
+    fn stops_on_an_override_that_leaves_the_instance() {
+        let (pack, game) = write_pack("escape", &[("overrides/../../evil.txt", "x")]);
+
+        assert!(matches!(
+            extract_overrides(&pack, &game),
+            Err(ModrinthError::UnsafePath { .. })
+        ));
+    }
+}

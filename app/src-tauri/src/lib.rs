@@ -12,11 +12,12 @@ use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
+use sapling_core::modrinth::pack;
 use sapling_core::modrinth::{self, ModHit};
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
-use sapling_core::versions::install::{is_installed, prepare_version};
+use sapling_core::versions::install::{PrepareStage, is_installed, prepare_version};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -196,6 +197,42 @@ async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
     worlds::recent(&instance.game_dir(&dirs), RECENT_WORLD_LIMIT)
         .await
         .map_err(text)
+}
+
+#[tauri::command]
+async fn search_packs(query: String) -> Result<Vec<ModHit>, String> {
+    let client = new_client().map_err(text)?;
+    pack::search_packs(&client, &query).await.map_err(text)
+}
+
+#[tauri::command]
+async fn install_pack(
+    app: AppHandle,
+    project_id: String,
+    name: String,
+) -> Result<Instance, String> {
+    let dirs = data_dirs()?;
+    let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let client = new_client().map_err(text)?;
+    let mut last_progress = Instant::now();
+    pack::install_pack(
+        &client,
+        &dirs,
+        &project_id,
+        &name,
+        config.download_concurrency,
+        move |progress| {
+            let is_last = progress.finished_files == progress.total_files;
+            if is_last || last_progress.elapsed() >= PROGRESS_INTERVAL {
+                last_progress = Instant::now();
+                let stage = PrepareStage::Game;
+                // 進度只用於顯示，送不出去不影響下載本身。
+                let _ = app.emit(INSTALL_EVENT, LaunchEvent::Progress { stage, progress });
+            }
+        },
+    )
+    .await
+    .map_err(text)
 }
 
 #[tauri::command]
@@ -455,6 +492,8 @@ pub fn run() {
             list_worlds,
             backup_world,
             recent_worlds,
+            search_packs,
+            install_pack,
             search_mods,
             install_mod,
             list_mods,
