@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "./api";
-import { applyTheme } from "./applyTheme";
+import { applyColorMode, applyTheme } from "./applyTheme";
 import { applyScale } from "./applyScale";
 import type { Feature } from "./feature";
 import { createSaveQueue } from "./saveQueue";
@@ -20,6 +20,8 @@ const DEFAULT_CONFIG: LauncherConfig = {
   offlineName: "",
   favorites: [],
   uiScale: 100,
+  colorMode: "system",
+  minimizeOnLaunch: true,
 };
 
 type AppState = {
@@ -38,6 +40,9 @@ type AppState = {
   isEnabled: (featureId: string) => boolean;
   goTo: (featureId: string) => void;
   activeTab: string;
+  /** 實例裡的檔案從外部改變時增加，清單用它重新讀取。 */
+  contentVersion: number;
+  touchContent: () => void;
   loadVersions: () => Promise<void>;
   loadInstances: () => Promise<void>;
   selectInstance: (id: string) => void;
@@ -75,6 +80,7 @@ export function AppProvider({
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [saveError, setSaveError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [contentVersion, setContentVersion] = useState(0);
   const [saves] = useState(() => createSaveQueue(SAVE_DELAY_MS, setSaveError));
   // 長時間的操作結束後才改設定時，要以最新的設定為基礎，不能用當初的舊值。
   const latestConfig = useRef(config);
@@ -106,6 +112,17 @@ export function AppProvider({
       .finally(() => setLoaded(true));
     loadVersions();
   }, [loadInstances, loadVersions]);
+
+  // 跟隨系統時，系統切換深淺色要立刻反應。
+  useEffect(() => {
+    applyColorMode(config.colorMode);
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const follow = () => applyColorMode(config.colorMode);
+    query.addEventListener("change", follow);
+    return () => query.removeEventListener("change", follow);
+  }, [config.colorMode]);
+
+  const touchContent = useCallback(() => setContentVersion((version) => version + 1), []);
 
   const updateConfig = useCallback(
     (change: Partial<LauncherConfig>) => {
@@ -156,6 +173,8 @@ export function AppProvider({
       features,
       allFeatures,
       activeTab,
+      contentVersion,
+      touchContent,
       isEnabled: (featureId: string) => !config.disabledFeatures.includes(featureId),
       goTo,
       loadVersions,
@@ -176,6 +195,8 @@ export function AppProvider({
       features,
       allFeatures,
       activeTab,
+      contentVersion,
+      touchContent,
       goTo,
       loadVersions,
       loadInstances,

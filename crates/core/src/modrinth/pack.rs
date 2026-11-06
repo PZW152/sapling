@@ -21,9 +21,10 @@ use crate::versions::fetch_manifest;
 
 use super::{API_URL, FileHashes, ModVersion, ModrinthError, fetch_version, pick_version};
 
-const INDEX_FILE: &str = "modrinth.index.json";
-const SUPPORTED_FORMAT: u32 = 1;
-const GAME: &str = "minecraft";
+pub(super) const INDEX_FILE: &str = "modrinth.index.json";
+pub(super) const FORMAT_VERSION: u32 = 1;
+pub(super) const GAME: &str = "minecraft";
+pub(super) const OVERRIDES: &str = "overrides";
 const UNSUPPORTED: &str = "unsupported";
 const SECURE_SCHEME: &str = "https://";
 /// 依序解開，後面的覆蓋前面的。
@@ -31,7 +32,7 @@ const OVERRIDE_FOLDERS: [&str; 2] = ["overrides/", "client-overrides/"];
 /// 還不支援的載入器。規格說之後可能新增，其他未知項目一律忽略。
 const UNSUPPORTED_LOADERS: [(&str, &str); 1] = [("quilt-loader", "Quilt")];
 /// 整合包裡的載入器名稱。
-const LOADERS: [(&str, LoaderKind); 3] = [
+pub(super) const LOADERS: [(&str, LoaderKind); 3] = [
     ("fabric-loader", LoaderKind::Fabric),
     ("forge", LoaderKind::Forge),
     ("neoforge", LoaderKind::NeoForge),
@@ -40,6 +41,8 @@ const LOADERS: [(&str, LoaderKind); 3] = [
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PackIndex {
+    #[serde(default)]
+    name: String,
     format_version: u32,
     game: String,
     files: Vec<PackFile>,
@@ -105,6 +108,25 @@ pub async fn install_pack(
     // 清理失敗不影響結果，只是留下一個暫存檔。
     let _ = tokio::fs::remove_file(&pack_path).await;
     result
+}
+
+/// 安裝電腦上的 `.mrpack`。實例名稱用整合包自己的名稱，沒有才用檔名。
+pub async fn install_local_pack(
+    client: &reqwest::Client,
+    dirs: &DataDirs,
+    path: &Path,
+    concurrency: usize,
+    on_progress: impl FnMut(DownloadProgress),
+) -> Result<Instance, ModrinthError> {
+    let index = read_index(path.to_path_buf()).await?;
+    let file_name = path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().to_string());
+    let name = Some(index.name)
+        .filter(|name| !name.trim().is_empty())
+        .or(file_name)
+        .unwrap_or_else(|| "整合包".to_string());
+    install_from_file(client, dirs, path, &name, concurrency, on_progress).await
 }
 
 async fn latest_pack_version(
@@ -194,7 +216,7 @@ fn open_archive(path: &Path) -> Result<ZipArchive<File>, ModrinthError> {
 }
 
 fn pack_target(index: &PackIndex) -> Result<PackTarget, ModrinthError> {
-    if index.format_version != SUPPORTED_FORMAT || index.game != GAME {
+    if index.format_version != FORMAT_VERSION || index.game != GAME {
         return Err(ModrinthError::BadPack);
     }
     for (id, name) in UNSUPPORTED_LOADERS {
@@ -297,6 +319,26 @@ fn extract_overrides(pack_path: &Path, game_dir: &Path) -> Result<(), ModrinthEr
     Ok(())
 }
 
+/// 測試用：讀回匯出的整合包，確認安裝流程看得懂。
+#[cfg(test)]
+pub(super) fn read_exported(path: &Path) -> (String, String, LoaderKind, Vec<String>) {
+    let mut archive = open_archive(path).unwrap();
+    let names = archive
+        .file_names()
+        .flatten()
+        .map(|name| name.to_string())
+        .collect();
+    let mut text = String::new();
+    archive
+        .by_name(INDEX_FILE)
+        .unwrap()
+        .read_to_string(&mut text)
+        .unwrap();
+    let index: PackIndex = serde_json::from_str(&text).unwrap();
+    let target = pack_target(&index).unwrap();
+    (index.name, target.game_version, target.loader, names)
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -319,6 +361,7 @@ mod tests {
             path: path.to_string(),
             hashes: FileHashes {
                 sha1: "a".to_string(),
+                sha512: String::new(),
             },
             env: client.map(|client| PackEnv {
                 client: client.to_string(),

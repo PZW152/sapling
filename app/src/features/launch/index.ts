@@ -1,6 +1,6 @@
 import type { Feature } from "../../shell/feature";
-import { LaunchAdvanced } from "./LaunchAdvanced";
 import { LaunchPage } from "./LaunchPage";
+import { LaunchOptions } from "./LaunchOptions";
 import { LaunchSettings } from "./LaunchSettings";
 import "./launch.css";
 
@@ -10,6 +10,6 @@ export const launch: Feature = {
   description: "登入帳號和啟動遊戲",
   optional: false,
   tab: { label: "啟動", Page: LaunchPage, keepAlive: true },
-  instancePanel: { label: "記憶體", order: 4, Panel: LaunchSettings },
-  AdvancedSettings: LaunchAdvanced,
+  instancePanel: { label: "設定", order: 4, Panel: LaunchSettings },
+  Settings: LaunchOptions,
 };

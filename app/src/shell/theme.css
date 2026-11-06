@@ -118,6 +118,37 @@
   --color-bg: #e9eeea;
 }
 
+/* 深色：只換中性色。主區塊和側欄本來就是深色，維持原樣。中山主題是宣紙，不受影響。 */
+:root[data-mode="dark"]:not([data-festival]) {
+  color-scheme: dark;
+
+  --color-bg: #111814;
+  --color-surface: #1b2520;
+  --color-ink: #e6efe9;
+  --color-muted: #adbcb3;
+  --color-faint: #98a89e;
+  --color-line: #33423a;
+  --color-soft: color-mix(in srgb, var(--color-accent) 26%, var(--color-surface));
+  --color-strong: color-mix(in srgb, var(--color-accent) 42%, white);
+  --color-link: color-mix(in srgb, var(--color-accent) 55%, white);
+  --color-tint: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --color-danger: #f0a493;
+  --color-danger-soft: #3a2420;
+  --color-rail: color-mix(in srgb, var(--color-accent) 16%, #0b120f);
+  --color-rail-text: #cfdcd4;
+  --shadow-tile: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 12px 34px rgba(0, 0, 0, 0.6);
+}
+
+/* 深色的卡片和側欄太接近，選中項要靠主色才看得出來。 */
+:root[data-mode="dark"]:not([data-festival]) .rail-mark {
+  background: color-mix(in srgb, var(--color-accent) 58%, var(--color-surface));
+}
+
+:root[data-mode="dark"]:not([data-festival]) .nav[aria-current="page"] {
+  color: var(--color-on-dark);
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

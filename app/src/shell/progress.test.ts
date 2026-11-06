@@ -1,31 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { overallProgress, toMegabytes } from "./progress";
-import type { Progress } from "./types";
+import { formatSpeed, nextSpeed } from "./progress";
 
-function progress(stage: Progress["stage"], finishedBytes: number, totalBytes: number): Progress {
-  return { stage, finishedFiles: 0, downloadedFiles: 0, totalFiles: 0, finishedBytes, totalBytes };
-}
-
-describe("overallProgress", () => {
-  it("還沒開始時是 0", () => {
-    expect(overallProgress(null)).toBe(0);
+describe("nextSpeed", () => {
+  it("第一次沒有速度", () => {
+    expect(nextSpeed(null, 0, 500).speed).toBe(0);
   });
 
-  it("遊戲檔案完成後進入 Java 階段，進度不會倒退", () => {
-    const gameDone = overallProgress(progress("game", 10, 10));
-    const javaStart = overallProgress(progress("java", 0, 10));
-
-    expect(javaStart).toBe(gameDone);
-    expect(overallProgress(progress("java", 10, 10))).toBeCloseTo(1);
+  it("滿一秒才更新", () => {
+    const first = nextSpeed(null, 0, 0);
+    expect(nextSpeed(first, 500, 100)).toBe(first);
+    expect(nextSpeed(first, 2000, 1000).speed).toBe(500);
   });
 
-  it("總大小是 0 時不會出錯", () => {
-    expect(overallProgress(progress("game", 0, 0))).toBe(0);
+  it("換一批下載時重新計算", () => {
+    expect(nextSpeed({ time: 0, bytes: 900, speed: 5 }, 3000, 10).speed).toBe(0);
   });
 });
 
-describe("toMegabytes", () => {
-  it("四捨五入到整數 MB", () => {
-    expect(toMegabytes(1.6 * 1024 * 1024)).toBe(2);
+describe("formatSpeed", () => {
+  it("用 MB/s 表示", () => {
+    expect(formatSpeed(1572864)).toBe("1.5 MB/s");
   });
 });

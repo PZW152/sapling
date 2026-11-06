@@ -54,6 +54,8 @@ pub enum LaunchError {
         #[source]
         source: io::Error,
     },
+    #[error("找不到自訂的 Java：{}。請到實例的設定分頁修改，或清空改用自動。", path.display())]
+    CustomJavaMissing { path: PathBuf },
     #[error("找不到這個世界，可能已經被移動或刪除")]
     WorldNotFound,
     #[error("無法啟動 Java，請重新下載遊戲檔案後再試一次")]
@@ -202,7 +204,9 @@ pub async fn play(
 
     let mut arguments = build_arguments(session, instance, &prepared.details, dirs, &natives_dir);
     arguments.extend(world_arguments(&prepared.details, world));
-    let mut child = Command::new(&prepared.java)
+    arguments.extend(window_arguments(instance));
+    let java = chosen_java(instance, &prepared.java)?;
+    let mut child = Command::new(java)
         .args(&arguments)
         .current_dir(&game_dir)
         .stdin(Stdio::null())
@@ -311,6 +315,35 @@ fn build_arguments(
     arguments
 }
 
+/// 用戶指定的 Java 優先。路徑失效時要說清楚，不能默默換成別的版本。
+fn chosen_java(instance: &Instance, automatic: &Path) -> Result<PathBuf, LaunchError> {
+    if instance.java_path.is_empty() {
+        return Ok(automatic.to_path_buf());
+    }
+    let path = PathBuf::from(&instance.java_path);
+    if path.is_file() {
+        Ok(path)
+    } else {
+        Err(LaunchError::CustomJavaMissing { path })
+    }
+}
+
+/// 遊戲窗口大小。全螢幕時大小沒有意義。
+fn window_arguments(instance: &Instance) -> Vec<String> {
+    if instance.fullscreen {
+        return vec!["--fullscreen".to_string()];
+    }
+    if instance.window_width == 0 || instance.window_height == 0 {
+        return Vec::new();
+    }
+    vec![
+        "--width".to_string(),
+        instance.window_width.to_string(),
+        "--height".to_string(),
+        instance.window_height.to_string(),
+    ]
+}
+
 /// 直接進入世界的參數。舊版本不支援時照常停在主畫面。
 fn world_arguments(details: &VersionDetails, world: Option<&str>) -> Vec<String> {
     let supported = details
@@ -394,6 +427,44 @@ fn path_text(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn window_size_needs_both_numbers() {
+        let mut instance = Instance::blank();
+        assert!(window_arguments(&instance).is_empty());
+
+        instance.window_width = 1280;
+        assert!(window_arguments(&instance).is_empty());
+
+        instance.window_height = 720;
+        assert_eq!(
+            window_arguments(&instance),
+            ["--width", "1280", "--height", "720"]
+        );
+    }
+
+    #[test]
+    fn fullscreen_wins_over_window_size() {
+        let mut instance = Instance::blank();
+        instance.window_width = 1280;
+        instance.window_height = 720;
+        instance.fullscreen = true;
+
+        assert_eq!(window_arguments(&instance), ["--fullscreen"]);
+    }
+
+    #[test]
+    fn a_missing_custom_java_is_reported_instead_of_replaced() {
+        let mut instance = Instance::blank();
+        let automatic = Path::new("auto.exe");
+        assert_eq!(chosen_java(&instance, automatic).unwrap(), automatic);
+
+        instance.java_path = "C:/nowhere/java.exe".to_string();
+        assert!(matches!(
+            chosen_java(&instance, automatic),
+            Err(LaunchError::CustomJavaMissing { .. })
+        ));
+    }
 
     #[tokio::test]
     async fn cancel_is_remembered_until_the_next_launch_resets_it() {

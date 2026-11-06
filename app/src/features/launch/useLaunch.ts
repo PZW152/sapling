@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, onLaunchEvent } from "../../shell/api";
+import { useApp } from "../../shell/AppContext";
 import type { Progress } from "../../shell/types";
 import type { OverlayOrigin } from "./LaunchOverlay";
 
@@ -19,6 +20,8 @@ async function returnToLauncher() {
 
 /** 一次啟動的完整狀態：準備、運行、失敗，以及啟動轉場。 */
 export function useLaunch() {
+  const { config } = useApp();
+  const minimize = config.minimizeOnLaunch;
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState("");
@@ -45,11 +48,13 @@ export function useLaunch() {
     }
     // 收起後移除轉場，用戶中途打開窗口時仍然可以使用啟動器。
     const timer = setTimeout(async () => {
-      await getCurrentWindow().minimize();
+      if (minimize) {
+        await getCurrentWindow().minimize();
+      }
       setOrigin(null);
     }, MINIMIZE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [phase]);
+  }, [phase, minimize]);
 
   async function start(
     instanceId: string,

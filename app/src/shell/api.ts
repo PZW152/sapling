@@ -8,6 +8,8 @@ import type {
   LauncherConfig,
   LoaderKind,
   LoginCode,
+  AddedKind,
+  ExportSummary,
   InstalledMod,
   ModFile,
   PackFile,
@@ -66,6 +68,13 @@ export const api = {
   setModEnabled: (action: ModAction) => invoke<void>("set_mod_enabled", { action }),
   deleteMod: (action: ModAction) => invoke<void>("delete_mod", { action }),
   openModsFolder: (id: string) => invoke<void>("open_mods_folder", { id }),
+  installLocalPack: (path: string) => invoke<Instance>("install_local_pack", { path }),
+  exportPack: (id: string, path: string) => invoke<ExportSummary>("export_pack", { id, path }),
+  addInstanceFile: (id: string, path: string) =>
+    invoke<AddedKind>("add_instance_file", { id, path }),
+  changeInstanceVersion: (id: string, version: string, loader: LoaderKind) =>
+    invoke<Instance>("change_instance_version", { id, version, loader }),
+  repairInstance: (id: string) => invoke<void>("repair_instance", { id }),
   inspectMods: (id: string) => invoke<InstalledMod[]>("inspect_mods", { id }),
   listPacks: (id: string, kind: PackKind) => invoke<PackFile[]>("list_packs", { id, kind }),
   deletePack: (id: string, kind: PackKind, name: string) =>

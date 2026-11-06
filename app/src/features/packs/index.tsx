@@ -36,6 +36,7 @@ function PackSection({
 }) {
   const [packs, setPacks] = useState<PackFile[]>([]);
   const [error, setError] = useState("");
+  const { contentVersion } = useApp();
 
   const load = useCallback(() => {
     api.listPacks(instanceId, kind)
@@ -43,7 +44,7 @@ function PackSection({
       .catch((reason) => setError(String(reason)));
   }, [instanceId, kind]);
 
-  useEffect(load, [load]);
+  useEffect(load, [load, contentVersion]);
 
   function remove(name: string) {
     setError("");

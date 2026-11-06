@@ -47,7 +47,9 @@ Sapling 是為 Windows 做的 Minecraft Java 版啟動器：單一 exe，放進�
 
 下載 `portable.exe`，放進一個資料夾後直接打開，不需要安裝。遊戲和設定會存在同一個資料夾的 `Sapling Data` 裡。
 
-目前只支援 Windows 11 x64。程式尚未數位簽章，Windows 可能會顯示安全警告。
+目前只支援 Windows 11 x64。
+
+Sapling 是學生的個人專案，沒有購買數位簽章，所以第一次打開時 Windows 可能顯示「Windows 已保護您的電腦」。按「其他資訊」再按「仍要執行」就能打開。想確認檔案沒被改過，可以比對 Release 頁面上的 SHA256，程式碼也都公開在這裡。
 
 下載會走 Windows 的系統代理。連不上官方伺服器時，請先開啟代理或加速器。
 

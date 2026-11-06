@@ -1,3 +1,5 @@
+import type { ColorMode } from "./types";
+
 const REVEAL_MS = 900;
 
 type Origin = { x: number; y: number };
@@ -7,6 +9,14 @@ export function applyTheme(theme: string, origin?: Origin) {
   revealChange(() => {
     document.documentElement.dataset.theme = theme;
   }, origin);
+}
+
+/** 切換深淺色。跟隨系統時看系統目前的設定。 */
+export function applyColorMode(mode: ColorMode) {
+  const dark =
+    mode === "dark" ||
+    (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.mode = dark ? "dark" : "light";
 }
 
 /** 執行一次畫面改動，並讓新畫面從點擊位置擴散開來。 */

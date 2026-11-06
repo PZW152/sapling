@@ -4,6 +4,7 @@ import { useApp } from "../../shell/AppContext";
 import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
 import { LOADERS, LOADER_HINT } from "../../shell/loaders";
+import { formatSpeed, useSpeed } from "../../shell/progress";
 import { Segments } from "../../shell/Segments";
 import { DownloadQueue } from "./DownloadQueue";
 import type { LoaderKind } from "../../shell/types";
@@ -158,6 +159,7 @@ function VersionRow({
 }) {
   const active = install?.id === id;
   const failed = active && install.error;
+  const speed = useSpeed(active ? install.progress : null);
 
   return (
     <div className={`vine-row${isInstalled ? " installed" : ""}${active ? " active" : ""}`}>
@@ -186,7 +188,10 @@ function VersionRow({
         <div className="vine-progress">
           <p className="status status-row">
             <span>{install.progress?.stage === "java" ? "正在下載 Java" : "正在下載遊戲檔案"}</span>
-            <span>{Math.round(install.percent * 100)}%</span>
+            <span>
+              {speed > 0 && `${formatSpeed(speed)}，`}
+              {Math.round(install.percent * 100)}%
+            </span>
           </p>
           <div
             className="progress"

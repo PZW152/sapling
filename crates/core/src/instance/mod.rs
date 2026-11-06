@@ -1,5 +1,6 @@
 //! 實例：一個獨立遊戲資料夾 + 遊戲版本 + 載入器 + 設定。
 
+pub mod add_file;
 mod copy;
 pub mod import;
 pub mod mods;
@@ -34,6 +35,10 @@ pub enum InstanceError {
     Storage(#[from] StorageError),
     #[error("實例名稱不能是空的")]
     EmptyName,
+    #[error("看不出「{name}」是什麼。可以放模組（.jar）、資源包或光影（.zip）")]
+    UnknownFile { name: String },
+    #[error("原版實例不能用模組，請換一個使用載入器的實例")]
+    ModsNeedLoader,
     #[error("找不到這個實例")]
     NotFound,
     #[error("無法讀寫實例資料夾：{}", path.display())]
@@ -58,9 +63,37 @@ pub struct Instance {
     pub memory_mb: u32,
     /// 額外的 Java 參數，用空白分隔。
     pub java_args: String,
+    /// 遊戲窗口大小，0 代表用遊戲的預設值。
+    #[serde(default)]
+    pub window_width: u32,
+    #[serde(default)]
+    pub window_height: u32,
+    #[serde(default)]
+    pub fullscreen: bool,
+    /// 自訂的 `java.exe`，空的代表自動使用合適的版本。
+    #[serde(default)]
+    pub java_path: String,
 }
 
 impl Instance {
+    /// 測試用的空白實例。
+    #[cfg(test)]
+    pub(crate) fn blank() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            version: String::new(),
+            loader: LoaderKind::Vanilla,
+            loader_version: String::new(),
+            memory_mb: AUTO_MEMORY,
+            java_args: String::new(),
+            window_width: 0,
+            window_height: 0,
+            fullscreen: false,
+            java_path: String::new(),
+        }
+    }
+
     /// 建立並保存一個新的原版實例。
     pub async fn create(dirs: &DataDirs, name: &str, version: &str) -> Result<Self, InstanceError> {
         Self::create_with_loader(dirs, name, version, LoaderKind::Vanilla, String::new()).await
@@ -83,6 +116,10 @@ impl Instance {
             loader_version,
             memory_mb: AUTO_MEMORY,
             java_args: String::new(),
+            window_width: 0,
+            window_height: 0,
+            fullscreen: false,
+            java_path: String::new(),
         };
         instance.save(dirs).await?;
         Ok(instance)

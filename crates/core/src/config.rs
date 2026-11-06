@@ -8,6 +8,8 @@ use crate::storage::{StorageError, read_json, write_json};
 
 const DEFAULT_THEME: &str = "sapling";
 const DEFAULT_UI_SCALE: u32 = 100;
+const DEFAULT_COLOR_MODE: &str = "system";
+const COLOR_MODES: [&str; 3] = ["system", "light", "dark"];
 const MAX_UI_SCALE: u32 = 130;
 const RETIRED_THEME: &str = "zhongshan";
 const MIN_CONCURRENCY: usize = 1;
@@ -34,6 +36,10 @@ pub struct LauncherConfig {
     pub favorites: Vec<serde_json::Value>,
     /// 介面大小的百分比。
     pub ui_scale: u32,
+    /// 淺色、深色或跟隨系統。
+    pub color_mode: String,
+    /// 遊戲開始後收起啟動器窗口。
+    pub minimize_on_launch: bool,
 }
 
 impl Default for LauncherConfig {
@@ -49,6 +55,8 @@ impl Default for LauncherConfig {
             offline_name: String::new(),
             favorites: Vec::new(),
             ui_scale: DEFAULT_UI_SCALE,
+            color_mode: DEFAULT_COLOR_MODE.to_string(),
+            minimize_on_launch: true,
         }
     }
 }
@@ -80,6 +88,9 @@ impl LauncherConfig {
             .download_concurrency
             .clamp(MIN_CONCURRENCY, MAX_CONCURRENCY);
         self.ui_scale = self.ui_scale.clamp(DEFAULT_UI_SCALE, MAX_UI_SCALE);
+        if !COLOR_MODES.contains(&self.color_mode.as_str()) {
+            self.color_mode = DEFAULT_COLOR_MODE.to_string();
+        }
         // 中山主題改成植樹節限定後，舊設定裡的值要換回預設主題。
         if self.theme == RETIRED_THEME {
             self.theme = DEFAULT_THEME.to_string();

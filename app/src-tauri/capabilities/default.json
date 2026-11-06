@@ -11,6 +11,8 @@
     "core:window:allow-set-focus",
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
-    "core:webview:allow-set-webview-zoom"
+    "core:webview:allow-set-webview-zoom",
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

@@ -21,6 +21,12 @@ export type Instance = {
   /** 0 代表自動分配。 */
   memoryMb: number;
   javaArgs: string;
+  /** 0 代表用遊戲的預設大小。 */
+  windowWidth: number;
+  windowHeight: number;
+  fullscreen: boolean;
+  /** 空的代表自動選擇 Java。 */
+  javaPath: string;
 };
 
 export type LauncherConfig = {
@@ -35,7 +41,13 @@ export type LauncherConfig = {
   favorites: Favorite[];
   /** 介面大小的百分比。 */
   uiScale: number;
+  colorMode: ColorMode;
+  minimizeOnLaunch: boolean;
 };
+
+export type ColorMode = "system" | "light" | "dark";
+export type AddedKind = "mod" | "resourcePack" | "shader";
+export type ExportSummary = { linkedMods: number; bundledMods: number };
 
 export type World = {
   /** 世界的資料夾名稱。 */
@@ -117,6 +129,8 @@ export type Progress = {
   totalFiles: number;
   finishedBytes: number;
   totalBytes: number;
+  /** 真正下載的位元組數，已存在而跳過的不算。 */
+  downloadedBytes: number;
 };
 
 export type LaunchEvent =

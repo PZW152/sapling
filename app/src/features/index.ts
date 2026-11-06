@@ -3,6 +3,7 @@ import { about } from "./about";
 import { appearance } from "./appearance";
 import { crash } from "./crash";
 import { download } from "./download";
+import { dropInstall } from "./drop-install";
 import { easterEggs } from "./easter-eggs";
 import { instances } from "./instances";
 import { launch } from "./launch";
@@ -25,6 +26,7 @@ export const FEATURES: Feature[] = [
   offlineAccount,
   recentWorlds,
   download,
+  dropInstall,
   modpacks,
   crash,
   update,

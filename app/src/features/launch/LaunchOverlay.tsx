@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import { api } from "../../shell/api";
-import { overallProgress, toMegabytes } from "../../shell/progress";
+import { formatSpeed, overallProgress, toMegabytes, useSpeed } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
 import { versionUnits } from "./versionUnits";
 
@@ -34,6 +34,7 @@ export function LaunchOverlay({
 }) {
   const share = running ? 1 : overallProgress(progress);
   const what = progress?.stage === "java" ? "Java" : "遊戲檔案";
+  const speed = useSpeed(progress);
 
   // 用計時而不是等動畫事件：系統關閉動畫或窗口被遮住時事件不一定會來。
   useEffect(() => {
@@ -84,7 +85,7 @@ export function LaunchOverlay({
             {!running && !progress && "正在確認需要哪些檔案"}
             {!running &&
               progress &&
-              `正在檢查${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB`}
+              `${speed > 0 ? "正在下載" : "正在檢查"}${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB${speed > 0 ? `，${formatSpeed(speed)}` : ""}`}
           </p>
           {!running && !closing && (
             <button className="overlay-cancel" onClick={api.cancelLaunch}>

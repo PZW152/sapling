@@ -22,7 +22,7 @@ export function ModList({ instanceId }: { instanceId: string }) {
   const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
   const [browsing, setBrowsing] = useState(false);
-  const { selected } = useApp();
+  const { selected, contentVersion } = useApp();
 
   const load = useCallback(() => {
     api.listMods(instanceId)
@@ -43,7 +43,7 @@ export function ModList({ instanceId }: { instanceId: string }) {
   useEffect(() => {
     load();
     inspect();
-  }, [load, inspect]);
+  }, [load, inspect, contentVersion]);
 
   function act(
     request: (action: ModAction) => Promise<void>,

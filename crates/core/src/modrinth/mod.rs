@@ -1,5 +1,6 @@
 //! Modrinth：搜尋和下載模組、資源包、光影和整合包。所有和 Modrinth 有關的網址和資料格式都在這裡。
 
+pub mod export;
 pub mod installed;
 pub mod pack;
 
@@ -206,6 +207,8 @@ struct ModVersionFile {
 #[derive(Debug, Clone, Deserialize)]
 struct FileHashes {
     sha1: String,
+    #[serde(default)]
+    sha512: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

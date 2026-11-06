@@ -1,5 +1,6 @@
 //! Tauri 命令：只做轉接，業務邏輯都在 sapling-core。
 
+use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -10,12 +11,14 @@ use sapling_core::cleanup::{self, CleanupSummary};
 use sapling_core::config::LauncherConfig;
 use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
+use sapling_core::instance::add_file::{self, AddedKind};
 use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::packs::{self, PackFile, PackKind};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
+use sapling_core::modrinth::export::{self, ExportSummary};
 use sapling_core::modrinth::installed::{self, InstalledMod};
 use sapling_core::modrinth::pack;
 use sapling_core::modrinth::{
@@ -24,7 +27,9 @@ use sapling_core::modrinth::{
 use sapling_core::platform::{DataDirs, open_folder, open_in_browser, total_memory_mb};
 use sapling_core::update::{self, UpdateInfo};
 use sapling_core::versions::fetch_manifest;
-use sapling_core::versions::install::{PrepareStage, is_installed, prepare_version};
+use sapling_core::versions::install::{
+    PrepareStage, is_installed, prepare_version, request_full_check,
+};
 use serde::{Deserialize, Serialize};
 use tauri::async_runtime::Mutex as AsyncMutex;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -266,6 +271,81 @@ async fn install_pack(
 }
 
 /// 指定版本時裝那個版本，否則裝最適合這個實例的版本。
+#[tauri::command]
+async fn install_local_pack(app: AppHandle, path: String) -> Result<Instance, String> {
+    let dirs = data_dirs()?;
+    let config = LauncherConfig::load(&dirs).await.map_err(text)?;
+    let client = new_client().map_err(text)?;
+    let mut last_progress = Instant::now();
+    pack::install_local_pack(
+        &client,
+        &dirs,
+        Path::new(&path),
+        config.download_concurrency,
+        move |progress| {
+            let is_last = progress.finished_files == progress.total_files;
+            if is_last || last_progress.elapsed() >= PROGRESS_INTERVAL {
+                last_progress = Instant::now();
+                let stage = PrepareStage::Game;
+                // 進度只用於顯示，送不出去不影響下載本身。
+                let _ = app.emit(PACK_EVENT, LaunchEvent::Progress { stage, progress });
+            }
+        },
+    )
+    .await
+    .map_err(text)
+}
+
+#[tauri::command]
+async fn export_pack(id: String, path: String) -> Result<ExportSummary, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let client = new_client().map_err(text)?;
+    export::export_pack(&client, &dirs, &instance, Path::new(&path))
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn add_instance_file(id: String, path: String) -> Result<AddedKind, String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    let supports_mods = instance.loader != LoaderKind::Vanilla;
+    add_file::add_file(&instance.game_dir(&dirs), Path::new(&path), supports_mods)
+        .await
+        .map_err(text)
+}
+
+#[tauri::command]
+async fn change_instance_version(
+    id: String,
+    version: String,
+    loader: LoaderKind,
+) -> Result<Instance, String> {
+    let dirs = data_dirs()?;
+    let mut instance = load_instance(&dirs, &id).await?;
+    instance.loader_version = loader::latest_version(loader, &version)
+        .await
+        .map_err(text)?;
+    instance.version = version;
+    instance.loader = loader;
+    instance.save(&dirs).await.map_err(text)?;
+    Ok(instance)
+}
+
+#[tauri::command]
+async fn repair_instance(id: String) -> Result<(), String> {
+    let dirs = data_dirs()?;
+    let instance = load_instance(&dirs, &id).await?;
+    // 還沒下載過的版本本來就會完整檢查。
+    if !is_installed(&dirs, &instance.version) {
+        return Ok(());
+    }
+    request_full_check(&dirs, &instance.version)
+        .await
+        .map_err(text)
+}
+
 #[tauri::command]
 async fn install_project(
     id: String,
@@ -641,6 +721,7 @@ fn lock_minimum_size(app: &AppHandle) {
 pub fn run() {
     update::remove_old_version();
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .setup(|app| {
             lock_minimum_size(app.handle());
@@ -648,6 +729,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
+            install_local_pack,
+            export_pack,
+            add_instance_file,
+            change_instance_version,
+            repair_instance,
             inspect_mods,
             list_packs,
             delete_pack,

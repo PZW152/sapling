@@ -81,6 +81,8 @@ pub struct DownloadProgress {
     pub total_files: usize,
     pub finished_bytes: u64,
     pub total_bytes: u64,
+    /// 真正下載的位元組數，用來算下載速度。
+    pub downloaded_bytes: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,6 +133,7 @@ pub async fn download_all(
         total_files: tasks.len(),
         finished_bytes: 0,
         total_bytes: tasks.iter().map(|task| task.size).sum(),
+        downloaded_bytes: 0,
     };
     let mut pending = tasks.into_iter();
     let mut running = JoinSet::new();
@@ -152,6 +155,7 @@ pub async fn download_all(
         progress.finished_files += 1;
         if outcome == DownloadOutcome::Downloaded {
             progress.downloaded_files += 1;
+            progress.downloaded_bytes += size;
         }
         progress.finished_bytes += size;
         on_progress(progress);
@@ -386,6 +390,7 @@ mod tests {
                 total_files: 5,
                 finished_bytes: 25,
                 total_bytes: 25,
+                downloaded_bytes: 25,
             })
         );
     }

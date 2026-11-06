@@ -79,15 +79,16 @@
   color: var(--color-danger);
 }
 
+/* 主區塊深淺色都是綠的，按鈕固定白底，不跟著深色模式變。 */
 .primary {
   display: grid;
   place-items: center;
   height: var(--primary-height);
   border-radius: 14px;
-  color: var(--color-strong);
+  color: var(--color-hero);
   font-size: var(--text-xl);
   font-weight: 700;
-  background: var(--color-surface);
+  background: var(--color-on-dark);
 }
 
 .primary:hover:enabled {

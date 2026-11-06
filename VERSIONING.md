@@ -25,7 +25,7 @@ Sapling Launcher 使用 `主版本.次版本.修訂號` 格式，例如 `0.2.1`�
 - [x] 支援 1.19 以前的正式版
 - [x] 可以在啟動器內下載模組
 - [x] 支援啟動器更新檢查
-- [ ] 發佈檔有數位簽章
+- [x] 發佈時附上 SHA256 校驗碼，讓用戶確認檔案沒有被改過
 - [ ] 錯誤提示和主要流程經過多個版本的實際使用
 - [ ] `instance.json` 和 `config.json` 的格式穩定，日後升級不需要用戶手動處理
 
@@ -43,5 +43,6 @@ Sapling Launcher 使用 `主版本.次版本.修訂號` 格式，例如 `0.2.1`�
 2. 在 [CHANGELOG.md](CHANGELOG.md) 寫下這個版本的改動。
 3. 確認 `cargo test --workspace` 和 CI 通過。
 4. 建立 `vX.Y.Z` 標籤和 GitHub Release，附上免安裝版。檔名必須以 `_portable.exe` 結尾，自動更新靠它尋找新版本。
+5. 在 Release 說明寫上 exe 的 SHA256。
 
 已發佈的版本不修改；要修問題就發佈新的版本號。

@@ -254,7 +254,7 @@ function InstanceDetail({
       <div className="detail-panel">
         {active && (
           <FeatureBoundary key={active.id} name={active.feature}>
-            <active.Panel instanceId={instance.id} />
+            <active.Panel key={instance.id} instanceId={instance.id} />
           </FeatureBoundary>
         )}
       </div>
