@@ -119,14 +119,6 @@
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
-  /* 帳號區變高時整欄捲動，不能把實例清單擠到看不見。 */
-  overflow-y: auto;
-  scrollbar-color: var(--color-line) transparent;
-  scrollbar-width: thin;
-}
-
-.side > * {
-  flex: none;
 }
 
 .account {
@@ -202,12 +194,9 @@
   animation: breathe 1.8s ease-in-out infinite;
 }
 
-.side > .instance-tile {
-  flex: 1 0 var(--instance-tile-min);
-}
-
 .instance-tile {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
@@ -404,40 +393,24 @@
 /* 問題記錄 */
 .log-panel {
   position: absolute;
+  inset: var(--space-3);
   z-index: 3;
-  inset: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-tile);
+  border-radius: var(--radius-control);
   color: var(--color-ink);
   background: var(--color-surface);
   box-shadow: var(--shadow-popover);
+  animation: tile-in var(--medium) var(--ease);
 }
 
 .log-panel header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
+  justify-content: space-between;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-line);
-}
-
-.log-panel header .mods-actions {
-  margin-left: auto;
-}
-
-.log-panel input {
-  width: 170px;
-  height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  color: var(--color-ink);
-  background: var(--color-surface);
-  user-select: text;
 }
 
 .log-panel h2 {
@@ -496,48 +469,4 @@
   height: 28px;
   padding: 0 var(--space-2);
   font-size: var(--text-xs);
-}
-
-.launch {
-  position: relative;
-}
-
-.log-lines [data-level="warn"] {
-  color: var(--color-warn);
-}
-
-.log-lines [data-level="error"] {
-  color: var(--color-danger);
-}
-
-.log-lines {
-  user-select: text;
-}
-
-.hero-running {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-3);
-}
-
-.hero-running .text-button,
-.hero-running .text-button.danger {
-  color: var(--color-on-dark);
-}
-
-/* 實例圖示 */
-.instance-icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  color: var(--color-strong);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  object-fit: cover;
-  background: var(--color-tint);
 }

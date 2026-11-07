@@ -1,15 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import { api } from "../../shell/api";
-import { useFocusHandoff } from "../../shell/keyboard";
 import { formatSpeed, overallProgress, toMegabytes, useSpeed } from "../../shell/progress";
 import type { Progress } from "../../shell/types";
 import { versionUnits } from "./versionUnits";
 
 /** 比 theme.css 的 --overlay 稍長，收合動畫播完才移除。 */
 const CLOSE_MS = 780;
-/** 比 --overlay 稍長，展開完才把後面的畫面藏起來。 */
-const SETTLE_MS = 700;
 
 /** 主區塊在窗口裡的位置，轉場從這裡展開、也收回這裡。 */
 export type OverlayOrigin = { top: number; right: number; bottom: number; left: number };
@@ -38,15 +35,6 @@ export function LaunchOverlay({
   const share = running ? 1 : overallProgress(progress);
   const what = progress?.stage === "java" ? "Java" : "遊戲檔案";
   const speed = useSpeed(progress);
-  const cancel = useFocusHandoff<HTMLButtonElement>();
-
-  // 展開後藏起後面的畫面，讓轉場直接透出窗口玻璃。
-  // 不用 backdrop-filter：下載可能要幾分鐘，內顯一直算模糊會佔掉四成多的 GPU。
-  const [settled, setSettled] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setSettled(true), SETTLE_MS);
-    return () => clearTimeout(timer);
-  }, []);
 
   // 用計時而不是等動畫事件：系統關閉動畫或窗口被遮住時事件不一定會來。
   useEffect(() => {
@@ -59,7 +47,7 @@ export function LaunchOverlay({
 
   return (
     <div
-      className={`launch-overlay${closing ? " closing" : settled ? " settled" : ""}`}
+      className={closing ? "launch-overlay closing" : "launch-overlay"}
       data-tauri-drag-region
       style={
         {
@@ -100,7 +88,7 @@ export function LaunchOverlay({
               `${speed > 0 ? "正在下載" : "正在檢查"}${what}，${toMegabytes(progress.finishedBytes)} / ${toMegabytes(progress.totalBytes)} MB${speed > 0 ? `，${formatSpeed(speed)}` : ""}`}
           </p>
           {!running && !closing && (
-            <button ref={cancel} className="overlay-cancel" onClick={api.cancelLaunch}>
+            <button className="overlay-cancel" onClick={api.cancelLaunch}>
               取消
             </button>
           )}

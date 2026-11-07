@@ -1,9 +1,9 @@
 import type { MouseEvent } from "react";
 import { applyScale } from "../../shell/applyScale";
-import { applyColorMode, applyMaterial, applyTheme, revealChange } from "../../shell/applyTheme";
+import { applyColorMode, applyTheme, revealChange } from "../../shell/applyTheme";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
-import type { ColorMode, WindowMaterial } from "../../shell/types";
+import type { ColorMode } from "../../shell/types";
 import { THEMES } from "./theme";
 import "./appearance.css";
 
@@ -11,12 +11,6 @@ const MODES: { id: ColorMode; name: string }[] = [
   { id: "system", name: "跟隨系統" },
   { id: "light", name: "淺色" },
   { id: "dark", name: "深色" },
-];
-
-const MATERIALS: { id: WindowMaterial; name: string; hint: string }[] = [
-  { id: "acrylic", name: "毛玻璃", hint: "透出窗口後面的畫面，最通透。" },
-  { id: "mica", name: "雲母", hint: "只帶一點桌布的顏色，比較省資源。" },
-  { id: "solid", name: "純色", hint: "不透明，最省資源。" },
 ];
 
 const SCALES = [
@@ -75,26 +69,6 @@ function AppearanceSettings() {
           </button>
         ))}
       </div>
-      <div className="setting-head">
-        <span>窗口材質</span>
-      </div>
-      <div className="chips" role="group" aria-label="窗口材質">
-        {MATERIALS.map(({ id, name }) => (
-          <button
-            key={id}
-            className="chip"
-            aria-pressed={config.windowMaterial === id}
-            onClick={(event) => {
-              const origin = { x: event.clientX, y: event.clientY };
-              revealChange(() => applyMaterial(id), origin);
-              updateConfig({ windowMaterial: id });
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-      <p className="hint">{MATERIALS.find(({ id }) => id === config.windowMaterial)?.hint}</p>
       <div className="setting-head">
         <span>介面大小</span>
       </div>

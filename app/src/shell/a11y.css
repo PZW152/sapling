@@ -63,17 +63,6 @@
     forced-color-adjust: none;
   }
 
-  /* 開了 forced-color-adjust 後子元素不會自動換色，要跟著選中的文字色。 */
-  [aria-current] * {
-    color: HighlightText !important;
-  }
-
-  /* 高對比模式會在文字後面墊底色。版本號很大，墊的底色會蓋住上面的名稱。 */
-  .version-number {
-    color: CanvasText;
-    forced-color-adjust: none;
-  }
-
   .switch {
     forced-color-adjust: none;
     background: Canvas;

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { getVersion } from "@tauri-apps/api/app";
 import { api } from "../../shell/api";
-import { useApp } from "../../shell/AppContext";
 import { ErrorText } from "../../shell/ErrorText";
 import type { Feature } from "../../shell/feature";
 import type { UpdateInfo } from "../../shell/types";
@@ -102,60 +100,11 @@ function UpdateNotice() {
   );
 }
 
-const RELEASE_URL = "https://github.com/PZW152/sapling/releases/tag/v";
-
-/** 更新後第一次打開時，告訴用戶這一版改了什麼。 */
-function WhatsNew() {
-  const { loaded, config, updateConfig } = useApp();
-  const [version, setVersion] = useState("");
-
-  useEffect(() => {
-    if (!loaded) {
-      return;
-    }
-    getVersion().then((current) => {
-      if (config.seenVersion === current) {
-        return;
-      }
-      // 第一次使用的人沒有「更新」可言。
-      if (config.seenVersion) {
-        setVersion(current);
-      }
-      updateConfig({ seenVersion: current });
-    });
-  }, [loaded, config.seenVersion, updateConfig]);
-
-  if (!version) {
-    return null;
-  }
-
-  return (
-    <aside className="toast">
-      <p>已更新到 {version}</p>
-      <button className="text-button" onClick={() => api.openLink(`${RELEASE_URL}${version}`)}>
-        看看改了什麼
-      </button>
-      <button className="text-button" onClick={() => setVersion("")}>
-        知道了
-      </button>
-    </aside>
-  );
-}
-
-function UpdateOverlay() {
-  return (
-    <>
-      <UpdateNotice />
-      <WhatsNew />
-    </>
-  );
-}
-
 export const update: Feature = {
   id: "update",
   name: "自動更新",
   description: "打開時檢查新版本",
   optional: true,
   Settings: UpdateSettings,
-  Overlay: UpdateOverlay,
+  Overlay: UpdateNotice,
 };

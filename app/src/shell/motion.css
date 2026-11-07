@@ -112,11 +112,6 @@
     opacity var(--medium) var(--ease);
 }
 
-/* 第一次出現時直接就位。 */
-[data-mark-placing] > .slide-mark {
-  transition: none;
-}
-
 /* 開關和選中 */
 .switch::after {
   transition:

@@ -58,7 +58,3 @@ export function clearFinished() {
 export function useDownloadTasks() {
   return useSyncExternalStore(subscribe, () => tasks);
 }
-
-export function hasRunningDownloads() {
-  return tasks.some(isRunning);
-}

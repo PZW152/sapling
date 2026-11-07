@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { api, onLaunchRequest } from "../../shell/api";
 import { useApp } from "../../shell/AppContext";
-import { ConfirmButton } from "../../shell/ConfirmButton";
 import { ErrorText } from "../../shell/ErrorText";
 import { FeatureBoundary } from "../../shell/FeatureBoundary";
-import { InstanceIcon } from "../../shell/InstanceIcon";
 import { loaderName } from "../../shell/loaders";
 import { useSlideMark } from "../../shell/motion";
 import type { Instance, Profile } from "../../shell/types";
@@ -47,24 +45,6 @@ export function LaunchPage() {
   const canStart = launchBlock === null && (profile !== null || offlineName !== null);
 
   const busy = phase === "preparing" || phase === "running";
-
-  // 轉場裡的取消鍵消失後，鍵盤焦點要回到主區塊，不能掉回頁面最上面。
-  const overlayShown = useRef(false);
-  useEffect(() => {
-    if (origin) {
-      overlayShown.current = true;
-      return;
-    }
-    if (!overlayShown.current) {
-      return;
-    }
-    overlayShown.current = false;
-    requestAnimationFrame(() => {
-      if (document.activeElement === document.body) {
-        hero.current?.querySelector<HTMLElement>("button:enabled")?.focus();
-      }
-    });
-  }, [origin, hero]);
 
   // 從桌面捷徑打開，或第一次按「開始玩」時，等登入好就自動啟動。
   useEffect(() => {
@@ -201,16 +181,8 @@ export function LaunchPage() {
           )}
         </div>
 
+        {logOpen && <LogPanel lines={logs} onClose={() => setLogOpen(false)} />}
       </section>
-
-      {logOpen && (
-        <LogPanel
-          lines={logs}
-          instanceId={selected?.id}
-          problemsFirst={phase === "failed"}
-          onClose={() => setLogOpen(false)}
-        />
-      )}
 
       {origin && selected && (
         <LaunchOverlay
@@ -334,7 +306,6 @@ function InstanceList({
               title={`${instance.name}，${instance.version}`}
               onClick={() => onChoose(instance.id)}
             >
-              <InstanceIcon id={instance.id} name={instance.name} />
               <span>{instance.name}</span>
               <small>{instance.version}</small>
             </button>
@@ -395,7 +366,7 @@ function HeroStatus({
         <div className="mods-actions">
           {hasLogs && (
             <button className="text-button" onClick={onShowLogs}>
-              查看日誌
+              查看問題記錄
             </button>
           )}
           <button className="text-button" onClick={onShowReports}>
@@ -410,22 +381,9 @@ function HeroStatus({
   }
   if (phase === "running") {
     return (
-      <div className="hero-running">
-        <p className="hero-note" role="status">
-          遊戲運行中
-        </p>
-        <div className="mods-actions">
-          <button className="text-button" onClick={onShowLogs}>
-            查看日誌
-          </button>
-          <ConfirmButton
-            className="text-button"
-            label="結束遊戲"
-            warning="再按一次，未保存的進度會遺失"
-            onConfirm={() => api.cancelLaunch()}
-          />
-        </div>
-      </div>
+      <p className="hero-note" role="status">
+        遊戲已啟動，關閉遊戲後可以再次啟動。
+      </p>
     );
   }
   if (noInstance) {

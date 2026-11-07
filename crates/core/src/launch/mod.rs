@@ -20,8 +20,7 @@ use crate::auth::Session;
 use crate::download::DownloadProgress;
 use crate::instance::{Instance, worlds};
 use crate::loader::{self, LoaderError};
-use crate::logbook;
-use crate::platform::{CREATE_NO_WINDOW, DataDirs, prefer_high_performance_gpu, total_memory_mb};
+use crate::platform::{CREATE_NO_WINDOW, DataDirs, total_memory_mb};
 use crate::versions::details::{Argument, VersionDetails};
 use crate::versions::install::{
     InstallError, PrepareStage, PreparedVersion, log_config_argument, prepare_version,
@@ -38,8 +37,6 @@ const HIDDEN_TOKEN: &str = "***";
 const GAME_LOGS: [&str; 2] = ["logs/latest.log", "logs/debug.log"];
 /// 舊版遊戲要求這個參數，內容可以是空的。
 const EMPTY_PROPERTIES: &str = "{}";
-/// 一次送給介面的日誌行數上限。
-const LOG_BATCH_SIZE: usize = 200;
 const LOG_CHANNEL_SIZE: usize = 256;
 /// 版本 JSON 用這個功能開關標記支援直接進入世界，1.20 起才有。
 const QUICK_PLAY_FEATURE: &str = "is_quick_play_singleplayer";
@@ -47,15 +44,6 @@ const QUICK_PLAY_ARGUMENT: &str = "--quickPlaySingleplayer";
 const QUICK_JOIN_FEATURE: &str = "is_quick_play_multiplayer";
 /// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
 const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
-/// 官方啟動器的預設值，版本檔裡沒有。
-const GC_ARGUMENTS: [&str; 6] = [
-    "-XX:+UnlockExperimentalVMOptions",
-    "-XX:+UseG1GC",
-    "-XX:G1NewSizePercent=20",
-    "-XX:G1ReservePercent=20",
-    "-XX:MaxGCPauseMillis=50",
-    "-XX:G1HeapRegionSize=32M",
-];
 
 #[derive(Debug, Error)]
 pub enum LaunchError {
@@ -91,9 +79,8 @@ pub enum LaunchEvent {
         progress: DownloadProgress,
     },
     Started,
-    /// 一批遊戲輸出。分批送，遊戲狂印日誌時介面才不會卡住。
     Log {
-        lines: Vec<String>,
+        line: String,
     },
 }
 
@@ -235,15 +222,6 @@ pub async fn play(
     let address = server.unwrap_or(&instance.join_server);
     arguments.extend(server_arguments(&prepared.details, address, world));
     let java = chosen_java(instance, &prepared.java)?;
-    let gpu_java = java.clone();
-    // 要在遊戲開始前設好，Windows 才會用。
-    let _ = tokio::task::spawn_blocking(move || prefer_high_performance_gpu(&gpu_java)).await;
-    logbook::record(&format!(
-        "啟動 {} {:?}，Java {}",
-        instance.version,
-        instance.loader,
-        java.display()
-    ));
     let mut child = Command::new(java)
         .args(&arguments)
         .current_dir(&game_dir)
@@ -264,42 +242,19 @@ pub async fn play(
         tokio::spawn(forward_lines(stderr, sender.clone()));
     }
     drop(sender);
-    // 離線的 token 只是佔位的 0，替換掉會弄亂記錄裡所有的數字。
-    let clean = |line: String| {
-        if session.is_offline() {
-            line
-        } else {
-            hide_token(&line, session.access_token())
-        }
-    };
-    let mut stopped = false;
-    loop {
-        tokio::select! {
-            line = receiver.recv() => {
-                let Some(line) = line else { break };
-                let mut lines = vec![clean(line)];
-                while lines.len() < LOG_BATCH_SIZE {
-                    match receiver.try_recv() {
-                        Ok(line) => lines.push(clean(line)),
-                        Err(_) => break,
-                    }
-                }
-                on_event(LaunchEvent::Log { lines });
-            }
-            () = cancel.cancelled(), if !stopped => {
-                stopped = true;
-                // 結束失敗時遊戲多半已經關了，繼續等輸出結束就好。
-                let _ = child.start_kill();
-            }
+    while let Some(line) = receiver.recv().await {
+        if is_problem_line(&line) {
+            // 離線的 token 只是佔位的 0，替換掉會弄亂記錄裡所有的數字。
+            let line = if session.is_offline() {
+                line
+            } else {
+                hide_token(&line, session.access_token())
+            };
+            on_event(LaunchEvent::Log { line });
         }
     }
 
     let status = child.wait().await.map_err(LaunchError::Spawn)?;
-    logbook::record(&format!(
-        "遊戲結束，代碼 {:?}，玩了 {} 秒",
-        status.code(),
-        started.elapsed().as_secs()
-    ));
     // 只是統計，寫不進去不該影響結果。
     let _ = instance
         .record_play(dirs, started.elapsed().as_secs())
@@ -309,7 +264,7 @@ pub async fn play(
             scrub_token(&game_dir.join(log), session.access_token()).await;
         }
     }
-    if status.success() || stopped {
+    if status.success() {
         return Ok(());
     }
     // 只影響下次啟動的速度和檢查範圍，寫不進去也不該蓋過崩潰原因。
@@ -343,6 +298,19 @@ async fn read_line_lossy(reader: &mut (impl AsyncBufRead + Unpin)) -> Option<Str
     }
 }
 
+/// 只保留警告、錯誤和例外堆疊。完整日誌由遊戲自己寫在實例的 `logs/latest.log`。
+fn is_problem_line(line: &str) -> bool {
+    const MARKERS: [&str; 6] = [
+        "/WARN]",
+        "/ERROR]",
+        "/FATAL]",
+        "Exception",
+        "Caused by:",
+        "\tat ",
+    ];
+    MARKERS.iter().any(|marker| line.contains(marker))
+}
+
 fn hide_token(line: &str, token: &str) -> String {
     line.replace(token, HIDDEN_TOKEN)
 }
@@ -360,25 +328,12 @@ fn build_arguments(
     let memory_mb = instance.effective_memory_mb(total_memory_mb());
     let mut arguments = vec![format!("-Xmx{memory_mb}M")];
     arguments.extend(OUTPUT_ENCODING_ARGUMENTS.map(str::to_string));
-    arguments.extend(gc_arguments(&instance.java_args));
     arguments.extend(instance.java_args.split_whitespace().map(str::to_string));
     arguments.extend(log_config_argument(details, dirs));
     arguments.extend(expand(&details.arguments.jvm, &values));
     arguments.push(details.main_class.clone());
     arguments.extend(expand(&details.arguments.game, &values));
     arguments
-}
-
-/// 用戶自己選了垃圾回收器時不加預設值：同時指定兩種，Java 會拒絕啟動。
-fn gc_arguments(java_args: &str) -> Vec<String> {
-    let chosen = java_args
-        .split_whitespace()
-        .any(|argument| argument.starts_with("-XX:+Use") && argument.ends_with("GC"));
-    if chosen {
-        Vec::new()
-    } else {
-        GC_ARGUMENTS.map(str::to_string).to_vec()
-    }
 }
 
 /// 用戶指定的 Java 優先。路徑失效時要說清楚，不能默默換成別的版本。
@@ -518,17 +473,6 @@ fn path_text(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn adds_gc_defaults_unless_the_user_chose_one() {
-        assert_eq!(gc_arguments("").len(), GC_ARGUMENTS.len());
-        assert_eq!(
-            gc_arguments("-Dfoo=bar -XX:+UseStringDeduplication").len(),
-            GC_ARGUMENTS.len()
-        );
-        assert!(gc_arguments("-XX:+UseZGC -XX:+ZGenerational").is_empty());
-        assert!(gc_arguments("-XX:+UseShenandoahGC").is_empty());
-    }
 
     #[test]
     fn window_size_needs_both_numbers() {
@@ -694,6 +638,17 @@ mod tests {
         assert!(broken.is_some());
         assert_eq!(last.as_deref(), Some("last"));
         assert_eq!(read_line_lossy(&mut reader).await, None);
+    }
+
+    #[test]
+    fn keeps_only_warnings_errors_and_stack_traces() {
+        assert!(is_problem_line("[12:00:00] [Render thread/WARN]: slow"));
+        assert!(is_problem_line("[12:00:00] [main/ERROR]: failed"));
+        assert!(is_problem_line("java.lang.NullPointerException: x"));
+        assert!(is_problem_line(
+            "\tat net.minecraft.client.Main.main(Main.java:1)"
+        ));
+        assert!(!is_problem_line("[12:00:00] [Render thread/INFO]: Loaded"));
     }
 
     #[test]

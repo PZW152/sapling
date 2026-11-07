@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::download::{DownloadError, download_all, shared_client};
+use crate::download::{DownloadError, download_all, new_client};
 use crate::instance::Instance;
 use crate::platform::DataDirs;
 use crate::storage::{StorageError, read_json, write_json};
@@ -121,13 +121,13 @@ pub async fn latest_version(kind: LoaderKind, game_version: &str) -> Result<Stri
     match kind {
         LoaderKind::Vanilla => Ok(String::new()),
         LoaderKind::Fabric => {
-            fabric::latest_version(&shared_client()?, fabric::FABRIC, game_version).await
+            fabric::latest_version(&new_client()?, fabric::FABRIC, game_version).await
         }
         LoaderKind::Quilt => {
-            fabric::latest_version(&shared_client()?, fabric::QUILT, game_version).await
+            fabric::latest_version(&new_client()?, fabric::QUILT, game_version).await
         }
-        LoaderKind::Forge => forge::latest_forge(&shared_client()?, game_version).await,
-        LoaderKind::NeoForge => forge::latest_neoforge(&shared_client()?, game_version).await,
+        LoaderKind::Forge => forge::latest_forge(&new_client()?, game_version).await,
+        LoaderKind::NeoForge => forge::latest_neoforge(&new_client()?, game_version).await,
     }
 }
 
@@ -142,7 +142,7 @@ pub async fn prepare(
     dirs: &DataDirs,
     concurrency: usize,
 ) -> Result<VersionDetails, LoaderError> {
-    let client = shared_client()?;
+    let client = new_client()?;
     let game_version = details.id.clone();
     let raw = match kind {
         LoaderKind::Vanilla => return Ok(details),

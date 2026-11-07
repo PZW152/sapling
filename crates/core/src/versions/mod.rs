@@ -4,8 +4,6 @@ pub mod details;
 pub mod install;
 pub mod rules;
 
-use std::path::Path;
-
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -97,36 +95,6 @@ pub async fn fetch_manifest(client: &reqwest::Client) -> Result<VersionManifest,
     VersionManifest::parse(&fetch_text(client, MANIFEST_URL).await?)
 }
 
-/// 取得版本清單並存在本機。沒有網路時用上次存的，已安裝的版本和新增實例才能繼續用。
-pub async fn fetch_manifest_cached(
-    client: &reqwest::Client,
-    cache: &Path,
-) -> Result<VersionManifest, VersionsError> {
-    let fetched = fetch_text(client, MANIFEST_URL).await;
-    manifest_or_cache(fetched.map_err(VersionsError::from), cache).await
-}
-
-/// 連上要先登入的 Wi-Fi 時，收到的是登入網頁，所以看不懂內容時也要改用快取。
-/// 快取也不能用時回報原本的問題，那才是用戶要解決的事。
-async fn manifest_or_cache(
-    fetched: Result<String, VersionsError>,
-    cache: &Path,
-) -> Result<VersionManifest, VersionsError> {
-    let parsed = fetched.and_then(|text| Ok((VersionManifest::parse(&text)?, text)));
-    match parsed {
-        Ok((manifest, text)) => {
-            // 只是快取，寫不進去不影響這次使用。
-            let _ = tokio::fs::write(cache, &text).await;
-            Ok(manifest)
-        }
-        Err(error) => tokio::fs::read_to_string(cache)
-            .await
-            .ok()
-            .and_then(|text| VersionManifest::parse(&text).ok())
-            .ok_or(error),
-    }
-}
-
 /// 下載並解析單個版本的版本 JSON。
 pub async fn fetch_details(
     client: &reqwest::Client,
@@ -150,46 +118,6 @@ mod tests {
             { "id": "b1.7.3", "type": "old_beta", "url": "u", "sha1": "s", "complianceLevel": 0 }
         ]
     }"#;
-
-    fn cache_file(name: &str) -> std::path::PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "sapling-manifest-{}-{name}.json",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_file(&path);
-        path
-    }
-
-    #[tokio::test]
-    async fn saves_a_good_manifest_for_later() {
-        let cache = cache_file("good");
-
-        let manifest = manifest_or_cache(Ok(SAMPLE.to_string()), &cache).await;
-
-        assert_eq!(manifest.unwrap().latest.release, "26.3");
-        assert_eq!(std::fs::read_to_string(&cache).unwrap(), SAMPLE);
-    }
-
-    #[tokio::test]
-    async fn a_wifi_login_page_falls_back_to_the_cache() {
-        let cache = cache_file("login-page");
-        std::fs::write(&cache, SAMPLE).unwrap();
-
-        let manifest = manifest_or_cache(Ok("<html>請先登入</html>".to_string()), &cache).await;
-
-        assert_eq!(manifest.unwrap().latest.release, "26.3");
-        assert_eq!(std::fs::read_to_string(&cache).unwrap(), SAMPLE);
-    }
-
-    #[tokio::test]
-    async fn a_broken_cache_reports_the_original_problem() {
-        let cache = cache_file("broken");
-        std::fs::write(&cache, "{ 寫到一半").unwrap();
-
-        let result = manifest_or_cache(Err(VersionsError::MissingOldestSupported), &cache).await;
-
-        assert!(matches!(result, Err(VersionsError::MissingOldestSupported)));
-    }
 
     #[test]
     fn lists_recent_snapshots_only() {

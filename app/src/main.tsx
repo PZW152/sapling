@@ -5,7 +5,6 @@ import "./shell/controls.css";
 import "./shell/a11y.css";
 import { Shell } from "./shell/Shell";
 import "./shell/motion.css";
-import "./shell/glass.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -1,4 +1,4 @@
-//! 把 refresh token 和登入快取存進 Windows 憑證管理員，不寫進任何檔案。
+//! 把 refresh token 存進 Windows 憑證管理員。
 //! 單筆憑證上限 2560 bytes，而 token 長度不固定，所以分段存放。
 
 use keyring::{Entry, Error};
@@ -10,8 +10,6 @@ const MAX_CHUNKS: usize = 16;
 
 /// 目前帳號的憑證名稱開頭。
 const ACTIVE: &str = "refresh-token";
-/// 目前帳號的登入快取。
-const SESSION: &str = "session";
 
 fn entry(name: &str, index: usize) -> Result<Entry, Error> {
     Entry::new(SERVICE, &format!("{name}-{index}"))
@@ -32,18 +30,6 @@ pub fn load() -> Result<Option<String>, Error> {
 
 pub fn delete() -> Result<(), Error> {
     delete_from(ACTIVE, 0)
-}
-
-pub fn save_session(content: &str) -> Result<(), Error> {
-    save_to(SESSION, content)
-}
-
-pub fn load_session() -> Result<Option<String>, Error> {
-    load_from(SESSION)
-}
-
-pub fn delete_session() -> Result<(), Error> {
-    delete_from(SESSION, 0)
 }
 
 pub fn save_slot(account_id: &str, token: &str) -> Result<(), Error> {

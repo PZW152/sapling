@@ -9,19 +9,17 @@ use std::time::{Duration, Instant};
 use sapling_core::auth::{self, AuthError, DeviceLogin, Profile, Session, accounts, skin};
 use sapling_core::cleanup::{self, CleanupSummary};
 use sapling_core::config::LauncherConfig;
-use sapling_core::download::shared_client;
+use sapling_core::download::new_client;
 use sapling_core::instance::Instance;
 use sapling_core::instance::add_file::{self, AddedKind};
-use sapling_core::instance::icon;
 use sapling_core::instance::import::{self, ImportSource};
 use sapling_core::instance::mods::{self, ModFile};
 use sapling_core::instance::packs::{self, PackFile, PackKind};
 use sapling_core::instance::screenshots::{self, Screenshot};
-use sapling_core::instance::servers::{self, Server, ServerStatus};
+use sapling_core::instance::servers::{self, Server};
 use sapling_core::instance::worlds::{self, World};
 use sapling_core::launch::{LaunchCancel, LaunchEvent, PlayOptions, play};
 use sapling_core::loader::{self, LoaderKind};
-use sapling_core::logbook;
 use sapling_core::modrinth::export::{self, ExportSummary};
 use sapling_core::modrinth::installed::{self, InstalledMod};
 use sapling_core::modrinth::pack;
@@ -33,7 +31,7 @@ use sapling_core::platform::{
     total_memory_mb,
 };
 use sapling_core::update::{self, UpdateInfo};
-use sapling_core::versions::fetch_manifest_cached;
+use sapling_core::versions::fetch_manifest;
 use sapling_core::versions::install::{
     PrepareStage, is_installed, prepare_version, request_full_check,
 };
@@ -109,11 +107,8 @@ struct ModAction {
     enabled: bool,
 }
 
-/// 所有命令的錯誤都經過這裡，順便留下記錄。
 fn text<E: ToString>(error: E) -> String {
-    let message = error.to_string();
-    logbook::record(&format!("錯誤：{message}"));
-    message
+    error.to_string()
 }
 
 fn data_dirs() -> Result<DataDirs, String> {
@@ -126,11 +121,9 @@ async fn load_instance(dirs: &DataDirs, id: &str) -> Result<Instance, String> {
 
 #[tauri::command]
 async fn list_versions() -> Result<VersionList, String> {
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
+    let manifest = fetch_manifest(&client).await.map_err(text)?;
     let dirs = data_dirs()?;
-    let manifest = fetch_manifest_cached(&client, &dirs.manifest_cache())
-        .await
-        .map_err(text)?;
     let versions: Vec<String> = manifest
         .supported_releases()
         .map_err(text)?
@@ -245,13 +238,13 @@ async fn recent_worlds(id: String) -> Result<Vec<World>, String> {
 
 #[tauri::command]
 async fn search_projects(request: SearchRequest) -> Result<SearchPage, String> {
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     modrinth::search(&client, &request).await.map_err(text)
 }
 
 #[tauri::command]
 async fn project_versions(project_id: String) -> Result<Vec<ProjectVersion>, String> {
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     modrinth::project_versions(&client, &project_id)
         .await
         .map_err(text)
@@ -266,7 +259,7 @@ async fn install_pack(
 ) -> Result<Instance, String> {
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let mut last_progress = Instant::now();
     pack::install_pack(
         &client,
@@ -294,7 +287,7 @@ async fn install_pack(
 async fn install_local_pack(app: AppHandle, path: String) -> Result<Instance, String> {
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let mut last_progress = Instant::now();
     pack::install_local_pack(
         &client,
@@ -319,7 +312,7 @@ async fn install_local_pack(app: AppHandle, path: String) -> Result<Instance, St
 async fn export_pack(id: String, path: String) -> Result<ExportSummary, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     export::export_pack(&client, &dirs, &instance, Path::new(&path))
         .await
         .map_err(text)
@@ -376,7 +369,7 @@ async fn install_project(
     let dirs = data_dirs()?;
     let config = LauncherConfig::load(&dirs).await.map_err(text)?;
     let instance = load_instance(&dirs, &id).await?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let other_mods_dirs = mods::all_mods_dirs(&dirs).await.map_err(text)?;
     let game_dir = instance.game_dir(&dirs);
     let wanted = version_id.map_or(Wanted::Project(project_id), Wanted::Version);
@@ -422,7 +415,7 @@ async fn delete_mod(action: ModAction) -> Result<(), String> {
 async fn inspect_mods(id: String) -> Result<Vec<InstalledMod>, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     installed::inspect(
         &client,
         &instance.game_dir(&dirs),
@@ -478,7 +471,7 @@ async fn restore_account(state: State<'_, AppState>) -> Result<Option<Profile>, 
 
 #[tauri::command]
 async fn login_start(state: State<'_, AppState>) -> Result<LoginCode, String> {
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let login = auth::begin_login(&client).await.map_err(text)?;
     // 打不開瀏覽器時，介面仍然顯示網址和代碼，用戶可以自己打開。
     let _ = open_in_browser(&login.verification_uri);
@@ -500,7 +493,7 @@ async fn login_finish(state: State<'_, AppState>) -> Result<Option<Profile>, Str
         .ok_or("請重新開始登入")?;
     let cancelled = Arc::new(AtomicBool::new(false));
     *state.login_cancelled.lock().map_err(|_| STATE_ERROR)? = Some(cancelled.clone());
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let session = match auth::finish_login(&client, &login, &cancelled).await {
         Ok(session) => session,
         Err(AuthError::Cancelled) => return Ok(None),
@@ -640,32 +633,6 @@ async fn install_game(
 }
 
 #[tauri::command]
-async fn ping_server(address: String) -> Option<ServerStatus> {
-    servers::ping(&address).await
-}
-
-#[tauri::command]
-async fn instance_icon(id: String) -> Result<Option<Vec<u8>>, String> {
-    let dirs = data_dirs()?;
-    let instance = load_instance(&dirs, &id).await?;
-    Ok(icon::read(&instance.game_dir(&dirs)).await)
-}
-
-#[tauri::command]
-async fn set_instance_icon(id: String, path: Option<String>) -> Result<(), String> {
-    let dirs = data_dirs()?;
-    let instance = load_instance(&dirs, &id).await?;
-    let game_dir = instance.game_dir(&dirs);
-    match path {
-        Some(path) => {
-            let bytes = read_file(&path)?;
-            icon::save(&game_dir, &bytes).await.map_err(text)
-        }
-        None => icon::remove(&game_dir).await.map_err(text),
-    }
-}
-
-#[tauri::command]
 async fn list_servers(id: String) -> Result<Vec<Server>, String> {
     let dirs = data_dirs()?;
     let instance = load_instance(&dirs, &id).await?;
@@ -711,8 +678,6 @@ fn take_pending_launch(state: State<'_, AppState>) -> Result<Option<String>, Str
 }
 
 /// 用戶回報問題時貼上。不含帳號、token 和個人路徑。
-const DIAGNOSTIC_LOG_LINES: usize = 30;
-
 #[tauri::command]
 async fn diagnostics() -> Result<String, String> {
     let dirs = data_dirs()?;
@@ -733,8 +698,6 @@ async fn diagnostics() -> Result<String, String> {
             instance.version, instance.loader, instance.loader_version, instance.memory_mb
         ));
     }
-    lines.push("最近的記錄：".to_string());
-    lines.extend(logbook::recent(DIAGNOSTIC_LOG_LINES));
     Ok(lines.join("\n"))
 }
 
@@ -757,14 +720,12 @@ async fn change_skin(
     let mut session = current_session(&state)
         .await?
         .ok_or_else(|| "請先登入微軟帳號".to_string())?;
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let profile = skin::upload(&client, &session, Path::new(&path), slim)
         .await
         .map_err(text)?;
     session.profile = profile.clone();
     state.set_session(Some(session))?;
-    // 快取裡還是舊皮膚，下次重新取得。
-    auth::forget_cached_session();
     remember_account(&profile).await;
     Ok(profile)
 }
@@ -798,7 +759,7 @@ fn open_link(url: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_update() -> Result<Option<UpdateInfo>, String> {
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     update::check(&client).await.map_err(text)
 }
 
@@ -807,7 +768,7 @@ async fn apply_update(app: AppHandle, update: UpdateInfo) -> Result<(), String> 
     if cfg!(debug_assertions) {
         return Err("開發模式不能自動更新".to_string());
     }
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let exe = update::install(&client, &update).await.map_err(text)?;
     Command::new(exe).spawn().map_err(text)?;
     app.exit(0);
@@ -876,7 +837,7 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
     if let Some(session) = state.session()?.filter(|session| !session.is_expired()) {
         return Ok(Some(session));
     }
-    let client = shared_client().map_err(text)?;
+    let client = new_client().map_err(text)?;
     let session = auth::restore_session(&client).await.map_err(text)?;
     state.set_session(session.clone())?;
     if let Some(session) = &session {
@@ -886,10 +847,6 @@ async fn current_session(state: &State<'_, AppState>) -> Result<Option<Session>,
 }
 
 /// 預設大小就是最小大小。系統算最小值時包含隱形邊框，所以用開啟時的實際外框，不寫死數字。
-fn read_file(path: &str) -> Result<Vec<u8>, String> {
-    std::fs::read(path).map_err(text)
-}
-
 fn launch_argument(arguments: &[String]) -> Option<String> {
     let position = arguments.iter().position(|item| item == LAUNCH_ARGUMENT)?;
     arguments.get(position + 1).cloned()
@@ -909,12 +866,6 @@ fn lock_minimum_size(app: &AppHandle) {
 pub fn run() {
     if let Ok(dirs) = DataDirs::locate() {
         log_panics(dirs.root().to_path_buf());
-        logbook::start(dirs.root());
-        logbook::record(&format!(
-            "Sapling {} 啟動，{}",
-            env!("CARGO_PKG_VERSION"),
-            os_version()
-        ));
     }
     update::remove_old_version();
     let arguments: Vec<String> = std::env::args().collect();
@@ -926,8 +877,6 @@ pub fn run() {
         // 兩個啟動器同時開會互相覆蓋設定，所以第二次打開時只叫出原本的窗口。
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if let Some(window) = app.get_webview_window("main") {
-                // 遊戲開著時關掉窗口只是隱藏，再打開要叫回來。
-                let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -943,9 +892,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             cancel_login,
-            ping_server,
-            instance_icon,
-            set_instance_icon,
             list_servers,
             list_screenshots,
             delete_screenshot,

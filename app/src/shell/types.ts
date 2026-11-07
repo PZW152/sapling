@@ -47,19 +47,13 @@ export type LauncherConfig = {
   /** 介面大小的百分比。 */
   uiScale: number;
   colorMode: ColorMode;
-  windowMaterial: WindowMaterial;
   minimizeOnLaunch: boolean;
-  /** 看過「有什麼新內容」的版本。 */
-  seenVersion: string;
 };
-
-export type ServerStatus = { online: number; max: number; latencyMs: number };
 
 export type Server = { name: string; address: string };
 export type Screenshot = { name: string; path: string; takenMs: number };
 
 export type ColorMode = "system" | "light" | "dark";
-export type WindowMaterial = "acrylic" | "mica" | "solid";
 export type AddedKind = "mod" | "resourcePack" | "shader";
 export type ExportSummary = { linkedMods: number; bundledMods: number };
 
@@ -150,4 +144,4 @@ export type Progress = {
 export type LaunchEvent =
   | ({ kind: "progress" } & Progress)
   | { kind: "started" }
-  | { kind: "log"; lines: string[] };
+  | { kind: "log"; line: string };

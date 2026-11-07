@@ -3,13 +3,9 @@ import type { CSSProperties } from "react";
 import { api } from "../../shell/api";
 import { ConfirmButton } from "../../shell/ConfirmButton";
 import type { Feature, HeroPanelProps } from "../../shell/feature";
-import type { ImportSource, Server, ServerStatus, World } from "../../shell/types";
+import type { ImportSource, Server, World } from "../../shell/types";
 import { canEnterWorld, iconUrl, playedAgo } from "./worlds";
 import "./recent-worlds.css";
-
-function serverLine(status: ServerStatus | undefined) {
-  return status ? `${status.online} / ${status.max} 人在線` : "伺服器";
-}
 
 /** 首頁最多放幾張卡片。 */
 const TILE_LIMIT = 3;
@@ -17,7 +13,6 @@ const TILE_LIMIT = 3;
 function RecentWorlds({ instance, busy, canStart, onPlay, onJoin }: HeroPanelProps) {
   const [worlds, setWorlds] = useState<World[]>([]);
   const [servers, setServers] = useState<Server[]>([]);
-  const [statuses, setStatuses] = useState<Record<string, ServerStatus>>({});
   const supported = canEnterWorld(instance.version);
 
   // 切換實例或玩完一局後，清單都可能變。
@@ -39,24 +34,6 @@ function RecentWorlds({ instance, busy, canStart, onPlay, onJoin }: HeroPanelPro
   }, [instance.id, supported, busy]);
 
   const shownServers = servers.slice(0, Math.max(TILE_LIMIT - worlds.length, 0));
-  const pingKey = shownServers.map(({ address }) => address).join("|");
-
-  useEffect(() => {
-    let current = true;
-    for (const address of pingKey ? pingKey.split("|") : []) {
-      api.pingServer(address)
-        .then((status) => {
-          if (current && status) {
-            setStatuses((known) => ({ ...known, [address]: status }));
-          }
-        })
-        .catch(() => {});
-    }
-    return () => {
-      current = false;
-    };
-  }, [pingKey]);
-
   if (worlds.length === 0 && shownServers.length === 0) {
     return null;
   }
@@ -102,7 +79,7 @@ function RecentWorlds({ instance, busy, canStart, onPlay, onJoin }: HeroPanelPro
               </span>
               <span className="world-text">
                 <strong>{server.name}</strong>
-                <small>{serverLine(statuses[server.address])}</small>
+                <small>伺服器</small>
               </span>
             </button>
           </li>

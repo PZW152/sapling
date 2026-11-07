@@ -1,11 +1,8 @@
 //! 遊戲裡保存的伺服器清單。`servers.dat` 是沒有壓縮的 NBT，這裡只讀需要的欄位。
 
 use std::path::Path;
-use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use serde::Serialize;
 
 const SERVERS_FILE: &str = "servers.dat";
 const TAG_END: u8 = 0;
@@ -20,110 +17,6 @@ const MAX_DEPTH: u8 = 16;
 pub struct Server {
     pub name: String,
     pub address: String,
-}
-
-/// 伺服器目前的狀況。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ServerStatus {
-    pub online: u32,
-    pub max: u32,
-    pub latency_ms: u32,
-}
-
-const DEFAULT_PORT: u16 = 25565;
-const PING_TIMEOUT: Duration = Duration::from_secs(4);
-/// 伺服器回傳的狀態裡可能有很大的圖示，但超過這個大小就不正常了。
-const MAX_STATUS_BYTES: usize = 1024 * 1024;
-const HANDSHAKE_PACKET: u8 = 0;
-const STATUS_STATE: u8 = 1;
-
-#[derive(Deserialize)]
-struct StatusResponse {
-    players: StatusPlayers,
-}
-
-#[derive(Deserialize)]
-struct StatusPlayers {
-    online: u32,
-    max: u32,
-}
-
-/// 問伺服器現在幾個人在線。連不上或看不懂都回傳 `None`，介面就不顯示。
-pub async fn ping(address: &str) -> Option<ServerStatus> {
-    tokio::time::timeout(PING_TIMEOUT, request_status(address))
-        .await
-        .ok()
-        .flatten()
-}
-
-fn split_address(address: &str) -> (&str, u16) {
-    match address.rsplit_once(':') {
-        Some((host, port)) => (host, port.parse().unwrap_or(DEFAULT_PORT)),
-        None => (address, DEFAULT_PORT),
-    }
-}
-
-fn push_varint(out: &mut Vec<u8>, mut value: u32) {
-    loop {
-        let byte = (value & 0x7F) as u8;
-        value >>= 7;
-        if value == 0 {
-            out.push(byte);
-            return;
-        }
-        out.push(byte | 0x80);
-    }
-}
-
-fn handshake(host: &str, port: u16) -> Vec<u8> {
-    let mut body = vec![HANDSHAKE_PACKET];
-    // 協定版本填 -1：只問狀態時伺服器不看這個值。
-    push_varint(&mut body, u32::MAX);
-    push_varint(&mut body, host.len() as u32);
-    body.extend(host.as_bytes());
-    body.extend(port.to_be_bytes());
-    body.push(STATUS_STATE);
-    let mut packet = Vec::new();
-    push_varint(&mut packet, body.len() as u32);
-    packet.extend(body);
-    // 緊接著送空的狀態請求。
-    packet.extend([1, 0]);
-    packet
-}
-
-async fn read_varint(stream: &mut TcpStream) -> Option<usize> {
-    let mut value = 0_usize;
-    for shift in 0..5 {
-        let byte = stream.read_u8().await.ok()?;
-        value |= usize::from(byte & 0x7F) << (shift * 7);
-        if byte & 0x80 == 0 {
-            return Some(value);
-        }
-    }
-    None
-}
-
-async fn request_status(address: &str) -> Option<ServerStatus> {
-    let (host, port) = split_address(address.trim());
-    let started = Instant::now();
-    let mut stream = TcpStream::connect((host, port)).await.ok()?;
-    stream.write_all(&handshake(host, port)).await.ok()?;
-    read_varint(&mut stream).await?;
-    let latency_ms = started.elapsed().as_millis() as u32;
-    read_varint(&mut stream).await?;
-    let length = read_varint(&mut stream).await?;
-    if length > MAX_STATUS_BYTES {
-        return None;
-    }
-    let mut text = vec![0; length];
-    stream.read_exact(&mut text).await.ok()?;
-    let status: StatusResponse = serde_json::from_slice(&text).ok()?;
-    Some(ServerStatus {
-        online: status.players.online,
-        max: status.players.max,
-        latency_ms,
-    })
 }
 
 /// 讀取伺服器清單。沒有檔案或看不懂時回傳空清單。
@@ -319,56 +212,6 @@ mod tests {
             assert_eq!(parse(&whole[..length]), None, "長度 {length}");
         }
         assert_eq!(parse(b"not nbt at all"), None);
-    }
-
-    #[test]
-    fn reads_ports_from_addresses() {
-        assert_eq!(split_address("a.net"), ("a.net", DEFAULT_PORT));
-        assert_eq!(split_address("a.net:25566"), ("a.net", 25566));
-    }
-
-    #[test]
-    fn writes_varints_like_the_protocol() {
-        let mut out = Vec::new();
-        push_varint(&mut out, 300);
-        assert_eq!(out, [0xAC, 0x02]);
-
-        let mut negative = Vec::new();
-        push_varint(&mut negative, u32::MAX);
-        assert_eq!(negative, [0xFF, 0xFF, 0xFF, 0xFF, 0x0F]);
-    }
-
-    /// 假伺服器照協定回應，確認整個來回。
-    #[tokio::test]
-    async fn asks_a_server_how_many_players_are_online() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            let (mut stream, _) = listener.accept().await.unwrap();
-            let mut request = [0; 64];
-            let _ = stream.read(&mut request).await.unwrap();
-            let json = br#"{"version":{"name":"1.21"},"players":{"max":20,"online":3}}"#;
-            let mut body = vec![0];
-            push_varint(&mut body, json.len() as u32);
-            body.extend(json);
-            let mut packet = Vec::new();
-            push_varint(&mut packet, body.len() as u32);
-            packet.extend(body);
-            stream.write_all(&packet).await.unwrap();
-        });
-
-        let status = ping(&format!("127.0.0.1:{port}")).await.unwrap();
-
-        assert_eq!((status.online, status.max), (3, 20));
-    }
-
-    #[tokio::test]
-    async fn an_unreachable_server_is_just_unknown() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        drop(listener);
-
-        assert_eq!(ping(&format!("127.0.0.1:{port}")).await, None);
     }
 
     #[tokio::test]

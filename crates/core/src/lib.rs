@@ -8,7 +8,6 @@ pub mod instance;
 pub mod java;
 pub mod launch;
 pub mod loader;
-pub mod logbook;
 pub mod modrinth;
 pub mod platform;
 pub(crate) mod storage;

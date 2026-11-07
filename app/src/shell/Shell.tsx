@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ask } from "@tauri-apps/plugin-dialog";
 import { FEATURES } from "../features";
 import { AppProvider, useApp } from "./AppContext";
-import { addCloseGuard, requestClose } from "./closing";
-import { hasRunningDownloads } from "./downloads";
 import type { Feature } from "./feature";
 import { FeatureBoundary } from "./FeatureBoundary";
 import { ICONS } from "./icons";
@@ -116,34 +113,9 @@ function WindowControls() {
   const { flushSaves } = useApp();
   const appWindow = getCurrentWindow();
 
-  // Alt+F4 和工作列的關閉也要走同一條路。
-  useEffect(() => {
-    const stop = getCurrentWindow().onCloseRequested((event) => {
-      event.preventDefault();
-      requestClose(flushSaves);
-    });
-    return () => {
-      stop.then((unlisten) => unlisten());
-    };
-  }, [flushSaves]);
-
-  useEffect(
-    () =>
-      addCloseGuard(async () => {
-        if (!hasRunningDownloads()) {
-          return false;
-        }
-        const leave = await ask("下載還沒完成，確定要關閉嗎？下次可以接著下載。", {
-          title: "Sapling",
-          kind: "warning",
-        });
-        return !leave;
-      }),
-    [],
-  );
-
-  function close() {
-    requestClose(flushSaves);
+  async function close() {
+    await flushSaves();
+    await appWindow.close();
   }
 
   return (

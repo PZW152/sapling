@@ -7,7 +7,6 @@ use std::path::Path;
 use reqwest::Url;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::task::JoinSet;
 
 use super::{API_URL, ModVersion, ModrinthError, RELEASE, loader_names};
 use crate::download::{fetch_text, file_sha1};
@@ -16,7 +15,6 @@ use crate::loader::LoaderKind;
 
 /// 一次最多查幾個專案，網址才不會太長。
 const PROJECTS_PER_REQUEST: usize = 100;
-const HASH_CONCURRENCY: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,34 +104,19 @@ pub async fn inspect(
         .collect())
 }
 
-/// 同時算幾個模組的雜湊。模組多的整合包，一個一個算要等很久。
 async fn hash_all(game_dir: &Path, files: Vec<ModFile>) -> Vec<(ModFile, String)> {
-    let folder = mods::mods_dir(game_dir);
-    let mut pending = files.into_iter();
-    let mut running = JoinSet::new();
     let mut hashed = Vec::new();
-    loop {
-        while running.len() < HASH_CONCURRENCY {
-            let Some(file) = pending.next() else {
-                break;
-            };
-            let name = if file.enabled {
-                file.name.clone()
-            } else {
-                format!("{}.disabled", file.name)
-            };
-            let path = folder.join(name);
-            running.spawn(async move { (file, file_sha1(&path).await) });
-        }
-        let Some(finished) = running.join_next().await else {
-            // 完成的順序不固定，排回去讓結果穩定。
-            hashed.sort_by(|a: &(ModFile, String), b| a.0.name.cmp(&b.0.name));
-            return hashed;
+    for file in files {
+        let name = if file.enabled {
+            file.name.clone()
+        } else {
+            format!("{}.disabled", file.name)
         };
-        if let Ok((file, Ok(Some(hash)))) = finished {
+        if let Ok(Some(hash)) = file_sha1(&mods::mods_dir(game_dir).join(name)).await {
             hashed.push((file, hash));
         }
     }
+    hashed
 }
 
 /// 只提示真的更新的版本：用戶裝的是正式版時不換成測試版，也不換成比較舊的版本。
@@ -197,38 +180,6 @@ mod tests {
             loaders: Vec::new(),
             date_published: date.to_string(),
         }
-    }
-
-    #[tokio::test]
-    async fn hashes_every_mod_including_disabled_ones() {
-        let dir = std::env::temp_dir().join(format!("sapling-hash-all-{}", std::process::id()));
-        std::fs::create_dir_all(mods::mods_dir(&dir)).unwrap();
-        let mut files = Vec::new();
-        for index in 0..20 {
-            let name = format!("{index:02}.jar");
-            let enabled = index % 2 == 0;
-            let on_disk = if enabled {
-                name.clone()
-            } else {
-                format!("{name}.disabled")
-            };
-            std::fs::write(mods::mods_dir(&dir).join(on_disk), "hello").unwrap();
-            files.push(ModFile {
-                name,
-                enabled,
-                size: 5,
-            });
-        }
-        files.push(ModFile {
-            name: "gone.jar".to_string(),
-            enabled: true,
-            size: 5,
-        });
-        let hashed = hash_all(&dir, files).await;
-        std::fs::remove_dir_all(dir).unwrap();
-        assert_eq!(hashed.len(), 20);
-        assert_eq!(hashed[0].0.name, "00.jar");
-        assert_eq!(hashed[19].0.name, "19.jar");
     }
 
     #[test]
