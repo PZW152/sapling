@@ -8,7 +8,7 @@ mod token_store;
 use md5::{Digest, Md5};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -31,6 +31,8 @@ const PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
 /// Minecraft token 到期前多久就當作已過期，避免遊戲啟動到一半失效。
 const EXPIRY_MARGIN: Duration = Duration::from_secs(300);
+/// 快取至少還要有效這麼久才用，夠玩一整段時間。
+const MIN_CACHED_SECONDS: u64 = 6 * 60 * 60;
 /// 微軟要求 `slow_down` 時，輪詢間隔要增加的秒數。
 const SLOW_DOWN_STEP_SECS: u64 = 5;
 
@@ -290,11 +292,64 @@ pub async fn finish_login(
     }
 }
 
-/// 用保存的 refresh token 恢復登入。沒有保存過就回傳 `None`。
+/// 憑證管理員裡的登入快取。不實作 `Debug`，token 不會被印出來。
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedSession {
+    access_token: String,
+    /// Unix 時間，單位秒。
+    expires_at: u64,
+    profile: Profile,
+}
+
+fn unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
+}
+
+/// 讀不懂或快過期就不用，走完整登入。遊戲可能開很久，所以要留足夠的時間。
+fn session_from_cache(content: &str, now: u64) -> Option<Session> {
+    let cached: CachedSession = serde_json::from_str(content).ok()?;
+    let remaining = cached.expires_at.checked_sub(now)?;
+    if remaining < MIN_CACHED_SECONDS {
+        return None;
+    }
+    Some(Session {
+        profile: cached.profile,
+        access_token: cached.access_token,
+        expires_at: Instant::now() + Duration::from_secs(remaining),
+    })
+}
+
+/// 記下登入結果。失敗沒關係，下次走完整登入。
+fn cache_session(session: &Session, lifetime: u64) {
+    let cached = CachedSession {
+        access_token: session.access_token.clone(),
+        expires_at: unix_seconds() + lifetime,
+        profile: session.profile.clone(),
+    };
+    if let Ok(content) = serde_json::to_string(&cached) {
+        let _ = token_store::save_session(&content);
+    }
+}
+
+/// 清掉登入快取。帳號或玩家資料改變時要呼叫。
+pub fn forget_cached_session() {
+    let _ = token_store::delete_session();
+}
+
+/// 恢復登入。沒有保存過就回傳 `None`。
+///
+/// 快取還有效時不連網路：每次打開都走完整登入，連續重開會被 Minecraft 限速。
 pub async fn restore_session(client: &reqwest::Client) -> Result<Option<Session>, AuthError> {
     let Some(refresh_token) = token_store::load()? else {
         return Ok(None);
     };
+    let cached = token_store::load_session().ok().flatten();
+    if let Some(session) = cached.and_then(|content| session_from_cache(&content, unix_seconds())) {
+        return Ok(Some(session));
+    }
     let response = client
         .post(TOKEN_URL)
         .form(&[
@@ -314,6 +369,7 @@ pub async fn restore_session(client: &reqwest::Client) -> Result<Option<Session>
     match response.json::<OAuthError>().await {
         Ok(error) if error.error == "invalid_grant" => {
             token_store::delete()?;
+            forget_cached_session();
             Err(AuthError::SessionExpired)
         }
         Ok(error) => Err(AuthError::ClientRejected { code: error.error }),
@@ -348,6 +404,7 @@ fn offline_uuid(name: &str) -> String {
 
 pub fn sign_out() -> Result<(), AuthError> {
     token_store::delete()?;
+    forget_cached_session();
     Ok(())
 }
 
@@ -366,11 +423,13 @@ async fn complete_login(
     let profile = fetch_profile(client, token).await?;
 
     token_store::save(&microsoft.refresh_token)?;
-    Ok(Session {
+    let session = Session {
         profile,
         expires_at: Instant::now() + Duration::from_secs(minecraft.expires_in),
         access_token: minecraft.access_token,
-    })
+    };
+    cache_session(&session, minecraft.expires_in);
+    Ok(session)
 }
 
 async fn xbox_login(client: &reqwest::Client, access_token: &str) -> Result<String, AuthError> {
@@ -512,6 +571,40 @@ fn active_skin_url(skins: &[MinecraftSkin]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cached(expires_at: u64) -> String {
+        serde_json::to_string(&CachedSession {
+            access_token: "token".to_string(),
+            expires_at,
+            profile: Profile {
+                id: "id".to_string(),
+                name: "Steve".to_string(),
+                skin_url: None,
+            },
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn a_fresh_cache_restores_the_session() {
+        let session = session_from_cache(&cached(1000 + MIN_CACHED_SECONDS + 60), 1000).unwrap();
+        assert_eq!(session.access_token(), "token");
+        assert_eq!(session.profile.name, "Steve");
+        assert!(!session.is_offline());
+        assert!(!session.is_expired());
+    }
+
+    #[test]
+    fn a_cache_close_to_expiry_is_not_used() {
+        assert!(session_from_cache(&cached(1000 + MIN_CACHED_SECONDS - 1), 1000).is_none());
+        assert!(session_from_cache(&cached(999), 1000).is_none());
+    }
+
+    #[test]
+    fn a_broken_cache_is_ignored() {
+        assert!(session_from_cache("not json", 1000).is_none());
+        assert!(session_from_cache("{}", 1000).is_none());
+    }
 
     #[test]
     fn offline_uuid_matches_the_game() {

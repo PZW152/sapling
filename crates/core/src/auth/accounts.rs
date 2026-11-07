@@ -43,12 +43,14 @@ fn with_account(mut accounts: Vec<Profile>, profile: Profile) -> Vec<Profile> {
 pub fn switch(id: &str) -> Result<(), AuthError> {
     let token = token_store::load_slot(id)?.ok_or(AuthError::SessionExpired)?;
     token_store::save(&token)?;
+    super::forget_cached_session();
     Ok(())
 }
 
 /// 從這台電腦移除帳號。
 pub async fn forget(dirs: &DataDirs, id: &str) -> Result<(), AuthError> {
     token_store::delete_slot(id)?;
+    super::forget_cached_session();
     let mut accounts = list(dirs).await?;
     accounts.retain(|account| account.id != id);
     write_json(&accounts_path(dirs), &accounts).await?;

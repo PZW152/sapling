@@ -763,6 +763,8 @@ async fn change_skin(
         .map_err(text)?;
     session.profile = profile.clone();
     state.set_session(Some(session))?;
+    // 快取裡還是舊皮膚，下次重新取得。
+    auth::forget_cached_session();
     remember_account(&profile).await;
     Ok(profile)
 }
