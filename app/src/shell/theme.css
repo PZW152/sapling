@@ -64,6 +64,7 @@
   --primary-height: 64px;
   --avatar-size: 44px;
   --list-width: 200px;
+  --instance-tile-min: 200px;
   --notice-width: 380px;
   --node-size: 10px;
 
@@ -250,7 +251,9 @@ button:disabled {
   flex-direction: column;
   gap: var(--space-1);
   width: var(--rail-width);
+  margin: var(--space-2) 0 var(--space-2) var(--space-2);
   padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-tile);
   background: var(--color-rail);
 }
 

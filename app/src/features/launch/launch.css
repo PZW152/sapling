@@ -119,6 +119,14 @@
   flex-direction: column;
   gap: var(--space-3);
   min-height: 0;
+  /* 帳號區變高時整欄捲動，不能把實例清單擠到看不見。 */
+  overflow-y: auto;
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}
+
+.side > * {
+  flex: none;
 }
 
 .account {
@@ -194,9 +202,12 @@
   animation: breathe 1.8s ease-in-out infinite;
 }
 
+.side > .instance-tile {
+  flex: 1 0 var(--instance-tile-min);
+}
+
 .instance-tile {
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;

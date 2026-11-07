@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef } from "react";
-import { applyLiquid } from "./liquid";
 
 const running = new WeakMap<HTMLElement, Animation>();
 
@@ -32,17 +31,13 @@ function stretch(mark: HTMLElement, direction: "vertical" | "horizontal") {
   }
   const style = getComputedStyle(mark);
   running.get(mark)?.cancel();
-  const animation = mark.animate(
+  running.set(mark, mark.animate(
     { scale: ["1 1", direction === "vertical" ? "0.93 1.14" : "1.1 0.9", "1 1"] },
     {
       duration: toMilliseconds(style.getPropertyValue("--pop")),
       easing: style.getPropertyValue("--spring").trim(),
     },
-  );
-  running.set(mark, animation);
-  // 折射只有移動時看得到。靜止時關掉，顯卡不用一直算。
-  mark.dataset.moving = "";
-  animation.onfinish = () => delete mark.dataset.moving;
+  ));
 }
 
 /** 讓標記平滑滑到容器裡目前選中的項目。 */
@@ -63,17 +58,21 @@ export function useSlideMark<T extends HTMLElement>(dependency: unknown) {
         return;
       }
       const moved = stretchDirection(element, active);
+      // 第一次量是直接就位，不能從左上角長出來。
+      const first = !element.style.getPropertyValue("--mark-y");
+      element.toggleAttribute("data-mark-placing", first);
       element.style.setProperty("--mark-x", `${active?.offsetLeft ?? 0}px`);
       element.style.setProperty("--mark-y", `${active?.offsetTop ?? 0}px`);
       element.style.setProperty("--mark-w", `${active?.offsetWidth ?? 0}px`);
       element.style.setProperty("--mark-h", `${active?.offsetHeight ?? 0}px`);
       element.style.setProperty("--mark-opacity", active ? "1" : "0");
+      if (first) {
+        // 讓瀏覽器先畫好位置，之後才恢復滑動。
+        requestAnimationFrame(() => element.removeAttribute("data-mark-placing"));
+      }
       const mark = element.querySelector<HTMLElement>(":scope > .slide-mark");
-      if (active && mark) {
-        applyLiquid(mark, mark.offsetWidth || active.offsetWidth, active.offsetHeight);
-        if (moved) {
-          stretch(mark, moved);
-        }
+      if (mark && moved) {
+        stretch(mark, moved);
       }
     }
     measure();

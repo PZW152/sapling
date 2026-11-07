@@ -9,9 +9,10 @@
  */
 
 :root[data-glass]:not([data-festival]) {
-  --color-bg: color-mix(in srgb, var(--color-soft) 26%, transparent);
+  --color-bg: color-mix(in srgb, var(--color-accent) 5%, rgb(255 255 255 / 0.22));
   --color-surface: rgb(255 255 255 / 0.7);
   --color-line: rgb(22 48 42 / 0.16);
+  --color-soft: color-mix(in srgb, var(--color-accent) 15%, transparent);
   --color-hero-tile: rgb(255 255 255 / 0.1);
   --color-hero-soft: rgb(255 255 255 / 0.2);
   --color-rail-text: #e6f0ea;
@@ -25,7 +26,7 @@
   --glass-button: rgb(255 255 255 / 0.94);
   --glass-button-hover: rgb(255 255 255 / 0.98);
   --glass-mark-dark: rgb(255 255 255 / 0.12);
-  --glass-mark-light: rgb(255 255 255 / 0.6);
+  --glass-mark-light: color-mix(in srgb, var(--color-accent) 16%, transparent);
 
   /* 玻璃的厚度：亮的上緣和淡一點的下緣 */
   --glass-rim:
@@ -46,7 +47,6 @@
   --glass-blur-float: blur(26px) saturate(170%);
   --glass-blur-cover: blur(30px) saturate(160%);
   --glass-blur-drop: blur(20px) saturate(160%);
-  --glass-lens: saturate(150%) brightness(1.06);
 
   background: transparent;
 }
@@ -54,10 +54,11 @@
 :root[data-glass][data-mode="dark"]:not([data-festival]) {
   --color-bg: rgb(10 16 13 / 0.62);
   --color-surface: rgb(36 46 41 / 0.55);
+  --color-soft: color-mix(in srgb, var(--color-accent) 24%, transparent);
   --color-line: rgb(255 255 255 / 0.13);
   --color-muted: #c6d3cb;
   --glass-float: rgb(24 32 28 / 0.8);
-  --glass-mark-light: rgb(255 255 255 / 0.1);
+  --glass-mark-light: rgb(255 255 255 / 0.12);
   --glass-rim: var(--glass-rim-dark);
   --shadow-tile: 0 2px 10px rgb(0 0 0 / 0.35);
 }
@@ -89,8 +90,6 @@
 
 /* 側欄是浮在窗口玻璃上的一塊玻璃，四周透出後面的畫面。 */
 :root[data-glass]:not([data-festival]) .rail {
-  margin: var(--space-2) 0 var(--space-2) var(--space-2);
-  border-radius: var(--radius-tile);
   background: var(--glass-rail);
   box-shadow: var(--glass-rim-dark), var(--shadow-tile);
 }
@@ -106,6 +105,18 @@
 
 :root[data-glass]:not([data-festival]) .world {
   box-shadow: var(--glass-rim-dark);
+}
+
+/* 窗口是透明的，卡片從完全透明開始會閃出一幀空窗口。 */
+:root[data-glass]:not([data-festival]) .page:not([hidden]) :is(.hero, .panel, .notice-card) {
+  animation-name: glass-in;
+}
+
+@keyframes glass-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(6px);
+  }
 }
 
 /* 主按鈕：一塊厚玻璃。比周圍都亮，還是畫面上最顯眼的東西。 */
@@ -155,16 +166,10 @@
   backdrop-filter: var(--glass-blur-drop);
 }
 
-/* 液態玻璃：滑動時標記蓋在文字上面，邊緣會折彎底下的字。靜止時退到文字下面，也不用計算。 */
-:root[data-glass]:not([data-festival]) :is(.rail-mark, .segment-mark) {
-  pointer-events: none;
-}
-
-:root[data-glass]:not([data-festival], [data-glass-lite]) :is(.rail-mark, .segment-mark)[data-moving] {
-  z-index: 1;
-  backdrop-filter: var(--liquid, blur(0)) var(--glass-lens);
-}
-
+/*
+ * 液態玻璃標記：靠滑動時的拉伸和玻璃邊緣表現。
+ * 不用 backdrop-filter：窗口本身半透明，濾鏡會把後面的畫面再疊一層，標記一動就變色。
+ */
 :root[data-glass]:not([data-festival]) .rail-mark {
   background: var(--glass-mark-dark);
   box-shadow: var(--glass-rim-dark), var(--glass-mark-shadow-dark);
