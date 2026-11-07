@@ -75,10 +75,15 @@ pub fn local_time_text() -> String {
     )
 }
 
+/// Windows 用完整路徑比對程式。路徑裡混了正斜線就對不上。
+fn gpu_preference_name(java: &Path) -> String {
+    java.to_string_lossy().replace('/', "\\")
+}
+
 /// 筆電有內顯和獨顯時，Windows 常讓遊戲跑在內顯上。這裡請 Windows 改用高性能顯卡。
 /// 用戶在 Windows 設定裡選過就不動。失敗也沒關係，只是用回系統預設。
 pub fn prefer_high_performance_gpu(java: &Path) {
-    let value = java.to_string_lossy();
+    let value = gpu_preference_name(java);
     let reg = |arguments: &[&str]| {
         Command::new("reg")
             .args(arguments)
@@ -246,5 +251,19 @@ impl DataDirs {
 
     pub fn config_file(&self) -> PathBuf {
         self.root.join("config.json")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gpu_preference_uses_the_real_windows_path() {
+        let java = Path::new(r"D:\Sapling Data\runtimes\gamma\bin/java.exe");
+        assert_eq!(
+            gpu_preference_name(java),
+            r"D:\Sapling Data\runtimes\gamma\bin\java.exe"
+        );
     }
 }
