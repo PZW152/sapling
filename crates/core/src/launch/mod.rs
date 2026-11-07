@@ -47,7 +47,7 @@ const QUICK_PLAY_ARGUMENT: &str = "--quickPlaySingleplayer";
 const QUICK_JOIN_FEATURE: &str = "is_quick_play_multiplayer";
 /// 讓遊戲輸出固定用 UTF-8，日誌窗口的中文才不會變亂碼。
 const OUTPUT_ENCODING_ARGUMENTS: [&str; 2] = ["-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8"];
-/// 官方啟動器的預設值。版本檔沒有這些，少了遊戲會因垃圾回收而週期性卡頓。
+/// 官方啟動器的預設值，版本檔裡沒有。
 const GC_ARGUMENTS: [&str; 6] = [
     "-XX:+UnlockExperimentalVMOptions",
     "-XX:+UseG1GC",

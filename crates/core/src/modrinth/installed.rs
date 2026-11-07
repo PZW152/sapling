@@ -199,6 +199,38 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn hashes_every_mod_including_disabled_ones() {
+        let dir = std::env::temp_dir().join(format!("sapling-hash-all-{}", std::process::id()));
+        std::fs::create_dir_all(mods::mods_dir(&dir)).unwrap();
+        let mut files = Vec::new();
+        for index in 0..20 {
+            let name = format!("{index:02}.jar");
+            let enabled = index % 2 == 0;
+            let on_disk = if enabled {
+                name.clone()
+            } else {
+                format!("{name}.disabled")
+            };
+            std::fs::write(mods::mods_dir(&dir).join(on_disk), "hello").unwrap();
+            files.push(ModFile {
+                name,
+                enabled,
+                size: 5,
+            });
+        }
+        files.push(ModFile {
+            name: "gone.jar".to_string(),
+            enabled: true,
+            size: 5,
+        });
+        let hashed = hash_all(&dir, files).await;
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(hashed.len(), 20);
+        assert_eq!(hashed[0].0.name, "00.jar");
+        assert_eq!(hashed[19].0.name, "19.jar");
+    }
+
     #[test]
     fn offers_a_newer_release() {
         let current = version("a", "release", "2026-01-01T00:00:00Z");

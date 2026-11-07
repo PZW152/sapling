@@ -33,8 +33,13 @@ pub fn record(message: &str) {
     };
     let folder = folder.lock().unwrap_or_else(PoisonError::into_inner);
     let line = format!("{} {}\n", platform::local_time_text(), clean(message));
+    append(&folder, &line, MAX_LOG_BYTES);
+}
+
+/// 記錄太大時換一個新檔，舊的留一份。
+fn append(folder: &Path, line: &str, limit: u64) {
     let path = folder.join(LOG_FILE);
-    if fs::metadata(&path).is_ok_and(|found| found.len() > MAX_LOG_BYTES) {
+    if fs::metadata(&path).is_ok_and(|found| found.len() > limit) {
         let _ = fs::rename(&path, folder.join(OLD_LOG_FILE));
     }
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
@@ -80,7 +85,7 @@ fn is_secret_character(character: char) -> bool {
     character.is_ascii_alphanumeric()
         || matches!(
             character,
-            '-' | '_' | '.' | '+' | '/' | '=' | '!' | '*' | '$'
+            '-' | '_' | '.' | '+' | '/' | '=' | '!' | '*' | '$' | ':' | '?' | '&' | '%'
         )
 }
 
@@ -88,10 +93,9 @@ fn looks_like_hash(word: &str) -> bool {
     word.len() <= MAX_HASH_LENGTH && word.chars().all(|character| character.is_ascii_hexdigit())
 }
 
-/// 網址和路徑也會是長字串，但它們有分隔的斜線；token 沒有這麼多段。
-fn looks_like_path(word: &str) -> bool {
-    word.split('/')
-        .all(|part| part.len() < MIN_SECRET_LENGTH || looks_like_hash(part))
+/// 普通網址留著才查得出問題。帶參數的網址可能夾著 token，一律遮掉。
+fn is_plain_link(word: &str) -> bool {
+    word.starts_with("https://") && !word.contains(['?', '='])
 }
 
 /// 把看起來像 token 的長字串換掉。寧可多遮，不能漏。
@@ -103,7 +107,7 @@ fn hide_secrets(text: &str) -> String {
             word.push(character);
             continue;
         }
-        if word.len() >= MIN_SECRET_LENGTH && !looks_like_hash(&word) && !looks_like_path(&word) {
+        if word.len() >= MIN_SECRET_LENGTH && !looks_like_hash(&word) && !is_plain_link(&word) {
             result.push_str(HIDDEN);
         } else {
             result.push_str(&word);
@@ -128,6 +132,31 @@ mod tests {
 
         let refresh = "M.C512_BAY.0.U.-CkdPqZ7Rz!ZzAb*cD1eF2gH3iJ4kL5mN6oP7qR8sT9$uV";
         assert_eq!(hide_secrets(refresh), HIDDEN);
+    }
+
+    #[test]
+    fn hides_tokens_that_look_like_paths_or_links() {
+        let base64 = "dGVzdC9zZWNyZXQ/abcdEFGH123/ijklMNOP456/qrstUVWX789/yzABCDEF";
+        assert_eq!(hide_secrets(base64), HIDDEN);
+        let link = "https://login.example.com/callback?code=abcdefghijklmnopqrstuvwxyz";
+        assert_eq!(hide_secrets(link), HIDDEN);
+    }
+
+    #[test]
+    fn starts_a_new_file_when_the_log_is_too_big() {
+        let folder = std::env::temp_dir().join(format!("sapling-logbook-{}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        append(&folder, "第一行\n", 3);
+        append(&folder, "第二行\n", 3);
+        assert_eq!(
+            fs::read_to_string(folder.join(LOG_FILE)).unwrap(),
+            "第二行\n"
+        );
+        assert_eq!(
+            fs::read_to_string(folder.join(OLD_LOG_FILE)).unwrap(),
+            "第一行\n"
+        );
+        fs::remove_dir_all(folder).unwrap();
     }
 
     #[test]
