@@ -6,6 +6,3 @@
 
 # Logs
 /logs/
-
-# 本機測試頁，不能提交
-app/mock.html
