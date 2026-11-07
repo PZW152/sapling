@@ -48,6 +48,24 @@ export function LaunchPage() {
 
   const busy = phase === "preparing" || phase === "running";
 
+  // 轉場裡的取消鍵消失後，鍵盤焦點要回到主區塊，不能掉回頁面最上面。
+  const overlayShown = useRef(false);
+  useEffect(() => {
+    if (origin) {
+      overlayShown.current = true;
+      return;
+    }
+    if (!overlayShown.current) {
+      return;
+    }
+    overlayShown.current = false;
+    requestAnimationFrame(() => {
+      if (document.activeElement === document.body) {
+        hero.current?.querySelector<HTMLElement>("button:enabled")?.focus();
+      }
+    });
+  }, [origin, hero]);
+
   // 從桌面捷徑打開，或第一次按「開始玩」時，等登入好就自動啟動。
   useEffect(() => {
     api.takePendingLaunch().then(setPending);
