@@ -10,6 +10,8 @@ const DEFAULT_THEME: &str = "sapling";
 const DEFAULT_UI_SCALE: u32 = 100;
 const DEFAULT_COLOR_MODE: &str = "system";
 const COLOR_MODES: [&str; 3] = ["system", "light", "dark"];
+const DEFAULT_WINDOW_MATERIAL: &str = "acrylic";
+const WINDOW_MATERIALS: [&str; 3] = ["acrylic", "mica", "solid"];
 const MAX_UI_SCALE: u32 = 130;
 const RETIRED_THEME: &str = "zhongshan";
 const MIN_CONCURRENCY: usize = 1;
@@ -38,8 +40,8 @@ pub struct LauncherConfig {
     pub ui_scale: u32,
     /// 淺色、深色或跟隨系統。
     pub color_mode: String,
-    /// 窗口用玻璃材質。關掉就是不透明的純色。
-    pub glass: bool,
+    /// 窗口材質：毛玻璃、雲母或純色。
+    pub window_material: String,
     /// 遊戲開始後收起啟動器窗口。
     pub minimize_on_launch: bool,
     /// 用戶看過「有什麼新內容」的版本。
@@ -60,7 +62,7 @@ impl Default for LauncherConfig {
             favorites: Vec::new(),
             ui_scale: DEFAULT_UI_SCALE,
             color_mode: DEFAULT_COLOR_MODE.to_string(),
-            glass: true,
+            window_material: DEFAULT_WINDOW_MATERIAL.to_string(),
             minimize_on_launch: true,
             seen_version: String::new(),
         }
@@ -97,6 +99,9 @@ impl LauncherConfig {
         if !COLOR_MODES.contains(&self.color_mode.as_str()) {
             self.color_mode = DEFAULT_COLOR_MODE.to_string();
         }
+        if !WINDOW_MATERIALS.contains(&self.window_material.as_str()) {
+            self.window_material = DEFAULT_WINDOW_MATERIAL.to_string();
+        }
         // 中山主題改成植樹節限定後，舊設定裡的值要換回預設主題。
         if self.theme == RETIRED_THEME {
             self.theme = DEFAULT_THEME.to_string();
@@ -118,9 +123,16 @@ mod tests {
     }
 
     #[test]
-    fn old_config_without_glass_uses_glass() {
+    fn old_config_without_a_material_uses_the_default() {
         let config: LauncherConfig = serde_json::from_str("{}").unwrap();
-        assert!(config.glass);
+        assert_eq!(config.window_material, DEFAULT_WINDOW_MATERIAL);
+    }
+
+    #[test]
+    fn unknown_material_falls_back_to_the_default() {
+        let config: LauncherConfig =
+            serde_json::from_str(r#"{ "windowMaterial": "lava" }"#).unwrap();
+        assert_eq!(config.normalized().window_material, DEFAULT_WINDOW_MATERIAL);
     }
 
     #[tokio::test]

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ComponentType, CSSProperties } from "react";
 import { api } from "../../shell/api";
 import { useFocusHandoff } from "../../shell/keyboard";
@@ -8,6 +8,8 @@ import { versionUnits } from "./versionUnits";
 
 /** 比 theme.css 的 --overlay 稍長，收合動畫播完才移除。 */
 const CLOSE_MS = 780;
+/** 比 --overlay 稍長，展開完才把後面的畫面藏起來。 */
+const SETTLE_MS = 700;
 
 /** 主區塊在窗口裡的位置，轉場從這裡展開、也收回這裡。 */
 export type OverlayOrigin = { top: number; right: number; bottom: number; left: number };
@@ -38,6 +40,14 @@ export function LaunchOverlay({
   const speed = useSpeed(progress);
   const cancel = useFocusHandoff<HTMLButtonElement>();
 
+  // 展開後藏起後面的畫面，讓轉場直接透出窗口玻璃。
+  // 不用 backdrop-filter：下載可能要幾分鐘，內顯一直算模糊會佔掉四成多的 GPU。
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   // 用計時而不是等動畫事件：系統關閉動畫或窗口被遮住時事件不一定會來。
   useEffect(() => {
     if (!closing) {
@@ -49,7 +59,7 @@ export function LaunchOverlay({
 
   return (
     <div
-      className={closing ? "launch-overlay closing" : "launch-overlay"}
+      className={`launch-overlay${closing ? " closing" : settled ? " settled" : ""}`}
       data-tauri-drag-region
       style={
         {

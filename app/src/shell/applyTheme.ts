@@ -1,5 +1,5 @@
 import { Effect, getCurrentWindow } from "@tauri-apps/api/window";
-import type { ColorMode } from "./types";
+import type { ColorMode, WindowMaterial } from "./types";
 
 const REVEAL_MS = 900;
 
@@ -24,20 +24,32 @@ export function applyColorMode(mode: ColorMode) {
     .catch(() => {});
 }
 
-/** 切換玻璃和純色。用戶在 Windows 關掉透明效果或開高對比時，一律用純色。 */
-export function applyMaterial(wanted: boolean) {
+let software: boolean | null = null;
+
+/** 沒有硬體加速時，模糊要靠處理器算，轉場會掉幀。只問一次，結果不會變。 */
+function isSoftwareRendering() {
+  if (software === null) {
+    const context = document
+      .createElement("canvas")
+      .getContext("webgl", { failIfMajorPerformanceCaveat: true });
+    software = context === null;
+    context?.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+  return software;
+}
+
+/** 切換窗口材質。用戶在 Windows 關掉透明效果或開高對比時，一律用純色。 */
+export function applyMaterial(material: WindowMaterial) {
   const blocked =
     window.matchMedia("(prefers-reduced-transparency: reduce)").matches ||
     window.matchMedia("(forced-colors: active)").matches;
-  const glass = wanted && !blocked;
+  const glass = material !== "solid" && !blocked;
   const root = document.documentElement;
-  if (glass) {
-    root.dataset.glass = "";
-  } else {
-    delete root.dataset.glass;
-  }
+  root.toggleAttribute("data-glass", glass);
+  root.toggleAttribute("data-glass-lite", glass && isSoftwareRendering());
   const win = getCurrentWindow();
-  (glass ? win.setEffects({ effects: [Effect.Acrylic] }) : win.clearEffects()).catch(() => {});
+  const effect = material === "mica" ? Effect.Mica : Effect.Acrylic;
+  (glass ? win.setEffects({ effects: [effect] }) : win.clearEffects()).catch(() => {});
 }
 
 /** 執行一次畫面改動，並讓新畫面從點擊位置擴散開來。 */

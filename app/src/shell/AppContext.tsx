@@ -22,7 +22,7 @@ const DEFAULT_CONFIG: LauncherConfig = {
   favorites: [],
   uiScale: 100,
   colorMode: "system",
-  glass: true,
+  windowMaterial: "acrylic",
   minimizeOnLaunch: true,
   seenVersion: "",
 };
@@ -129,15 +129,15 @@ export function AppProvider({
     if (!loaded) {
       return;
     }
-    applyMaterial(config.glass);
+    applyMaterial(config.windowMaterial);
     // 用戶在 Windows 切換透明效果或高對比時要立刻反應。
-    const follow = () => applyMaterial(config.glass);
+    const follow = () => applyMaterial(config.windowMaterial);
     const queries = ["(prefers-reduced-transparency: reduce)", "(forced-colors: active)"].map(
       (query) => window.matchMedia(query),
     );
     queries.forEach((query) => query.addEventListener("change", follow));
     return () => queries.forEach((query) => query.removeEventListener("change", follow));
-  }, [loaded, config.glass]);
+  }, [loaded, config.windowMaterial]);
 
   const touchContent = useCallback(() => setContentVersion((version) => version + 1), []);
 

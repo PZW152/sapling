@@ -1,6 +1,14 @@
 import { useLayoutEffect, useRef } from "react";
 import { applyLiquid } from "./liquid";
 
+const running = new WeakMap<HTMLElement, Animation>();
+
+/** CSS 的時長換成毫秒。打包時 `420ms` 會被壓縮成 `.42s`，兩種都要認得。 */
+export function toMilliseconds(value: string) {
+  const text = value.trim();
+  return parseFloat(text) * (text.endsWith("ms") ? 1 : 1000);
+}
+
 /** 標記這次往哪個方向移動。沒移動時回傳 null。 */
 function stretchDirection(container: HTMLElement, active: HTMLElement | null | undefined) {
   if (!active) {
@@ -23,13 +31,18 @@ function stretch(mark: HTMLElement, direction: "vertical" | "horizontal") {
     return;
   }
   const style = getComputedStyle(mark);
-  mark.animate(
+  running.get(mark)?.cancel();
+  const animation = mark.animate(
     { scale: ["1 1", direction === "vertical" ? "0.93 1.14" : "1.1 0.9", "1 1"] },
     {
-      duration: parseFloat(style.getPropertyValue("--pop")),
+      duration: toMilliseconds(style.getPropertyValue("--pop")),
       easing: style.getPropertyValue("--spring").trim(),
     },
   );
+  running.set(mark, animation);
+  // 折射只有移動時看得到。靜止時關掉，顯卡不用一直算。
+  mark.dataset.moving = "";
+  animation.onfinish = () => delete mark.dataset.moving;
 }
 
 /** 讓標記平滑滑到容器裡目前選中的項目。 */

@@ -3,7 +3,7 @@ import { applyScale } from "../../shell/applyScale";
 import { applyColorMode, applyMaterial, applyTheme, revealChange } from "../../shell/applyTheme";
 import { useApp } from "../../shell/AppContext";
 import type { Feature } from "../../shell/feature";
-import type { ColorMode } from "../../shell/types";
+import type { ColorMode, WindowMaterial } from "../../shell/types";
 import { THEMES } from "./theme";
 import "./appearance.css";
 
@@ -13,9 +13,10 @@ const MODES: { id: ColorMode; name: string }[] = [
   { id: "dark", name: "深色" },
 ];
 
-const MATERIALS = [
-  { glass: true, name: "玻璃" },
-  { glass: false, name: "純色" },
+const MATERIALS: { id: WindowMaterial; name: string; hint: string }[] = [
+  { id: "acrylic", name: "毛玻璃", hint: "透出窗口後面的畫面，最通透。" },
+  { id: "mica", name: "雲母", hint: "只帶一點桌布的顏色，比較省資源。" },
+  { id: "solid", name: "純色", hint: "不透明，最省資源。" },
 ];
 
 const SCALES = [
@@ -78,21 +79,22 @@ function AppearanceSettings() {
         <span>窗口材質</span>
       </div>
       <div className="chips" role="group" aria-label="窗口材質">
-        {MATERIALS.map(({ glass, name }) => (
+        {MATERIALS.map(({ id, name }) => (
           <button
-            key={name}
+            key={id}
             className="chip"
-            aria-pressed={config.glass === glass}
+            aria-pressed={config.windowMaterial === id}
             onClick={(event) => {
               const origin = { x: event.clientX, y: event.clientY };
-              revealChange(() => applyMaterial(glass), origin);
-              updateConfig({ glass });
+              revealChange(() => applyMaterial(id), origin);
+              updateConfig({ windowMaterial: id });
             }}
           >
             {name}
           </button>
         ))}
       </div>
+      <p className="hint">{MATERIALS.find(({ id }) => id === config.windowMaterial)?.hint}</p>
       <div className="setting-head">
         <span>介面大小</span>
       </div>
