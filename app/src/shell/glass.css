@@ -10,7 +10,7 @@
 
 :root[data-glass]:not([data-festival]) {
   --color-bg: color-mix(in srgb, var(--color-soft) 26%, transparent);
-  --color-surface: rgb(255 255 255 / 0.62);
+  --color-surface: rgb(255 255 255 / 0.68);
   --color-line: rgb(22 48 42 / 0.16);
   --color-hero-tile: rgb(255 255 255 / 0.1);
   --color-hero-soft: rgb(255 255 255 / 0.2);
@@ -52,11 +52,12 @@
 }
 
 :root[data-glass][data-mode="dark"]:not([data-festival]) {
-  --color-bg: rgb(10 16 13 / 0.3);
+  --color-bg: rgb(10 16 13 / 0.55);
   --color-surface: rgb(36 46 41 / 0.55);
   --color-line: rgb(255 255 255 / 0.13);
   --color-muted: #c6d3cb;
   --glass-float: rgb(24 32 28 / 0.8);
+  --glass-top: rgb(10 16 13 / 0.5);
   --glass-rim: var(--glass-rim-dark);
   --shadow-tile: 0 2px 10px rgb(0 0 0 / 0.35);
 }
@@ -67,6 +68,11 @@
     radial-gradient(70% 90% at 100% 0%, var(--glass-ambient), transparent 70%),
     radial-gradient(60% 80% at 20% 100%, var(--glass-ambient), transparent 70%),
     var(--color-bg);
+}
+
+/* 標題直接貼在窗口玻璃上。深色模式遇到亮桌面時，只在這裡加深，卡片保持透明。 */
+:root[data-glass][data-mode="dark"]:not([data-festival]) .top {
+  background: linear-gradient(var(--glass-top) 70%, transparent);
 }
 
 :root[data-glass]:not([data-festival]) .rail {
