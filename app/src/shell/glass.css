@@ -16,11 +16,15 @@
   --color-hero-soft: rgb(255 255 255 / 0.2);
   --color-rail-text: #e6f0ea;
 
-  --glass-tint: color-mix(in srgb, var(--color-accent) 46%, black);
+  --glass-tint: color-mix(in srgb, var(--color-accent) 40%, black);
   --glass-rail: color-mix(in srgb, color-mix(in srgb, var(--color-accent) 14%, #0c1512) 70%, transparent);
   --glass-hero: color-mix(in srgb, var(--glass-tint) 76%, transparent);
   --glass-float: rgb(250 252 249 / 0.8);
   --glass-ambient: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  --glass-button: rgb(255 255 255 / 0.94);
+  --glass-button-hover: rgb(255 255 255 / 0.98);
+  --glass-mark-dark: rgb(255 255 255 / 0.12);
+  --glass-mark-light: rgb(255 255 255 / 0.22);
 
   /* 玻璃的厚度：亮的上緣和淡一點的下緣 */
   --glass-rim:
@@ -29,7 +33,20 @@
   --glass-rim-dark:
     inset 1px 1px 0 rgb(255 255 255 / 0.26),
     inset -1px -1px 0 rgb(255 255 255 / 0.08);
+  --glass-rail-edge: inset -1px 0 0 rgb(255 255 255 / 0.1);
+  --glass-button-depth:
+    inset 0 1px 1px rgb(255 255 255 / 0.9),
+    inset 0 -2px 6px color-mix(in srgb, var(--color-accent) 16%, transparent),
+    0 6px 18px rgb(0 0 0 / 0.18);
+  --glass-mark-shadow-dark: 0 4px 14px rgb(0 0 0 / 0.22);
+  --glass-mark-shadow-light: 0 2px 8px rgb(22 48 42 / 0.16);
   --shadow-tile: 0 2px 10px rgb(22 48 42 / 0.1);
+
+  /* 模糊和折射的強度 */
+  --glass-blur-float: blur(26px) saturate(170%);
+  --glass-blur-cover: blur(30px) saturate(160%);
+  --glass-blur-drop: blur(20px) saturate(160%);
+  --glass-lens: saturate(150%) brightness(1.06);
 
   background: transparent;
 }
@@ -38,6 +55,7 @@
   --color-bg: rgb(10 16 13 / 0.3);
   --color-surface: rgb(36 46 41 / 0.55);
   --color-line: rgb(255 255 255 / 0.13);
+  --color-muted: #c6d3cb;
   --glass-float: rgb(24 32 28 / 0.8);
   --glass-rim: var(--glass-rim-dark);
   --shadow-tile: 0 2px 10px rgb(0 0 0 / 0.35);
@@ -53,7 +71,7 @@
 
 :root[data-glass]:not([data-festival]) .rail {
   background: var(--glass-rail);
-  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.1);
+  box-shadow: var(--glass-rail-edge);
 }
 
 :root[data-glass]:not([data-festival]) :is(.panel, .notice-card) {
@@ -72,11 +90,8 @@
 /* 主按鈕：一塊厚玻璃。比周圍都亮，還是畫面上最顯眼的東西。 */
 :root[data-glass]:not([data-festival]) .primary:enabled {
   color: var(--color-strong);
-  background: rgb(255 255 255 / 0.94);
-  box-shadow:
-    inset 0 1px 1px rgb(255 255 255 / 0.9),
-    inset 0 -2px 6px color-mix(in srgb, var(--color-accent) 16%, transparent),
-    0 6px 18px rgb(0 0 0 / 0.18);
+  background: var(--glass-button);
+  box-shadow: var(--glass-button-depth);
 }
 
 :root[data-glass][data-mode="dark"]:not([data-festival]) .primary:enabled {
@@ -84,50 +99,46 @@
 }
 
 :root[data-glass]:not([data-festival]) .primary:hover:enabled {
-  background: rgb(255 255 255 / 0.98);
+  background: var(--glass-button-hover);
 }
 
 /* 疊在內容上面的東西：真的模糊後面的畫面。 */
 :root[data-glass]:not([data-festival]) :is(.queue-panel, .log-panel, .drop-results p, .toast, .arbor-note) {
   background: var(--glass-float);
   box-shadow: var(--glass-rim), var(--shadow-popover);
-  backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: var(--glass-blur-float);
 }
 
 :root[data-glass]:not([data-festival]) .shot-viewer {
   background: var(--glass-float);
-  backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: var(--glass-blur-cover);
 }
 
 :root[data-glass]:not([data-festival]) .launch-overlay {
   background: var(--glass-hero);
-  backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: var(--glass-blur-cover);
 }
 
 :root[data-glass]:not([data-festival]) .drop-overlay {
   background: var(--glass-hero);
-  backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: var(--glass-blur-drop);
 }
 
 /* 液態玻璃：滑動標記蓋在文字上面，滑過去時邊緣會折彎底下的字。 */
 :root[data-glass]:not([data-festival]) :is(.rail-mark, .segment-mark) {
   z-index: 1;
   pointer-events: none;
-  backdrop-filter: var(--liquid, blur(0)) saturate(150%) brightness(1.06);
+  backdrop-filter: var(--liquid, blur(0)) var(--glass-lens);
 }
 
 :root[data-glass]:not([data-festival]) .rail-mark {
-  background: rgb(255 255 255 / 0.12);
-  box-shadow:
-    var(--glass-rim-dark),
-    0 4px 14px rgb(0 0 0 / 0.22);
+  background: var(--glass-mark-dark);
+  box-shadow: var(--glass-rim-dark), var(--glass-mark-shadow-dark);
 }
 
 :root[data-glass]:not([data-festival]) .segment-mark {
-  background: rgb(255 255 255 / 0.22);
-  box-shadow:
-    var(--glass-rim),
-    0 2px 8px rgb(22 48 42 / 0.16);
+  background: var(--glass-mark-light);
+  box-shadow: var(--glass-rim), var(--glass-mark-shadow-light);
 }
 
 :root[data-glass]:not([data-festival]) .nav[aria-current="page"] {

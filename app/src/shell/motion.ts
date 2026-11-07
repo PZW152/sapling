@@ -1,8 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { applyLiquid } from "./liquid";
 
-const STRETCH_MS = 420;
-
 /** 標記這次往哪個方向移動。沒移動時回傳 null。 */
 function stretchDirection(container: HTMLElement, active: HTMLElement | null | undefined) {
   if (!active) {
@@ -24,9 +22,13 @@ function stretch(mark: HTMLElement, direction: "vertical" | "horizontal") {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     return;
   }
+  const style = getComputedStyle(mark);
   mark.animate(
     { scale: ["1 1", direction === "vertical" ? "0.93 1.14" : "1.1 0.9", "1 1"] },
-    { duration: STRETCH_MS, easing: "cubic-bezier(0.3, 0.7, 0.3, 1)", composite: "replace" },
+    {
+      duration: parseFloat(style.getPropertyValue("--pop")),
+      easing: style.getPropertyValue("--spring").trim(),
+    },
   );
 }
 
